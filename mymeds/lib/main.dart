@@ -14,7 +14,7 @@ class MyMedsApp extends StatelessWidget {
     return MaterialApp(
       title: 'MyMeds',
       theme: AppTheme.lightTheme,
-      initialRoute: AppRouter.home,
+      initialRoute: AppRouter.login,
       onGenerateRoute: AppRouter.generateRoute,
       debugShowCheckedModeBanner: false,
     );

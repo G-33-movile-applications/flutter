@@ -3,8 +3,10 @@ import '../ui/home/home_screen.dart';
 import '../ui/map/map_screen.dart';
 import '../ui/upload/upload_screen_stub.dart';
 import '../ui/profile/profile_screen_stub.dart';
+import '../ui/auth/login_screen.dart';
 
 class AppRouter {
+  static const String login = '/';
   static const String home = '/home';
   static const String map = '/map';
   static const String upload = '/upload';
@@ -12,6 +14,11 @@ class AppRouter {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case login:
+        return MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+          settings: settings,
+        );
       case home:
         return MaterialPageRoute(
           builder: (_) => const HomeScreen(),
