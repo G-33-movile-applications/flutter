@@ -165,7 +165,7 @@ class AppRepositoryFacade {
 
     if (puntoFisicoId != null) {
       // Get medications available at specific pharmacy
-      medicamentos = await _medicamentoRepository.findByPuntoFisico(puntoFisicoId);
+      medicamentos = await _medicamentoRepository.findByPuntoFisicoId(puntoFisicoId);
     } else {
       // Get all medications with their available points
       medicamentos = await _medicamentoRepository.readAll();
@@ -183,14 +183,16 @@ class AppRepositoryFacade {
     return medicamentos;
   }
 
-  /// Add medication to pharmacy (establish availability)
+  /// Add medication to pharmacy (establish availability) - DEPRECATED in UML
+  @Deprecated('Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly')
   Future<void> addMedicamentoToPuntoPisico(String medicamentoId, String puntoFisicoId) async {
-    await _medicamentoRepository.addMedicamentoToPuntoFisico(medicamentoId, puntoFisicoId);
+    throw Exception('DEPRECATED: Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly');
   }
 
-  /// Remove medication from pharmacy
+  /// Remove medication from pharmacy - DEPRECATED in UML
+  @Deprecated('Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly')
   Future<void> removeMedicamentoFromPuntoFisico(String medicamentoId, String puntoFisicoId) async {
-    await _medicamentoRepository.removeMedicamentoFromPuntoFisico(medicamentoId, puntoFisicoId);
+    throw Exception('DEPRECATED: Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly');
   }
 
   /// Get restricted medications
@@ -239,9 +241,7 @@ class AppRepositoryFacade {
   /// Get complete pharmacy information with available medications
   Future<Map<String, dynamic>> getPharmacyWithMedicamentos(String puntoFisicoId) async {
     final pharmacy = await _puntoFisicoRepository.read(puntoFisicoId);
-    final medications = await _medicamentoRepository.findByPuntoFisico(puntoFisicoId);
-
-    return {
+      final medications = await _medicamentoRepository.findByPuntoFisicoId(puntoFisicoId);    return {
       'pharmacy': pharmacy,
       'medications': medications,
       'totalMedications': medications.length,
@@ -249,7 +249,7 @@ class AppRepositoryFacade {
     };
   }
 
-  /// Get medication availability across pharmacies
+  /// Get medication availability (single pharmacy per UML)
   Future<Map<String, dynamic>> getMedicamentoAvailability(String medicamentoId) async {
     final medicamento = await _medicamentoRepository.read(medicamentoId);
     
@@ -257,10 +257,13 @@ class AppRepositoryFacade {
       throw Exception('Medication not found');
     }
 
+    // Get the single punto fisico where this medicamento is available
+    final puntoFisico = await _puntoFisicoRepository.read(medicamento.puntoFisicoId);
+
     return {
       'medicamento': medicamento,
-      'availableAt': medicamento.puntosDisponibles,
-      'totalPharmacies': medicamento.puntosDisponibles.length,
+      'availableAt': puntoFisico,
+      'puntoFisicoId': medicamento.puntoFisicoId,
     };
   }
 
@@ -292,9 +295,13 @@ class AppRepositoryFacade {
     List<Map<String, dynamic>> results = [];
     
     for (final medicamento in filteredMedicamentos) {
+      // Get the punto fisico where this medicamento is available
+      final puntoFisico = await _puntoFisicoRepository.read(medicamento.puntoFisicoId);
+      
       results.add({
         'medicamento': medicamento,
-        'availableAt': medicamento.puntosDisponibles,
+        'availableAt': puntoFisico,
+        'puntoFisicoId': medicamento.puntoFisicoId,
         'isRestricted': medicamento.esRestringido,
         'type': medicamento.toMap()['tipo'],
       });
@@ -346,4 +353,52 @@ class AppRepositoryFacade {
   Future<bool> medicamentoExists(String id) async {
     return await _medicamentoRepository.exists(id);
   }
+
+  // ==================== UML RELATIONSHIP METHODS ====================
+
+  /// UML: Usuario (1) —— (0..*) Prescripcion
+  Future<List<Prescripcion>> getUserPrescripciones(String userId) async {
+    return await _prescripcionRepository.findByUserId(userId);
+  }
+
+  /// Stream version of getUserPrescripciones
+  Stream<List<Prescripcion>> streamUserPrescripciones(String userId) {
+    return _prescripcionRepository.streamByUserId(userId);
+  }
+
+  /// UML: Pedido (1) —— (1) Prescripcion
+  Future<Prescripcion?> getPrescripcionDePedido(String pedidoId) async {
+    return await _prescripcionRepository.findByPedidoId(pedidoId);
+  }
+
+  /// UML: Prescripcion (1) —— (1..*) Medicamento  
+  Future<List<Medicamento>> getMedicamentosDePrescripcion(String prescripcionId) async {
+    return await _medicamentoRepository.findByPrescripcionId(prescripcionId);
+  }
+
+  /// Stream version of getMedicamentosDePrescripcion
+  Stream<List<Medicamento>> streamMedicamentosDePrescripcion(String prescripcionId) {
+    return _medicamentoRepository.streamByPrescripcionId(prescripcionId);
+  }
+
+  /// UML: Medicamento (0..*) —— (1) PuntoFisico
+  Future<List<Medicamento>> getPuntoInventory(String puntoId) async {
+    return await _puntoFisicoRepository.findMedicamentos(puntoId);
+  }
+
+  /// Get medicamentos by type (UML generalization)
+  Future<List<Medicamento>> getMedicamentosByTipoUML(String tipo) async {
+    return await _medicamentoRepository.findByTipo(tipo);
+  }
+
+  /// Helper: Get distinct puntos fisicos for a user (via prescripciones → medicamentos)
+  Future<List<String>> getDistinctPuntosByUser(String userId) async {
+    return await _medicamentoRepository.findDistinctPuntosByUserId(userId);
+  }
+
+  // TODO: If migrating from old many-to-many medicamento-punto relationship,
+  // use the following query to find orphaned join table records:
+  // SELECT * FROM medicamento_puntos mp 
+  // LEFT JOIN medicamentos m ON mp.medicamento_id = m.id 
+  // WHERE m.punto_fisico_id != mp.punto_fisico_id;
 }

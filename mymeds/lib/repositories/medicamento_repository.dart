@@ -1,34 +1,34 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/medicamento.dart';
-import '../models/punto_fisico.dart';
-import 'punto_fisico_repository.dart';
 
 class MedicamentoRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'medicamentos';
-  final String _medicamentoPuntoCollection = 'medicamento_puntos';
-  final PuntoFisicoRepository _puntoFisicoRepository = PuntoFisicoRepository();
 
-  // Create a new medicamento
+
+  // Create a new medicamento - requires prescripcionId and puntoFisicoId per UML
   Future<void> create(Medicamento medicamento) async {
     try {
+      // Validation: both FKs must be provided per UML
+      if (medicamento.prescripcionId.isEmpty) {
+        throw Exception('prescripcionId is required - UML constraint');
+      }
+      if (medicamento.puntoFisicoId.isEmpty) {
+        throw Exception('puntoFisicoId is required - UML constraint');
+      }
+      
       await _firestore.collection(_collection).doc(medicamento.id).set(medicamento.toMap());
     } catch (e) {
       throw Exception('Error creating medicamento: $e');
     }
   }
 
-  // Read a medicamento by ID with its available points
+  // Read a medicamento by ID
   Future<Medicamento?> read(String id) async {
     try {
       final doc = await _firestore.collection(_collection).doc(id).get();
       if (doc.exists && doc.data() != null) {
-        final medicamentoData = doc.data()!;
-        
-        // Fetch related puntos fisicos
-        final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-        
-        return Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles);
+        return Medicamento.fromMap(doc.data()!);
       }
       return null;
     } catch (e) {
@@ -40,19 +40,9 @@ class MedicamentoRepository {
   Future<List<Medicamento>> readAll() async {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
-      List<Medicamento> medicamentos = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final medicamentoData = doc.data();
-        final id = medicamentoData['id'] as String;
-        
-        // Fetch related puntos fisicos for each medicamento
-        final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-        
-        medicamentos.add(Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles));
-      }
-      
-      return medicamentos;
+      return querySnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
     } catch (e) {
       throw Exception('Error reading all medicamentos: $e');
     }
@@ -70,17 +60,13 @@ class MedicamentoRepository {
   // Delete a medicamento
   Future<void> delete(String id) async {
     try {
-      // Delete related medicamento-punto relationships
-      await _deleteMedicamentoPuntoRelationships(id);
-      
-      // Delete the medicamento
       await _firestore.collection(_collection).doc(id).delete();
     } catch (e) {
       throw Exception('Error deleting medicamento: $e');
     }
   }
 
-  // Find medicamentos by prescription ID
+  // UML relationship: Prescripcion (1) —— (1..*) Medicamento
   Future<List<Medicamento>> findByPrescripcionId(String prescripcionId) async {
     try {
       final querySnapshot = await _firestore
@@ -88,21 +74,38 @@ class MedicamentoRepository {
           .where('prescripcionId', isEqualTo: prescripcionId)
           .get();
       
-      List<Medicamento> medicamentos = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final medicamentoData = doc.data();
-        final id = medicamentoData['id'] as String;
-        
-        // Fetch related puntos fisicos for each medicamento
-        final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-        
-        medicamentos.add(Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles));
-      }
-      
-      return medicamentos;
+      return querySnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
     } catch (e) {
-      throw Exception('Error finding medicamentos by prescription ID: $e');
+      throw Exception('Error finding medicamentos by prescripcion ID: $e');
+    }
+  }
+
+  // Stream version for reactive UIs
+  Stream<List<Medicamento>> streamByPrescripcionId(String prescripcionId) {
+    return _firestore
+        .collection(_collection)
+        .where('prescripcionId', isEqualTo: prescripcionId)
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) => Medicamento.fromMap(doc.data()))
+            .toList());
+  }
+
+  // UML relationship: Medicamento (0..*) —— (1) PuntoFisico  
+  Future<List<Medicamento>> findByPuntoFisicoId(String puntoFisicoId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_collection)
+          .where('puntoFisicoId', isEqualTo: puntoFisicoId)
+          .get();
+      
+      return querySnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      throw Exception('Error finding medicamentos by punto fisico ID: $e');
     }
   }
 
@@ -114,25 +117,15 @@ class MedicamentoRepository {
           .where('esRestringido', isEqualTo: esRestringido)
           .get();
       
-      List<Medicamento> medicamentos = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final medicamentoData = doc.data();
-        final id = medicamentoData['id'] as String;
-        
-        // Fetch related puntos fisicos for each medicamento
-        final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-        
-        medicamentos.add(Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles));
-      }
-      
-      return medicamentos;
+      return querySnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
     } catch (e) {
       throw Exception('Error finding medicamentos by restriction status: $e');
     }
   }
 
-  // Find medicamentos by type
+  // UML generalization: Find by tipo (Pastilla, Unguento, Inyectable, Jarabe)
   Future<List<Medicamento>> findByTipo(String tipo) async {
     try {
       final querySnapshot = await _firestore
@@ -140,69 +133,42 @@ class MedicamentoRepository {
           .where('tipo', isEqualTo: tipo)
           .get();
       
-      List<Medicamento> medicamentos = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final medicamentoData = doc.data();
-        final id = medicamentoData['id'] as String;
-        
-        // Fetch related puntos fisicos for each medicamento
-        final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-        
-        medicamentos.add(Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles));
-      }
-      
-      return medicamentos;
+      return querySnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
     } catch (e) {
-      throw Exception('Error finding medicamentos by type: $e');
+      throw Exception('Error finding medicamentos by tipo: $e');
     }
   }
 
-  // Find medicamentos available at a specific punto fisico
-  Future<List<Medicamento>> findByPuntoFisico(String puntoFisicoId) async {
+  // Helper method for getting distinct puntos by user (via prescripciones → medicamentos)
+  Future<List<String>> findDistinctPuntosByUserId(String userId) async {
     try {
-      final relationshipSnapshot = await _firestore
-          .collection(_medicamentoPuntoCollection)
-          .where('puntoFisicoId', isEqualTo: puntoFisicoId)
+      // First get user's prescripciones, then their medicamentos, then distinct puntos
+      final prescripcionesSnapshot = await _firestore
+          .collection('prescripciones')
+          .where('userId', isEqualTo: userId)
           .get();
       
-      List<Medicamento> medicamentos = [];
+      Set<String> distinctPuntos = <String>{};
       
-      for (var relationDoc in relationshipSnapshot.docs) {
-        final medicamentoId = relationDoc.data()['medicamentoId'] as String;
-        final medicamento = await read(medicamentoId);
-        if (medicamento != null) {
-          medicamentos.add(medicamento);
+      for (var prescripcionDoc in prescripcionesSnapshot.docs) {
+        final medicamentosSnapshot = await _firestore
+            .collection(_collection)
+            .where('prescripcionId', isEqualTo: prescripcionDoc.id)
+            .get();
+        
+        for (var medicamentoDoc in medicamentosSnapshot.docs) {
+          final puntoFisicoId = medicamentoDoc.data()['puntoFisicoId'] as String?;
+          if (puntoFisicoId != null && puntoFisicoId.isNotEmpty) {
+            distinctPuntos.add(puntoFisicoId);
+          }
         }
       }
       
-      return medicamentos;
+      return distinctPuntos.toList();
     } catch (e) {
-      throw Exception('Error finding medicamentos by punto fisico: $e');
-    }
-  }
-
-  // Add medicamento to punto fisico (many-to-many relationship)
-  Future<void> addMedicamentoToPuntoFisico(String medicamentoId, String puntoFisicoId) async {
-    try {
-      final relationshipId = '${medicamentoId}_$puntoFisicoId';
-      await _firestore.collection(_medicamentoPuntoCollection).doc(relationshipId).set({
-        'medicamentoId': medicamentoId,
-        'puntoFisicoId': puntoFisicoId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Error adding medicamento to punto fisico: $e');
-    }
-  }
-
-  // Remove medicamento from punto fisico
-  Future<void> removeMedicamentoFromPuntoFisico(String medicamentoId, String puntoFisicoId) async {
-    try {
-      final relationshipId = '${medicamentoId}_$puntoFisicoId';
-      await _firestore.collection(_medicamentoPuntoCollection).doc(relationshipId).delete();
-    } catch (e) {
-      throw Exception('Error removing medicamento from punto fisico: $e');
+      throw Exception('Error finding distinct puntos by user ID: $e');
     }
   }
 
@@ -215,10 +181,10 @@ class MedicamentoRepository {
           .get();
       
       for (var doc in querySnapshot.docs) {
-        await delete(doc.id);
+        await doc.reference.delete();
       }
     } catch (e) {
-      throw Exception('Error deleting medicamentos by prescription ID: $e');
+      throw Exception('Error deleting medicamentos by prescripcion ID: $e');
     }
   }
 
@@ -232,58 +198,31 @@ class MedicamentoRepository {
     }
   }
 
-  // Private helper methods
-  Future<List<PuntoFisico>> _getPuntosDisponiblesForMedicamento(String medicamentoId) async {
-    try {
-      final relationshipSnapshot = await _firestore
-          .collection(_medicamentoPuntoCollection)
-          .where('medicamentoId', isEqualTo: medicamentoId)
-          .get();
-      
-      List<PuntoFisico> puntos = [];
-      
-      for (var relationDoc in relationshipSnapshot.docs) {
-        final puntoFisicoId = relationDoc.data()['puntoFisicoId'] as String;
-        final punto = await _puntoFisicoRepository.read(puntoFisicoId);
-        if (punto != null) {
-          puntos.add(punto);
-        }
-      }
-      
-      return puntos;
-    } catch (e) {
-      throw Exception('Error getting puntos disponibles for medicamento: $e');
-    }
-  }
-
-  Future<void> _deleteMedicamentoPuntoRelationships(String medicamentoId) async {
-    try {
-      final relationshipSnapshot = await _firestore
-          .collection(_medicamentoPuntoCollection)
-          .where('medicamentoId', isEqualTo: medicamentoId)
-          .get();
-      
-      for (var doc in relationshipSnapshot.docs) {
-        await doc.reference.delete();
-      }
-    } catch (e) {
-      throw Exception('Error deleting medicamento-punto relationships: $e');
-    }
-  }
-
   // Stream of medicamento changes
   Stream<Medicamento?> streamMedicamento(String id) {
     return _firestore
         .collection(_collection)
         .doc(id)
         .snapshots()
-        .asyncMap((doc) async {
-          if (doc.exists && doc.data() != null) {
-            final medicamentoData = doc.data()!;
-            final puntosDisponibles = await _getPuntosDisponiblesForMedicamento(id);
-            return Medicamento.fromMap(medicamentoData, puntosDisponibles: puntosDisponibles);
-          }
-          return null;
-        });
+        .map((doc) => doc.exists && doc.data() != null 
+            ? Medicamento.fromMap(doc.data()!) 
+            : null);
+  }
+
+  // TODO: Migration helper - old many-to-many methods marked for removal
+  @Deprecated('Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly')
+  Future<void> addMedicamentoToPuntoFisico(String medicamentoId, String puntoFisicoId) async {
+    throw Exception('DEPRECATED: Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly');
+  }
+
+  @Deprecated('Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly')
+  Future<void> removeMedicamentoFromPuntoFisico(String medicamentoId, String puntoFisicoId) async {
+    throw Exception('DEPRECATED: Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly');
+  }
+
+  @Deprecated('Use findByPuntoFisicoId instead')
+  Future<List<Medicamento>> findByPuntoFisico(String puntoFisicoId) async {
+    // Redirect to new method
+    return await findByPuntoFisicoId(puntoFisicoId);
   }
 }

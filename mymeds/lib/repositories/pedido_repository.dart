@@ -187,4 +187,9 @@ class PedidoRepository {
           return pedidos;
         });
   }
+
+  // Alias method for UserSession compatibility
+  Future<List<Pedido>> getPedidosByUser(String usuarioId) async {
+    return await findByUsuarioId(usuarioId);
+  }
 }

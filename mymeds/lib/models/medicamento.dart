@@ -1,12 +1,10 @@
-import 'punto_fisico.dart';
-
 abstract class Medicamento {
   final String id;
   final String nombre;
   final String descripcion;
   final bool esRestringido;
   final String prescripcionId; // Foreign key to Prescripcion
-  final List<PuntoFisico> puntosDisponibles; // Many-to-many relationship
+  final String puntoFisicoId; // Foreign key to PuntoFisico - UML (0..*:1) relationship
 
   Medicamento({
     required this.id,
@@ -14,25 +12,25 @@ abstract class Medicamento {
     required this.descripcion,
     required this.esRestringido,
     required this.prescripcionId,
-    this.puntosDisponibles = const [],
+    required this.puntoFisicoId,
   });
 
   // Abstract method to convert to Map - each subclass will implement
   Map<String, dynamic> toMap();
 
   // Factory method to create appropriate subclass from Firestore data
-  static Medicamento fromMap(Map<String, dynamic> map, {List<PuntoFisico>? puntosDisponibles}) {
+  static Medicamento fromMap(Map<String, dynamic> map) {
     final tipo = map['tipo'] as String;
     
     switch (tipo) {
       case 'pastilla':
-        return Pastilla.fromMap(map, puntosDisponibles: puntosDisponibles);
+        return Pastilla.fromMap(map);
       case 'unguento':
-        return Unguento.fromMap(map, puntosDisponibles: puntosDisponibles);
+        return Unguento.fromMap(map);
       case 'inyectable':
-        return Inyectable.fromMap(map, puntosDisponibles: puntosDisponibles);
+        return Inyectable.fromMap(map);
       case 'jarabe':
-        return Jarabe.fromMap(map, puntosDisponibles: puntosDisponibles);
+        return Jarabe.fromMap(map);
       default:
         throw Exception('Tipo de medicamento desconocido: $tipo');
     }
@@ -64,21 +62,21 @@ class Pastilla extends Medicamento {
     required super.descripcion,
     required super.esRestringido,
     required super.prescripcionId,
+    required super.puntoFisicoId,
     required this.dosisMg,
     required this.cantidad,
-    super.puntosDisponibles = const [],
   });
 
-  factory Pastilla.fromMap(Map<String, dynamic> map, {List<PuntoFisico>? puntosDisponibles}) {
+  factory Pastilla.fromMap(Map<String, dynamic> map) {
     return Pastilla(
       id: map['id'] ?? '',
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
       prescripcionId: map['prescripcionId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
       dosisMg: (map['dosisMg'] ?? 0.0).toDouble(),
       cantidad: map['cantidad'] ?? 0,
-      puntosDisponibles: puntosDisponibles ?? [],
     );
   }
 
@@ -90,6 +88,7 @@ class Pastilla extends Medicamento {
       'descripcion': descripcion,
       'esRestringido': esRestringido,
       'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
       'tipo': 'pastilla',
       'dosisMg': dosisMg,
       'cantidad': cantidad,
@@ -108,21 +107,21 @@ class Unguento extends Medicamento {
     required super.descripcion,
     required super.esRestringido,
     required super.prescripcionId,
+    required super.puntoFisicoId,
     required this.concentracion,
     required this.cantidadEnvases,
-    super.puntosDisponibles = const [],
   });
 
-  factory Unguento.fromMap(Map<String, dynamic> map, {List<PuntoFisico>? puntosDisponibles}) {
+  factory Unguento.fromMap(Map<String, dynamic> map) {
     return Unguento(
       id: map['id'] ?? '',
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
       prescripcionId: map['prescripcionId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
       concentracion: map['concentracion'] ?? '',
       cantidadEnvases: map['cantidadEnvases'] ?? 0,
-      puntosDisponibles: puntosDisponibles ?? [],
     );
   }
 
@@ -134,6 +133,7 @@ class Unguento extends Medicamento {
       'descripcion': descripcion,
       'esRestringido': esRestringido,
       'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
       'tipo': 'unguento',
       'concentracion': concentracion,
       'cantidadEnvases': cantidadEnvases,
@@ -153,23 +153,23 @@ class Inyectable extends Medicamento {
     required super.descripcion,
     required super.esRestringido,
     required super.prescripcionId,
+    required super.puntoFisicoId,
     required this.concentracion,
     required this.volumenPorUnidad,
     required this.cantidadUnidades,
-    super.puntosDisponibles = const [],
   });
 
-  factory Inyectable.fromMap(Map<String, dynamic> map, {List<PuntoFisico>? puntosDisponibles}) {
+  factory Inyectable.fromMap(Map<String, dynamic> map) {
     return Inyectable(
       id: map['id'] ?? '',
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
       prescripcionId: map['prescripcionId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
       concentracion: map['concentracion'] ?? '',
       volumenPorUnidad: (map['volumenPorUnidad'] ?? 0.0).toDouble(),
       cantidadUnidades: map['cantidadUnidades'] ?? 0,
-      puntosDisponibles: puntosDisponibles ?? [],
     );
   }
 
@@ -181,6 +181,7 @@ class Inyectable extends Medicamento {
       'descripcion': descripcion,
       'esRestringido': esRestringido,
       'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
       'tipo': 'inyectable',
       'concentracion': concentracion,
       'volumenPorUnidad': volumenPorUnidad,
@@ -200,21 +201,21 @@ class Jarabe extends Medicamento {
     required super.descripcion,
     required super.esRestringido,
     required super.prescripcionId,
+    required super.puntoFisicoId,
     required this.cantidadBotellas,
     required this.mlPorBotella,
-    super.puntosDisponibles = const [],
   });
 
-  factory Jarabe.fromMap(Map<String, dynamic> map, {List<PuntoFisico>? puntosDisponibles}) {
+  factory Jarabe.fromMap(Map<String, dynamic> map) {
     return Jarabe(
       id: map['id'] ?? '',
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
       prescripcionId: map['prescripcionId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
       cantidadBotellas: map['cantidadBotellas'] ?? 0,
       mlPorBotella: (map['mlPorBotella'] ?? 0.0).toDouble(),
-      puntosDisponibles: puntosDisponibles ?? [],
     );
   }
 
@@ -226,6 +227,7 @@ class Jarabe extends Medicamento {
       'descripcion': descripcion,
       'esRestringido': esRestringido,
       'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
       'tipo': 'jarabe',
       'cantidadBotellas': cantidadBotellas,
       'mlPorBotella': mlPorBotella,

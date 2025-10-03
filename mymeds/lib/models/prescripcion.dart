@@ -5,6 +5,7 @@ class Prescripcion {
   final String id;
   final DateTime fechaEmision;
   final String recetadoPor;
+  final String userId; // Foreign key to Usuario - UML relationship
   final String pedidoId; // Foreign key to Pedido
   final List<Medicamento> medicamentos; // Related medications
 
@@ -12,6 +13,7 @@ class Prescripcion {
     required this.id,
     required this.fechaEmision,
     required this.recetadoPor,
+    required this.userId,
     required this.pedidoId,
     this.medicamentos = const [],
   });
@@ -22,6 +24,7 @@ class Prescripcion {
       id: map['id'] ?? '',
       fechaEmision: (map['fechaEmision'] as Timestamp).toDate(),
       recetadoPor: map['recetadoPor'] ?? '',
+      userId: map['userId'] ?? '',
       pedidoId: map['pedidoId'] ?? '',
       medicamentos: medicamentos ?? [],
     );
@@ -33,6 +36,7 @@ class Prescripcion {
       'id': id,
       'fechaEmision': Timestamp.fromDate(fechaEmision),
       'recetadoPor': recetadoPor,
+      'userId': userId,
       'pedidoId': pedidoId,
     };
   }
@@ -42,6 +46,7 @@ class Prescripcion {
     String? id,
     DateTime? fechaEmision,
     String? recetadoPor,
+    String? userId,
     String? pedidoId,
     List<Medicamento>? medicamentos,
   }) {
@@ -49,6 +54,7 @@ class Prescripcion {
       id: id ?? this.id,
       fechaEmision: fechaEmision ?? this.fechaEmision,
       recetadoPor: recetadoPor ?? this.recetadoPor,
+      userId: userId ?? this.userId,
       pedidoId: pedidoId ?? this.pedidoId,
       medicamentos: medicamentos ?? this.medicamentos,
     );

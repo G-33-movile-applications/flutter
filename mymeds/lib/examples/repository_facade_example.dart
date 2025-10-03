@@ -42,6 +42,7 @@ class RepositoryFacadeExample {
         id: 'PRESC001',
         fechaEmision: DateTime.now(),
         recetadoPor: 'Dr. María García',
+        userId: 'user123', // UML required FK
         pedidoId: 'PED001',
       );
 
@@ -53,6 +54,7 @@ class RepositoryFacadeExample {
           descripcion: 'Antiinflamatorio',
           esRestringido: false,
           prescripcionId: 'PRESC001',
+          puntoFisicoId: 'FARM001', // UML required FK
           dosisMg: 400.0,
           cantidad: 20,
         ),
@@ -62,6 +64,7 @@ class RepositoryFacadeExample {
           descripcion: 'Antibiótico',
           esRestringido: true,
           prescripcionId: 'PRESC001',
+          puntoFisicoId: 'FARM001', // UML required FK
           cantidadBotellas: 1,
           mlPorBotella: 250.0,
         ),

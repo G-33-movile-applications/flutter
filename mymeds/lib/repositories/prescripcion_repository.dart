@@ -169,4 +169,48 @@ class PrescripcionRepository {
           return null;
         });
   }
+
+  // UML relationship method: Usuario (1) —— (0..*) Prescripcion
+  Future<List<Prescripcion>> findByUserId(String userId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      List<Prescripcion> prescripciones = [];
+      
+      for (var doc in querySnapshot.docs) {
+        final medicamentos = await _medicamentoRepository.findByPrescripcionId(doc.id);
+        prescripciones.add(Prescripcion.fromMap(doc.data(), medicamentos: medicamentos));
+      }
+      
+      return prescripciones;
+    } catch (e) {
+      throw Exception('Error finding prescripciones by user ID: $e');
+    }
+  }
+
+  // Stream version of findByUserId for reactive UIs
+  Stream<List<Prescripcion>> streamByUserId(String userId) {
+    return _firestore
+        .collection(_collection)
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .asyncMap((querySnapshot) async {
+          List<Prescripcion> prescripciones = [];
+          
+          for (var doc in querySnapshot.docs) {
+            final medicamentos = await _medicamentoRepository.findByPrescripcionId(doc.id);
+            prescripciones.add(Prescripcion.fromMap(doc.data(), medicamentos: medicamentos));
+          }
+          
+          return prescripciones;
+        });
+  }
+
+  // Alias method for UserSession compatibility
+  Future<List<Prescripcion>> getPrescripcionesByUser(String userId) async {
+    return await findByUserId(userId);
+  }
 }

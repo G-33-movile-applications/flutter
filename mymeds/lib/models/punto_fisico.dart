@@ -5,6 +5,8 @@ class PuntoFisico {
   final String direccion;
   final String cadena;
   final String nombre;
+  final List<String> horarioAtencion; // UML required field
+  final List<String> diasAtencion; // UML required field
 
   PuntoFisico({
     required this.id,
@@ -13,6 +15,8 @@ class PuntoFisico {
     required this.direccion,
     required this.cadena,
     required this.nombre,
+    this.horarioAtencion = const [],
+    this.diasAtencion = const [],
   });
 
   // Create PuntoFisico from Firestore document
@@ -24,6 +28,8 @@ class PuntoFisico {
       direccion: map['direccion'] ?? '',
       cadena: map['cadena'] ?? '',
       nombre: map['nombre'] ?? '',
+      horarioAtencion: List<String>.from(map['horarioAtencion'] ?? []),
+      diasAtencion: List<String>.from(map['diasAtencion'] ?? []),
     );
   }
 
@@ -36,6 +42,8 @@ class PuntoFisico {
       'direccion': direccion,
       'cadena': cadena,
       'nombre': nombre,
+      'horarioAtencion': horarioAtencion,
+      'diasAtencion': diasAtencion,
     };
   }
 
@@ -47,6 +55,8 @@ class PuntoFisico {
     String? direccion,
     String? cadena,
     String? nombre,
+    List<String>? horarioAtencion,
+    List<String>? diasAtencion,
   }) {
     return PuntoFisico(
       id: id ?? this.id,
@@ -55,6 +65,8 @@ class PuntoFisico {
       direccion: direccion ?? this.direccion,
       cadena: cadena ?? this.cadena,
       nombre: nombre ?? this.nombre,
+      horarioAtencion: horarioAtencion ?? this.horarioAtencion,
+      diasAtencion: diasAtencion ?? this.diasAtencion,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/punto_fisico.dart';
+import '../models/medicamento.dart';
 
 class PuntoFisicoRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -173,5 +174,21 @@ class PuntoFisicoRepository {
 
   double _degreesToRadians(double degrees) {
     return degrees * (3.14159265359 / 180);
+  }
+
+  // UML relationship method: Get inventory for punto fisico
+  Future<List<Medicamento>> findMedicamentos(String puntoId) async {
+    try {
+      final medicamentosSnapshot = await FirebaseFirestore.instance
+          .collection('medicamentos')
+          .where('puntoFisicoId', isEqualTo: puntoId)
+          .get();
+      
+      return medicamentosSnapshot.docs
+          .map((doc) => Medicamento.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      throw Exception('Error finding medicamentos for punto fisico: $e');
+    }
   }
 }
