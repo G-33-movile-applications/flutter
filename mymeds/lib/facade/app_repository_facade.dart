@@ -8,6 +8,7 @@ import '../repositories/pedido_repository.dart';
 import '../repositories/prescripcion_repository.dart';
 import '../repositories/medicamento_repository.dart';
 import '../repositories/punto_fisico_repository.dart';
+import '../repositories/medicamento_punto_fisico_repository.dart';
 
 /// Façade class that provides a simplified interface to all repositories
 /// This class acts as a single entry point for the UI layer, hiding the complexity
@@ -19,6 +20,7 @@ class AppRepositoryFacade {
   final PrescripcionRepository _prescripcionRepository;
   final MedicamentoRepository _medicamentoRepository;
   final PuntoFisicoRepository _puntoFisicoRepository;
+  final MedicamentoPuntoFisicoRepository _medicamentoPuntoFisicoRepository;
 
   // Constructor with optional dependency injection
   AppRepositoryFacade({
@@ -27,11 +29,13 @@ class AppRepositoryFacade {
     PrescripcionRepository? prescripcionRepository,
     MedicamentoRepository? medicamentoRepository,
     PuntoFisicoRepository? puntoFisicoRepository,
+    MedicamentoPuntoFisicoRepository? medicamentoPuntoFisicoRepository,
   })  : _usuarioRepository = usuarioRepository ?? UsuarioRepository(),
         _pedidoRepository = pedidoRepository ?? PedidoRepository(),
         _prescripcionRepository = prescripcionRepository ?? PrescripcionRepository(),
         _medicamentoRepository = medicamentoRepository ?? MedicamentoRepository(),
-        _puntoFisicoRepository = puntoFisicoRepository ?? PuntoFisicoRepository();
+        _puntoFisicoRepository = puntoFisicoRepository ?? PuntoFisicoRepository(),
+        _medicamentoPuntoFisicoRepository = medicamentoPuntoFisicoRepository ?? MedicamentoPuntoFisicoRepository();
 
   // ==================== USER OPERATIONS ====================
 
@@ -164,10 +168,17 @@ class AppRepositoryFacade {
     List<Medicamento> medicamentos = [];
 
     if (puntoFisicoId != null) {
-      // Get medications available at specific pharmacy
-      medicamentos = await _medicamentoRepository.findByPuntoFisicoId(puntoFisicoId);
+      // Get medicamento IDs available at this punto fisico
+      final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoFisicoId);
+      // Fetch individual medicamentos
+      for (String medId in medicamentoIds) {
+        final med = await _medicamentoRepository.read(medId);
+        if (med != null) {
+          medicamentos.add(med);
+        }
+      }
     } else {
-      // Get all medications with their available points
+      // Get all medications
       medicamentos = await _medicamentoRepository.readAll();
     }
 
@@ -241,7 +252,18 @@ class AppRepositoryFacade {
   /// Get complete pharmacy information with available medications
   Future<Map<String, dynamic>> getPharmacyWithMedicamentos(String puntoFisicoId) async {
     final pharmacy = await _puntoFisicoRepository.read(puntoFisicoId);
-      final medications = await _medicamentoRepository.findByPuntoFisicoId(puntoFisicoId);    return {
+    
+    // Get medicamentos available at this pharmacy via many-to-many relationship
+    final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoFisicoId);
+    List<Medicamento> medications = [];
+    for (String medId in medicamentoIds) {
+      final med = await _medicamentoRepository.read(medId);
+      if (med != null) {
+        medications.add(med);
+      }
+    }
+    
+    return {
       'pharmacy': pharmacy,
       'medications': medications,
       'totalMedications': medications.length,
@@ -249,7 +271,7 @@ class AppRepositoryFacade {
     };
   }
 
-  /// Get medication availability (single pharmacy per UML)
+  /// Get medication availability (now supports multiple pharmacies per UML)
   Future<Map<String, dynamic>> getMedicamentoAvailability(String medicamentoId) async {
     final medicamento = await _medicamentoRepository.read(medicamentoId);
     
@@ -257,13 +279,26 @@ class AppRepositoryFacade {
       throw Exception('Medication not found');
     }
 
-    // Get the single punto fisico where this medicamento is available
-    final puntoFisico = await _puntoFisicoRepository.read(medicamento.puntoFisicoId);
-
+    // Get all punto fisicos where this medicamento is available
+    final puntoFisicoIds = await _medicamentoPuntoFisicoRepository.getPuntosFisicosForMedicamento(medicamentoId);
+    List<Map<String, dynamic>> availability = [];
+    
+    for (String puntoId in puntoFisicoIds) {
+      final puntoFisico = await _puntoFisicoRepository.read(puntoId);
+      final relationship = await _medicamentoPuntoFisicoRepository.findByMedicamentoAndPuntoFisico(medicamentoId, puntoId);
+      
+      if (puntoFisico != null && relationship != null) {
+        availability.add({
+          'puntoFisico': puntoFisico,
+          'cantidad': relationship.cantidad,
+          'fechaActualizacion': relationship.fechaActualizacion,
+        });
+      }
+    }
+    
     return {
       'medicamento': medicamento,
-      'availableAt': puntoFisico,
-      'puntoFisicoId': medicamento.puntoFisicoId,
+      'availability': availability,
     };
   }
 
@@ -295,13 +330,25 @@ class AppRepositoryFacade {
     List<Map<String, dynamic>> results = [];
     
     for (final medicamento in filteredMedicamentos) {
-      // Get the punto fisico where this medicamento is available
-      final puntoFisico = await _puntoFisicoRepository.read(medicamento.puntoFisicoId);
+      // Get all puntos fisicos where this medicamento is available
+      final puntoFisicoIds = await _medicamentoPuntoFisicoRepository.getPuntosFisicosForMedicamento(medicamento.id);
+      
+      List<Map<String, dynamic>> availability = [];
+      for (String puntoId in puntoFisicoIds) {
+        final puntoFisico = await _puntoFisicoRepository.read(puntoId);
+        final relationship = await _medicamentoPuntoFisicoRepository.findByMedicamentoAndPuntoFisico(medicamento.id, puntoId);
+        
+        if (puntoFisico != null && relationship != null) {
+          availability.add({
+            'puntoFisico': puntoFisico,
+            'cantidad': relationship.cantidad,
+          });
+        }
+      }
       
       results.add({
         'medicamento': medicamento,
-        'availableAt': puntoFisico,
-        'puntoFisicoId': medicamento.puntoFisicoId,
+        'availability': availability,
         'isRestricted': medicamento.esRestringido,
         'type': medicamento.toMap()['tipo'],
       });
@@ -373,17 +420,30 @@ class AppRepositoryFacade {
 
   /// UML: Prescripcion (1) —— (1..*) Medicamento  
   Future<List<Medicamento>> getMedicamentosDePrescripcion(String prescripcionId) async {
-    return await _medicamentoRepository.findByPrescripcionId(prescripcionId);
+    final prescripcion = await _prescripcionRepository.read(prescripcionId);
+    return prescripcion?.medicamentos ?? [];
   }
 
   /// Stream version of getMedicamentosDePrescripcion
   Stream<List<Medicamento>> streamMedicamentosDePrescripcion(String prescripcionId) {
-    return _medicamentoRepository.streamByPrescripcionId(prescripcionId);
+    return _prescripcionRepository.streamPrescripcion(prescripcionId)
+        .map((prescripcion) => prescripcion?.medicamentos ?? []);
   }
 
-  /// UML: Medicamento (0..*) —— (1) PuntoFisico
+  /// UML: Medicamento (0..*) —— (*) PuntoFisico (now many-to-many)
   Future<List<Medicamento>> getPuntoInventory(String puntoId) async {
-    return await _puntoFisicoRepository.findMedicamentos(puntoId);
+    // Get medicamento IDs available at this punto fisico
+    final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoId);
+    List<Medicamento> medicamentos = [];
+    
+    for (String medId in medicamentoIds) {
+      final med = await _medicamentoRepository.read(medId);
+      if (med != null) {
+        medicamentos.add(med);
+      }
+    }
+    
+    return medicamentos;
   }
 
   /// Get medicamentos by type (UML generalization)
@@ -391,9 +451,70 @@ class AppRepositoryFacade {
     return await _medicamentoRepository.findByTipo(tipo);
   }
 
-  /// Helper: Get distinct puntos fisicos for a user (via prescripciones → medicamentos)
+  /// Helper: Get distinct puntos fisicos for a user (via prescripciones → medicamentos → MedicamentoPuntoFisico)
   Future<List<String>> getDistinctPuntosByUser(String userId) async {
-    return await _medicamentoRepository.findDistinctPuntosByUserId(userId);
+    // Get user's prescripciones
+    final prescripciones = await _prescripcionRepository.findByUserId(userId);
+    
+    Set<String> distinctPuntos = <String>{};
+    
+    for (var prescripcion in prescripciones) {
+      for (var medicamento in prescripcion.medicamentos) {
+        // Get puntos fisicos where this medicamento is available
+        final puntoIds = await _medicamentoPuntoFisicoRepository.getPuntosFisicosForMedicamento(medicamento.id);
+        distinctPuntos.addAll(puntoIds);
+      }
+    }
+    
+    return distinctPuntos.toList();
+  }
+
+  // ==================== MANY-TO-MANY RELATIONSHIP OPERATIONS ====================
+  
+  /// Add or update stock for a medicamento at a specific punto fisico
+  Future<void> addMedicamentoToPuntoFisico(String medicamentoId, String puntoFisicoId, int cantidad) async {
+    await _medicamentoPuntoFisicoRepository.addOrUpdateStock(medicamentoId, puntoFisicoId, cantidad);
+  }
+  
+  /// Remove medicamento from a punto fisico
+  Future<void> removeMedicamentoFromPharmacy(String medicamentoId, String puntoFisicoId) async {
+    await _medicamentoPuntoFisicoRepository.delete('${medicamentoId}_$puntoFisicoId');
+  }
+  
+  /// Update stock quantity for a medicamento at a punto fisico
+  Future<void> updateMedicamentoStock(String medicamentoId, String puntoFisicoId, int cantidad) async {
+    await _medicamentoPuntoFisicoRepository.updateCantidad(medicamentoId, puntoFisicoId, cantidad);
+  }
+  
+  /// Get stock information for a medicamento at a specific punto fisico
+  Future<int?> getMedicamentoStock(String medicamentoId, String puntoFisicoId) async {
+    final relationship = await _medicamentoPuntoFisicoRepository.findByMedicamentoAndPuntoFisico(medicamentoId, puntoFisicoId);
+    return relationship?.cantidad;
+  }
+  
+  /// Create a complete pedido (order) with prescription, medicamentos, and punto fisico assignment
+  Future<void> createCompletePedido({
+    required Pedido pedido,
+    required Prescripcion prescripcion,
+    required String puntoFisicoId,
+  }) async {
+    // Ensure pedido has the punto fisico assigned
+    final updatedPedido = pedido.copyWith(puntoFisicoId: puntoFisicoId);
+    
+    // Create the pedido
+    await _pedidoRepository.create(updatedPedido);
+    
+    // Create the prescription with embedded medicamentos
+    await _prescripcionRepository.create(prescripcion);
+    
+    // Ensure all medicamentos are available at the assigned punto fisico
+    for (var medicamento in prescripcion.medicamentos) {
+      final stockExists = await _medicamentoPuntoFisicoRepository.exists(medicamento.id, puntoFisicoId);
+      if (!stockExists) {
+        // Add medicamento to punto fisico with default stock
+        await _medicamentoPuntoFisicoRepository.addOrUpdateStock(medicamento.id, puntoFisicoId, 10);
+      }
+    }
   }
 
   // TODO: If migrating from old many-to-many medicamento-punto relationship,

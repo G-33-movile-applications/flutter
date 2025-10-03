@@ -176,19 +176,11 @@ class PuntoFisicoRepository {
     return degrees * (3.14159265359 / 180);
   }
 
-  // UML relationship method: Get inventory for punto fisico
+  // UML relationship method: Get inventory for punto fisico via many-to-many relationship
+  // NOTE: This now requires using MedicamentoPuntoFisicoRepository to get the relationships
+  // and then fetching individual medicamentos
+  @Deprecated('Use MedicamentoPuntoFisicoRepository.findByPuntoFisicoId() and then fetch individual medicamentos')
   Future<List<Medicamento>> findMedicamentos(String puntoId) async {
-    try {
-      final medicamentosSnapshot = await FirebaseFirestore.instance
-          .collection('medicamentos')
-          .where('puntoFisicoId', isEqualTo: puntoId)
-          .get();
-      
-      return medicamentosSnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
-          .toList();
-    } catch (e) {
-      throw Exception('Error finding medicamentos for punto fisico: $e');
-    }
+    throw Exception('DEPRECATED: Use MedicamentoPuntoFisicoRepository.findByPuntoFisicoId() and then fetch individual medicamentos');
   }
 }

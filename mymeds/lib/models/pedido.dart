@@ -7,7 +7,9 @@ class Pedido {
   final DateTime fechaDespacho;
   final String direccionEntrega;
   final bool entregado;
+  final bool entregaEnTienda; // New field - pickup in store
   final String usuarioId; // Foreign key to Usuario
+  final String puntoFisicoId; // Foreign key to PuntoFisico - new many-to-one relationship
   final Prescripcion? prescripcion; // Related prescription
 
   Pedido({
@@ -16,7 +18,9 @@ class Pedido {
     required this.fechaDespacho,
     required this.direccionEntrega,
     required this.entregado,
+    required this.entregaEnTienda,
     required this.usuarioId,
+    required this.puntoFisicoId,
     this.prescripcion,
   });
 
@@ -28,7 +32,9 @@ class Pedido {
       fechaDespacho: (map['fechaDespacho'] as Timestamp).toDate(),
       direccionEntrega: map['direccionEntrega'] ?? '',
       entregado: map['entregado'] ?? false,
+      entregaEnTienda: map['entregaEnTienda'] ?? false,
       usuarioId: map['usuarioId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
       prescripcion: prescripcion,
     );
   }
@@ -41,7 +47,9 @@ class Pedido {
       'fechaDespacho': Timestamp.fromDate(fechaDespacho),
       'direccionEntrega': direccionEntrega,
       'entregado': entregado,
+      'entregaEnTienda': entregaEnTienda,
       'usuarioId': usuarioId,
+      'puntoFisicoId': puntoFisicoId,
     };
   }
 
@@ -52,7 +60,9 @@ class Pedido {
     DateTime? fechaDespacho,
     String? direccionEntrega,
     bool? entregado,
+    bool? entregaEnTienda,
     String? usuarioId,
+    String? puntoFisicoId,
     Prescripcion? prescripcion,
   }) {
     return Pedido(
@@ -61,7 +71,9 @@ class Pedido {
       fechaDespacho: fechaDespacho ?? this.fechaDespacho,
       direccionEntrega: direccionEntrega ?? this.direccionEntrega,
       entregado: entregado ?? this.entregado,
+      entregaEnTienda: entregaEnTienda ?? this.entregaEnTienda,
       usuarioId: usuarioId ?? this.usuarioId,
+      puntoFisicoId: puntoFisicoId ?? this.puntoFisicoId,
       prescripcion: prescripcion ?? this.prescripcion,
     );
   }

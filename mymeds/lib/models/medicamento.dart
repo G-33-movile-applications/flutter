@@ -3,16 +3,12 @@ abstract class Medicamento {
   final String nombre;
   final String descripcion;
   final bool esRestringido;
-  final String prescripcionId; // Foreign key to Prescripcion
-  final String puntoFisicoId; // Foreign key to PuntoFisico - UML (0..*:1) relationship
 
   Medicamento({
     required this.id,
     required this.nombre,
     required this.descripcion,
     required this.esRestringido,
-    required this.prescripcionId,
-    required this.puntoFisicoId,
   });
 
   // Abstract method to convert to Map - each subclass will implement
@@ -61,8 +57,6 @@ class Pastilla extends Medicamento {
     required super.nombre,
     required super.descripcion,
     required super.esRestringido,
-    required super.prescripcionId,
-    required super.puntoFisicoId,
     required this.dosisMg,
     required this.cantidad,
   });
@@ -73,8 +67,6 @@ class Pastilla extends Medicamento {
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
-      prescripcionId: map['prescripcionId'] ?? '',
-      puntoFisicoId: map['puntoFisicoId'] ?? '',
       dosisMg: (map['dosisMg'] ?? 0.0).toDouble(),
       cantidad: map['cantidad'] ?? 0,
     );
@@ -87,8 +79,6 @@ class Pastilla extends Medicamento {
       'nombre': nombre,
       'descripcion': descripcion,
       'esRestringido': esRestringido,
-      'prescripcionId': prescripcionId,
-      'puntoFisicoId': puntoFisicoId,
       'tipo': 'pastilla',
       'dosisMg': dosisMg,
       'cantidad': cantidad,
@@ -106,8 +96,6 @@ class Unguento extends Medicamento {
     required super.nombre,
     required super.descripcion,
     required super.esRestringido,
-    required super.prescripcionId,
-    required super.puntoFisicoId,
     required this.concentracion,
     required this.cantidadEnvases,
   });
@@ -118,8 +106,6 @@ class Unguento extends Medicamento {
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
-      prescripcionId: map['prescripcionId'] ?? '',
-      puntoFisicoId: map['puntoFisicoId'] ?? '',
       concentracion: map['concentracion'] ?? '',
       cantidadEnvases: map['cantidadEnvases'] ?? 0,
     );
@@ -132,8 +118,6 @@ class Unguento extends Medicamento {
       'nombre': nombre,
       'descripcion': descripcion,
       'esRestringido': esRestringido,
-      'prescripcionId': prescripcionId,
-      'puntoFisicoId': puntoFisicoId,
       'tipo': 'unguento',
       'concentracion': concentracion,
       'cantidadEnvases': cantidadEnvases,
@@ -152,8 +136,6 @@ class Inyectable extends Medicamento {
     required super.nombre,
     required super.descripcion,
     required super.esRestringido,
-    required super.prescripcionId,
-    required super.puntoFisicoId,
     required this.concentracion,
     required this.volumenPorUnidad,
     required this.cantidadUnidades,
@@ -165,8 +147,6 @@ class Inyectable extends Medicamento {
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
-      prescripcionId: map['prescripcionId'] ?? '',
-      puntoFisicoId: map['puntoFisicoId'] ?? '',
       concentracion: map['concentracion'] ?? '',
       volumenPorUnidad: (map['volumenPorUnidad'] ?? 0.0).toDouble(),
       cantidadUnidades: map['cantidadUnidades'] ?? 0,
@@ -180,8 +160,6 @@ class Inyectable extends Medicamento {
       'nombre': nombre,
       'descripcion': descripcion,
       'esRestringido': esRestringido,
-      'prescripcionId': prescripcionId,
-      'puntoFisicoId': puntoFisicoId,
       'tipo': 'inyectable',
       'concentracion': concentracion,
       'volumenPorUnidad': volumenPorUnidad,
@@ -200,8 +178,6 @@ class Jarabe extends Medicamento {
     required super.nombre,
     required super.descripcion,
     required super.esRestringido,
-    required super.prescripcionId,
-    required super.puntoFisicoId,
     required this.cantidadBotellas,
     required this.mlPorBotella,
   });
@@ -212,8 +188,6 @@ class Jarabe extends Medicamento {
       nombre: map['nombre'] ?? '',
       descripcion: map['descripcion'] ?? '',
       esRestringido: map['esRestringido'] ?? false,
-      prescripcionId: map['prescripcionId'] ?? '',
-      puntoFisicoId: map['puntoFisicoId'] ?? '',
       cantidadBotellas: map['cantidadBotellas'] ?? 0,
       mlPorBotella: (map['mlPorBotella'] ?? 0.0).toDouble(),
     );
@@ -226,8 +200,6 @@ class Jarabe extends Medicamento {
       'nombre': nombre,
       'descripcion': descripcion,
       'esRestringido': esRestringido,
-      'prescripcionId': prescripcionId,
-      'puntoFisicoId': puntoFisicoId,
       'tipo': 'jarabe',
       'cantidadBotellas': cantidadBotellas,
       'mlPorBotella': mlPorBotella,
