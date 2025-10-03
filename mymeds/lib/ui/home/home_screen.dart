@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -24,6 +25,15 @@ class HomeScreen extends StatelessWidget {
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
               // TODO: implement notifications
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () async {
+              await AuthService.signOut();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/');
+              }
             },
           ),
           const SizedBox(width: 8),

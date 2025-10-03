@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
 	const LoginScreen({super.key});
@@ -10,17 +11,47 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+		final _formKey = GlobalKey<FormState>();
 		final _emailController = TextEditingController();
 		final _passwordController = TextEditingController();
 		bool _isLoading = false;
 
 		Future<void> _login() async {
+			if (!_formKey.currentState!.validate()) return;
+
 			setState(() => _isLoading = true);
-			await Future.delayed(const Duration(seconds: 1));
-			if (!mounted) return;
-			// Simulate successful login for now
-			Navigator.pushReplacementNamed(context, '/home');
-			setState(() => _isLoading = false);
+
+			try {
+				final result = await AuthService.signInWithEmailAndPassword(
+					email: _emailController.text.trim(),
+					password: _passwordController.text,
+				);
+
+				if (!mounted) return;
+
+				if (result.success) {
+					Navigator.pushReplacementNamed(context, '/home');
+				} else {
+					ScaffoldMessenger.of(context).showSnackBar(
+						SnackBar(
+							content: Text(result.errorMessage ?? "Error al iniciar sesión"),
+							backgroundColor: Colors.red,
+						),
+					);
+				}
+			} catch (e) {
+				if (!mounted) return;
+				ScaffoldMessenger.of(context).showSnackBar(
+					SnackBar(
+						content: Text("Error inesperado: ${e.toString()}"),
+						backgroundColor: Colors.red,
+					),
+				);
+			} finally {
+				if (mounted) {
+					setState(() => _isLoading = false);
+				}
+			}
 		}
 
 	@override
@@ -31,9 +62,11 @@ class _LoginScreenState extends State<LoginScreen> {
 			body: Center(
 				child: SingleChildScrollView(
 					padding: const EdgeInsets.symmetric(horizontal: 32),
-					child: Column(
-						mainAxisAlignment: MainAxisAlignment.center,
-						children: [
+					child: Form(
+						key: _formKey,
+						child: Column(
+							mainAxisAlignment: MainAxisAlignment.center,
+							children: [
 							// App Logo
 							Image.asset(
 								'assets/Logo.png',
@@ -50,12 +83,23 @@ class _LoginScreenState extends State<LoginScreen> {
 							),
 							const SizedBox(height: 24),
 							// Email Field
-							TextField(
+							TextFormField(
 								controller: _emailController,
+								keyboardType: TextInputType.emailAddress,
 								style: GoogleFonts.balsamiqSans(),
+								validator: (value) {
+									if (value == null || value.isEmpty) {
+										return 'Ingresa tu correo electrónico';
+									}
+									final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+									if (!emailRegex.hasMatch(value)) {
+										return 'Ingresa un correo electrónico válido';
+									}
+									return null;
+								},
 								decoration: InputDecoration(
-									labelText: 'Usuario',
-									hintText: '¿Olvidó su usuario?',
+									labelText: 'Correo electrónico',
+									hintText: 'ejemplo@mail.com',
 									filled: true,
 									fillColor: const Color(0xFFFFF1D5),
 									border: OutlineInputBorder(
@@ -65,13 +109,22 @@ class _LoginScreenState extends State<LoginScreen> {
 							),
 							const SizedBox(height: 16),
 							// Password Field
-							TextField(
+							TextFormField(
 								controller: _passwordController,
 								obscureText: true,
 								style: GoogleFonts.balsamiqSans(),
+								validator: (value) {
+									if (value == null || value.isEmpty) {
+										return 'Ingresa tu contraseña';
+									}
+									if (value.length < 6) {
+										return 'La contraseña debe tener al menos 6 caracteres';
+									}
+									return null;
+								},
 								decoration: InputDecoration(
 									labelText: 'Contraseña',
-									hintText: '¿Olvidó su contraseña?',
+									hintText: 'Tu contraseña',
 									filled: true,
 									fillColor: const Color(0xFFFFF1D5),
 									border: OutlineInputBorder(
@@ -130,6 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
 								),
 							),
 						],
+						),
 					),
 				),
 			),

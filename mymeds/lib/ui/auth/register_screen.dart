@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
+import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -35,16 +36,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // Additional validation
+    if (_claveController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("La contraseña debe tener al menos 6 caracteres")),
+      );
+      return;
+    }
+
+    // Validate email format
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(_correoController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor ingresa un correo electrónico válido")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2)); // 🔹 Simulación por ahora
-    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Usuario registrado con éxito")),
-    );
-    Navigator.pop(context);
+    try {
+      final result = await AuthService.registerWithEmailAndPassword(
+        email: _correoController.text.trim(),
+        password: _claveController.text,
+        fullName: _nombreController.text.trim(),
+        phoneNumber: _telefonoController.text.trim(),
+        address: _direccionController.text.trim(),
+        city: _ciudadController.text.trim(),
+        department: _departamentoController.text.trim(),
+        zipCode: _codigoZipController.text.trim(),
+      );
 
-    setState(() => _isLoading = false);
+      if (!mounted) return;
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("¡Cuenta creada con éxito! Ahora puedes iniciar sesión."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage ?? "Error al crear la cuenta"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error inesperado: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
