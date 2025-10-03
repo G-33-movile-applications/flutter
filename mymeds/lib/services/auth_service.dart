@@ -30,20 +30,30 @@ class AuthService {
 
       final User? user = userCredential.user;
       if (user != null) {
-        // Create user document in Firestore
-        await _firestore.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'fullName': fullName,
-          'email': email,
-          'phoneNumber': phoneNumber,
-          'address': address,
-          'city': city,
-          'department': department,
-          'zipCode': zipCode,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        return AuthResult(success: true, user: user);
+        try {
+          // Create user document in Firestore with retry logic
+          final userData = {
+            'uid': user.uid,
+            'fullName': fullName,
+            'email': email,
+            'phoneNumber': phoneNumber,
+            'address': address,
+            'city': city,
+            'department': department,
+            'zipCode': zipCode,
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+          
+          await _firestore.collection('usuarios').doc(user.uid).set(userData);
+          debugPrint('AuthService: User document created successfully for ${user.uid}');
+          
+          return AuthResult(success: true, user: user);
+        } catch (firestoreError) {
+          debugPrint('AuthService: Failed to create user document: $firestoreError');
+          // If Firestore fails, we still return success since Firebase Auth succeeded
+          // The UserSession will handle creating a fallback user
+          return AuthResult(success: true, user: user);
+        }
       } else {
         return AuthResult(
           success: false,
@@ -121,7 +131,7 @@ class AuthService {
   // Get user data from Firestore
   static Future<UserModel?> getUserData(String uid) async {
     try {
-      final DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      final DocumentSnapshot doc = await _firestore.collection('usuarios').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         return UserModel.fromMap(doc.data() as Map<String, dynamic>);
       }

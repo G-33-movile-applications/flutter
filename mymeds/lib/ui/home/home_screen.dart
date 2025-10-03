@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
 import '../../theme/app_theme.dart';
-import '../../services/auth_service.dart';
+import '../../services/user_session.dart';
+import '../../models/user_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -30,7 +31,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
-              await AuthService.signOut();
+              await UserSession().signOut();
               if (context.mounted) {
                 Navigator.pushReplacementNamed(context, '/');
               }
@@ -110,36 +111,43 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting
-          Row(
+      child: ValueListenableBuilder<UserModel?>(
+        valueListenable: UserSession().currentUser,
+        builder: (context, user, child) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Greeting
+              Row(
+                children: [
+                  Text(
+                    'Hola, ',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    user != null ? user.fullName.split(' ').first : 'Usuario',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const Text(' 👋'),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // Status message
               Text(
-                'Hola, ',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textSecondary,
+                user != null 
+                    ? 'Tienes 2 prescripciones activas' // TODO: get active Prescripcion count from Firestore
+                    : 'Inicia sesión para ver tus prescripciones',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary.withValues(alpha: 0.8),
                 ),
               ),
-              Text(
-                'Andrés', // TODO: inject Usuario from auth provider
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const Text(' 👋'),
             ],
-          ),
-          const SizedBox(height: 4),
-          // Status message
-          Text(
-            'Tienes 2 prescripciones activas', // TODO: get active Prescripcion count from Firestore
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary.withValues(alpha: 0.8),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
