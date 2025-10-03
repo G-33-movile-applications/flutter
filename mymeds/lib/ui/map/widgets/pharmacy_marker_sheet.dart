@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
-import '../map_screen.dart';
+import '../../../models/punto_fisico.dart';
 
 class PharmacyMarkerSheet extends StatelessWidget {
   const PharmacyMarkerSheet({
@@ -11,7 +11,7 @@ class PharmacyMarkerSheet extends StatelessWidget {
     required this.onViewInventory,
   });
 
-  final PuntoFisicoMock pharmacy;
+  final PuntoFisico pharmacy;
   final double distance;
   final VoidCallback onNavigate;
   final VoidCallback onViewInventory;
