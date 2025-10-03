@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "403645073827",
-    "project_id": "mymeds-app",
-    "storage_bucket": "mymeds-app.firebasestorage.app"
+    "project_number": "686810964141",
+    "project_id": "mymeds-application-f99dd",
+    "storage_bucket": "mymeds-application-f99dd.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:403645073827:android:3277fbe7ef753c45c6b216",
+        "mobilesdk_app_id": "1:686810964141:android:160b991829d89700f62624",
         "android_client_info": {
           "package_name": "com.mobile.mymeds"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCSfHTvJ_P4gqMuj8kgp1HoscrsItDwc8o"
+          "current_key": "AIzaSyCW4zpIytCaCMdCiCC4FaB1zWLzjzUzrIo"
         }
       ],
       "services": {
@@ -23,7 +23,7 @@
           "other_platform_oauth_client": []
         }
       }
-    }
+    } 
   ],
   "configuration_version": "1"
 }
