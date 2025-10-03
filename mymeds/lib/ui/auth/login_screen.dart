@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 						children: [
 							// App Logo
 							Image.asset(
-								'Logo.png',
+								'assets/Logo.png',
 								height: 120,
 							),
 							const SizedBox(height: 32),
