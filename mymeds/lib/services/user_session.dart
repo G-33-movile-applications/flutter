@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
-
+import '../models/pedido.dart';
+import '../models/prescripcion.dart';
+import '../repositories/pedido_repository.dart';
+import '../repositories/prescripcion_repository.dart';
 /// Thread-safe Singleton that manages the current user session across the app.
 /// 
 /// This class automatically keeps the user model in sync with Firebase Auth
@@ -27,22 +30,22 @@ import '../models/user_model.dart';
 /// await UserSession().signOut();
 /// ```
 class UserSession {
-  // Private constructor for singleton pattern
+  // ---- Singleton ----
   UserSession._internal();
-  
-  // Singleton instance
   static final UserSession _instance = UserSession._internal();
-  
-  // Factory constructor returns the same instance
   factory UserSession() => _instance;
-
-  // Dependencies
+  
+  // ---- Dependencias ----
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+  final PedidoRepository _pedidoRepo = PedidoRepository();
+  final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
+
   // Reactive current user state - null means not authenticated
   final ValueNotifier<UserModel?> currentUser = ValueNotifier<UserModel?>(null);
-  
+  final ValueNotifier<List<Pedido>> currentPedidos = ValueNotifier<List<Pedido>>([]);
+  final ValueNotifier<List<Prescripcion>> currentPrescripciones = ValueNotifier<List<Prescripcion>>([]);
+
   // Auth state subscription for cleanup
   StreamSubscription<User?>? _authSubscription;
   
@@ -71,6 +74,7 @@ class UserSession {
       final currentAuthUser = _auth.currentUser;
       if (currentAuthUser != null) {
         await _loadUserData(currentAuthUser.uid);
+        await _loadSessionEntities(currentAuthUser.uid);
       }
       
       // Listen to auth state changes
@@ -99,14 +103,17 @@ class UserSession {
       if (authUser != null) {
         debugPrint('UserSession: User signed in: ${authUser.uid}');
         await _loadUserData(authUser.uid);
+        await _loadSessionEntities(authUser.uid);
       } else {
         debugPrint('UserSession: User signed out');
+        _clearEntities();
         currentUser.value = null;
       }
     } catch (e) {
       debugPrint('UserSession: Error handling auth state change: $e');
       // Don't throw here as it would break the stream
       currentUser.value = null;
+      _clearEntities();
     }
   }
 
@@ -175,6 +182,38 @@ class UserSession {
     }
   }
 
+// ---- Sesion Entities ----
+   Future<void> _loadSessionEntities(String uid) async {
+    try {
+      debugPrint('UserSession: Loading pedidos & prescripciones...');
+      final pedidos = await _pedidoRepo.getPedidosByUser(uid);
+      final prescripciones = await _prescripcionRepo.getPrescripcionesByUser(uid);
+
+      currentPedidos.value = pedidos;
+      currentPrescripciones.value = prescripciones;
+
+      debugPrint('UserSession: Entities loaded (Pedidos=${pedidos.length}, Prescripciones=${prescripciones.length})');
+    } catch (e) {
+      debugPrint('UserSession: Error loading session entities: $e');
+      _clearEntities();
+    }
+  }
+
+  Future<void> refreshPedidos() async {
+    if (currentUser.value == null) return;
+    currentPedidos.value = await _pedidoRepo.getPedidosByUser(currentUser.value!.uid);
+  }
+
+  Future<void> refreshPrescripciones() async {
+    if (currentUser.value == null) return;
+    currentPrescripciones.value = await _prescripcionRepo.getPrescripcionesByUser(currentUser.value!.uid);
+  }
+
+  void _clearEntities() {
+    currentPedidos.value = [];
+    currentPrescripciones.value = [];
+  }
+
   /// Refreshes the current user data from Firestore.
   /// 
   /// Returns the updated user model or null if not authenticated.
@@ -209,6 +248,7 @@ class UserSession {
       debugPrint('UserSession: Error signing out: $e');
       // Force clear on error
       currentUser.value = null;
+      _clearEntities();
       rethrow;
     }
   }
@@ -253,6 +293,8 @@ class UserSession {
     _authSubscription?.cancel();
     _authSubscription = null;
     currentUser.dispose();
+    currentPedidos.dispose();
+    currentPrescripciones.dispose();
     _isInitialized = false;
   }
 }
