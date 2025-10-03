@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 class UploadPrescriptionPage extends StatefulWidget {
   const UploadPrescriptionPage({super.key});
@@ -32,9 +33,16 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Medical_File_Upload"),
+        title: Text(
+          "Medical_File_Upload",
+          style: theme.appBarTheme.titleTextStyle,
+        ),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
         actions: const [
           Icon(Icons.home_outlined),
           SizedBox(width: 10),
@@ -48,17 +56,20 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 20),
-            const Text(
+            Text(
               "UPLOAD PRESCRIPTION",
-              style: TextStyle(
-                fontSize: 18,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: AppTheme.textPrimary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 15),
-            const Text(
-              "Lorem ipsum dolor sit amet lorem ipsum dolor sit amet",
+            Text(
+              "Selecciona tu archivo de prescripción médica para subirlo y procesarlo.",
               textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
             ),
             const SizedBox(height: 30),
 
@@ -75,7 +86,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                   width: 120,
                   height: 120,
                   decoration: const BoxDecoration(
-                    color: Colors.black,
+                    color: AppTheme.primaryColor,
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
@@ -93,11 +104,13 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                 onPressed: startUpload,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 15),
-                  backgroundColor: Colors.black,
+                  backgroundColor: AppTheme.buttonBackgroundColor,
+                  foregroundColor: AppTheme.buttonTextColor,
+                  textStyle: theme.textTheme.titleMedium,
                 ),
                 child: const Text(
                   "UPLOAD",
-                  style: TextStyle(color: Colors.white),
+                  // El color de texto lo da foregroundColor
                 ),
               ),
             ),
@@ -106,7 +119,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
             // Indicador de progreso
             if (isUploading)
               const CircularProgressIndicator(
-                color: Colors.black,
+                color: AppTheme.primaryColor,
                 strokeWidth: 3,
               ),
           ],
