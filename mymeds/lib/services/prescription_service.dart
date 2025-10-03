@@ -31,9 +31,9 @@ class PrescripcionService {
 
       // Guardar en Firestore
       await _prescripcionRepository.create(prescripcion);
-      print("✅ Prescripción guardada con ID: ${prescripcion.id}");
-    } catch (e) {
-      print("❌ Error procesando JSON: $e");
+      
+      } catch (e) {
+      
       rethrow;
     }
   }

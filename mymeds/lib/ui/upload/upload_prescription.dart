@@ -123,7 +123,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
           UploadPrescriptionWidget(
             isUploading: isUploading,
             onSelectFile: _selectFile,
-            onUpload: _startUpload, // 👈 usamos la función ya preparada
+            onUpload: _startUpload, // usamos la función ya preparada
         ),
       const SizedBox(height: 20),
 
@@ -151,7 +151,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
 
       const SizedBox(height: 20),
 
-      // 🔹 Preview de JSON (del último archivo)
+      // Preview de JSON (del último archivo)
       if (pdfAsJson != null)
         Container(
           padding: const EdgeInsets.all(12),
