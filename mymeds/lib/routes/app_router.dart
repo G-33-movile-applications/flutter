@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mymeds/ui/auth/forgot_password.dart';
 import 'package:mymeds/ui/auth/register_screen.dart';
 import 'package:mymeds/ui/delivery/delivery_screen.dart';
 import '../ui/home/home_screen.dart';
@@ -16,6 +17,7 @@ class AppRouter {
   static const String upload = '/upload';
   static const String profile = '/profile';
   static const String delivery = '/delivery';
+  static const String forgotPassword = '/forgot-password';
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case login:
@@ -26,6 +28,11 @@ class AppRouter {
       case register:
         return MaterialPageRoute(
           builder: (_) => const RegisterScreen(),
+          settings: settings,
+        );
+      case forgotPassword:
+        return MaterialPageRoute(
+          builder: (_) => const ForgotPasswordScreen(),
           settings: settings,
         );
       case home:
