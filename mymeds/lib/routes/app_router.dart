@@ -47,7 +47,7 @@ class AppRouter {
         );
       case upload:
         return MaterialPageRoute(
-          builder: (_) => const UploadScreenStub(),
+          builder: (_) => const UploadPrescriptionPage(),
           settings: settings,
         );
       case profile:
