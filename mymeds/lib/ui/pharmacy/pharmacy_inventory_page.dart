@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/medicamento.dart';
 import '../../models/punto_fisico.dart';
+import '../../models/medicamento_punto_fisico.dart';
 import '../../facade/app_repository_facade.dart';
+import '../../repositories/medicamento_punto_fisico_repository.dart';
 
 class PharmacyInventoryPage extends StatefulWidget {
   final PuntoFisico pharmacy;
@@ -16,9 +18,11 @@ class PharmacyInventoryPage extends StatefulWidget {
 }
 
 class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
+  final _repository = MedicamentoPuntoFisicoRepository();
   final _facade = AppRepositoryFacade();
   bool _isLoading = true;
-  Map<String, dynamic> _pharmacyData = {};
+  List<MedicamentoPuntoFisico> _inventory = [];
+  List<Medicamento> _medicamentos = [];
   String? _error;
 
   @override
@@ -34,11 +38,22 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
         _error = null;
       });
 
-      final pharmacyData = await _facade.getPharmacyWithMedicamentos(widget.pharmacy.id);
+      // Get the inventory relationships first
+      _inventory = await _repository.findByPuntoFisicoId(widget.pharmacy.id);
+      
+      // Get the full medicamento details for each inventory item
+      final medicamentoIds = _inventory.map((item) => item.medicamentoId).toList();
+      _medicamentos = [];
+      
+      for (final id in medicamentoIds) {
+        final medicamentoData = await _facade.getMedicamentoAvailability(id);
+        if (medicamentoData['medicamento'] != null) {
+          _medicamentos.add(medicamentoData['medicamento'] as Medicamento);
+        }
+      }
       
       if (mounted) {
         setState(() {
-          _pharmacyData = pharmacyData;
           _isLoading = false;
         });
       }
@@ -84,10 +99,7 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
       );
     }
 
-    final medications = _pharmacyData['medications'] as List<Medicamento>? ?? [];
-    final availability = _pharmacyData['availability'] as Map<String, dynamic>? ?? {};
-
-    if (medications.isEmpty) {
+    if (_inventory.isEmpty) {
       return const Center(
         child: Text('No hay medicamentos disponibles en esta farmacia'),
       );
@@ -97,10 +109,20 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
       onRefresh: _loadInventory,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: medications.length,
+        itemCount: _inventory.length,
         itemBuilder: (context, index) {
-          final medicamento = medications[index];
-          final stock = availability[medicamento.id] as Map<String, dynamic>? ?? {};
+          final inventoryItem = _inventory[index];
+          final medicamento = _medicamentos.firstWhere(
+            (m) => m.id == inventoryItem.medicamentoId,
+            orElse: () => Pastilla(
+              id: inventoryItem.medicamentoId,
+              nombre: 'Medicamento no encontrado',
+              descripcion: '',
+              esRestringido: false,
+              dosisMg: 0,
+              cantidad: 0,
+            ),
+          );
           
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -115,9 +137,12 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 4),
-                  Text('Cantidad disponible: ${stock['cantidad'] ?? 0}'),
-                  Text('Precio: \$${stock['precio'] ?? 0.0}'),
-                  Text('${medicamento.descripcion}'),
+                  Text('Cantidad disponible: ${inventoryItem.cantidad}'),
+                  if (medicamento.descripcion.isNotEmpty)
+                    Text(medicamento.descripcion),
+                  Text('Restringido: ${medicamento.esRestringido ? 'Sí' : 'No'}'),
+                  const SizedBox(height: 4),
+                  _buildMedicationTypeInfo(medicamento),
                 ],
               ),
             ),
@@ -125,5 +150,18 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
         },
       ),
     );
+  }
+
+  Widget _buildMedicationTypeInfo(Medicamento medicamento) {
+    if (medicamento is Pastilla) {
+      return Text('Pastilla - ${medicamento.dosisMg}mg (${medicamento.cantidad} unidades)');
+    } else if (medicamento is Unguento) {
+      return Text('Ungüento - ${medicamento.concentracion} (${medicamento.cantidadEnvases} envases)');
+    } else if (medicamento is Inyectable) {
+      return Text('Inyectable - ${medicamento.concentracion}, ${medicamento.volumenPorUnidad}ml (${medicamento.cantidadUnidades} unidades)');
+    } else if (medicamento is Jarabe) {
+      return Text('Jarabe - ${medicamento.mlPorBotella}ml (${medicamento.cantidadBotellas} botellas)');
+    }
+    return const Text('Tipo de medicamento no especificado');
   }
 }
