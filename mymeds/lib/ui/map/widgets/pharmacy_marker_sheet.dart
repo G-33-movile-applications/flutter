@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
-import '../map_screen.dart';
+import '../../../models/punto_fisico.dart';
 
 class PharmacyMarkerSheet extends StatelessWidget {
   const PharmacyMarkerSheet({
     super.key,
     required this.pharmacy,
     required this.distance,
-    required this.onNavigate,
+    required this.onDelivery,
     required this.onViewInventory,
   });
 
-  final PuntoFisicoMock pharmacy;
+  final PuntoFisico pharmacy;
   final double distance;
-  final VoidCallback onNavigate;
+  final VoidCallback onDelivery;
   final VoidCallback onViewInventory;
 
   @override
@@ -101,14 +101,14 @@ class PharmacyMarkerSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Semantics(
-                        label: 'Navegar a ${pharmacy.nombre}',
+                        label: 'Delivery desde ${pharmacy.nombre}',
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            onNavigate();
+                            onDelivery();
                           },
-                          icon: const Icon(Icons.directions_rounded),
-                          label: const Text('Navegar'),
+                          icon: const Icon(Icons.local_shipping_rounded),
+                          label: const Text('Delivery'),
                         ),
                       ),
                     ),

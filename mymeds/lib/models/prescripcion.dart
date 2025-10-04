@@ -20,13 +20,24 @@ class Prescripcion {
 
   // Create Prescripcion from Firestore document
   factory Prescripcion.fromMap(Map<String, dynamic> map, {List<Medicamento>? medicamentos}) {
+    List<Medicamento> parsedMedicamentos = [];
+    
+    if (medicamentos != null) {
+      parsedMedicamentos = medicamentos;
+    } else if (map['medicamentos'] != null) {
+      final medicamentosData = map['medicamentos'] as List<dynamic>;
+      parsedMedicamentos = medicamentosData
+          .map((medMap) => Medicamento.fromMap(medMap as Map<String, dynamic>))
+          .toList();
+    }
+    
     return Prescripcion(
       id: map['id'] ?? '',
       fechaEmision: (map['fechaEmision'] as Timestamp).toDate(),
       recetadoPor: map['recetadoPor'] ?? '',
       userId: map['userId'] ?? '',
       pedidoId: map['pedidoId'] ?? '',
-      medicamentos: medicamentos ?? [],
+      medicamentos: parsedMedicamentos,
     );
   }
 
@@ -38,6 +49,7 @@ class Prescripcion {
       'recetadoPor': recetadoPor,
       'userId': userId,
       'pedidoId': pedidoId,
+      'medicamentos': medicamentos.map((med) => med.toMap()).toList(),
     };
   }
 

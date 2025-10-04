@@ -7,8 +7,11 @@ class Pedido {
   final DateTime fechaDespacho;
   final String direccionEntrega;
   final bool entregado;
+  final bool entregaEnTienda; // New field - pickup in store
   final String usuarioId; // Foreign key to Usuario
-  final Prescripcion? prescripcion; // Related prescription
+  final String puntoFisicoId; // Foreign key to PuntoFisico - new many-to-one relationship
+  final String prescripcionId; // Foreign key to Prescripcion
+  final Prescripcion? prescripcion; // Related prescription (for in-memory use)
 
   Pedido({
     required this.identificadorPedido,
@@ -16,7 +19,10 @@ class Pedido {
     required this.fechaDespacho,
     required this.direccionEntrega,
     required this.entregado,
+    required this.entregaEnTienda,
     required this.usuarioId,
+    required this.puntoFisicoId,
+    required this.prescripcionId,
     this.prescripcion,
   });
 
@@ -28,7 +34,10 @@ class Pedido {
       fechaDespacho: (map['fechaDespacho'] as Timestamp).toDate(),
       direccionEntrega: map['direccionEntrega'] ?? '',
       entregado: map['entregado'] ?? false,
+      entregaEnTienda: map['entregaEnTienda'] ?? false,
       usuarioId: map['usuarioId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
+      prescripcionId: map['prescripcionId'] ?? '',
       prescripcion: prescripcion,
     );
   }
@@ -41,7 +50,10 @@ class Pedido {
       'fechaDespacho': Timestamp.fromDate(fechaDespacho),
       'direccionEntrega': direccionEntrega,
       'entregado': entregado,
+      'entregaEnTienda': entregaEnTienda,
       'usuarioId': usuarioId,
+      'puntoFisicoId': puntoFisicoId,
+      'prescripcionId': prescripcionId,
     };
   }
 
@@ -52,7 +64,10 @@ class Pedido {
     DateTime? fechaDespacho,
     String? direccionEntrega,
     bool? entregado,
+    bool? entregaEnTienda,
     String? usuarioId,
+    String? puntoFisicoId,
+    String? prescripcionId,
     Prescripcion? prescripcion,
   }) {
     return Pedido(
@@ -61,7 +76,10 @@ class Pedido {
       fechaDespacho: fechaDespacho ?? this.fechaDespacho,
       direccionEntrega: direccionEntrega ?? this.direccionEntrega,
       entregado: entregado ?? this.entregado,
+      entregaEnTienda: entregaEnTienda ?? this.entregaEnTienda,
       usuarioId: usuarioId ?? this.usuarioId,
+      puntoFisicoId: puntoFisicoId ?? this.puntoFisicoId,
+      prescripcionId: prescripcionId ?? this.prescripcionId,
       prescripcion: prescripcion ?? this.prescripcion,
     );
   }

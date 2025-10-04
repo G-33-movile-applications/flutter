@@ -141,7 +141,20 @@ class AuthService {
       return null;
     }
   }
-
+  
+static Future<AuthResult> sendPasswordResetEmail(String email) async {
+  print("🔥 FirebaseAuth instance: $_auth"); // Debug
+  try {
+    await _auth.sendPasswordResetEmail(email: email);
+    return AuthResult(success: true);
+  } on FirebaseAuthException catch (e) {
+    print("⚠️ FirebaseAuthException: ${e.code} - ${e.message}");
+    return AuthResult(success: false, errorMessage: e.message);
+  } catch (e) {
+    print("❌ Otro error: $e");
+    return AuthResult(success: false, errorMessage: "Error inesperado");
+  }
+}
   // Check if user is logged in
   static bool get isLoggedIn => _auth.currentUser != null;
 

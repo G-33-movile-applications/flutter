@@ -20,9 +20,9 @@ class PuntoFisico {
   });
 
   // Create PuntoFisico from Firestore document
-  factory PuntoFisico.fromMap(Map<String, dynamic> map) {
+  factory PuntoFisico.fromMap(Map<String, dynamic> map, {String? documentId}) {
     return PuntoFisico(
-      id: map['id'] ?? '',
+      id: documentId ?? map['id'] ?? '',
       latitud: (map['latitud'] ?? 0.0).toDouble(),
       longitud: (map['longitud'] ?? 0.0).toDouble(),
       direccion: map['direccion'] ?? '',

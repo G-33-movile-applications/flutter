@@ -1,31 +1,13 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
+import '../../models/punto_fisico.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
-
-// Mock data model - TODO: Replace with real PuntoFisico from Firestore
-class PuntoFisicoMock {
-  final String id;
-  final String nombre;
-  final String cadena;
-  final String direccion;
-  final double latitud;
-  final double longitud;
-
-  const PuntoFisicoMock({
-    required this.id,
-    required this.nombre,
-    required this.cadena,
-    required this.direccion,
-    required this.latitud,
-    required this.longitud,
-  });
-
-  LatLng get location => LatLng(latitud, longitud);
-}
+import '../pharmacy/pharmacy_inventory_page.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -40,56 +22,20 @@ class _MapScreenState extends State<MapScreen> {
   Set<Marker> _markers = {};
   bool _isLoading = true;
   String? _errorMessage;
-  List<PuntoFisicoMock> _nearbyPharmacies = [];
-
-  // Mock pharmacy data - TODO: Replace mocks with Firestore collection 'puntos_fisicos'
-  static const List<PuntoFisicoMock> _mockPharmacies = [
-    PuntoFisicoMock(
-      id: 'farm_1',
-      nombre: 'Farmacia San Rafael',
-      cadena: 'Cruz Verde',
-      direccion: 'Calle 72 #10-34, Bogotá',
-      latitud: 4.6500,
-      longitud: -74.0800,
-    ),
-    PuntoFisicoMock(
-      id: 'farm_2',
-      nombre: 'Droguería La Salud',
-      cadena: 'Copidrogas',
-      direccion: 'Carrera 15 #85-20, Bogotá',
-      latitud: 4.6600,
-      longitud: -74.0750,
-    ),
-    PuntoFisicoMock(
-      id: 'farm_3',
-      nombre: 'Farmacia Central',
-      cadena: 'Locatel',
-      direccion: 'Avenida 68 #75-50, Bogotá',
-      latitud: 4.6550,
-      longitud: -74.0850,
-    ),
-    PuntoFisicoMock(
-      id: 'farm_4',
-      nombre: 'Droguería El Descuento',
-      cadena: 'Cruz Verde',
-      direccion: 'Calle 80 #12-15, Bogotá',
-      latitud: 4.6620,
-      longitud: -74.0780,
-    ),
-    PuntoFisicoMock(
-      id: 'farm_5',
-      nombre: 'Farmacia Norte',
-      cadena: 'Farmatodo',
-      direccion: 'Calle 90 #20-10, Bogotá',
-      latitud: 4.6700,
-      longitud: -74.0720,
-    ),
-  ];
+  List<PuntoFisico> _nearbyPharmacies = [];
+  StreamSubscription<QuerySnapshot>? _firestoreSubscription;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
     _initializeLocation();
+  }
+
+  @override
+  void dispose() {
+    _firestoreSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeLocation() async {
@@ -133,15 +79,9 @@ class _MapScreenState extends State<MapScreen> {
       // Get current position
       _currentPosition = await Geolocator.getCurrentPosition();
       
-      // Filter nearby pharmacies
-      _filterNearbyPharmacies();
+      // Setup Firestore stream to listen for pharmacy data
+      _setupFirestoreListener();
       
-      // Create markers
-      await _createMarkers();
-
-      setState(() {
-        _isLoading = false;
-      });
     } catch (e) {
       setState(() {
         _errorMessage = 'No pudimos obtener tu ubicación. Inténtalo de nuevo.';
@@ -150,20 +90,45 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _filterNearbyPharmacies() {
+  void _setupFirestoreListener() {
+    _firestoreSubscription = _firestore
+        .collection('puntos_fisicos')
+        .snapshots()
+        .listen(
+      (snapshot) {
+        final allPharmacies = snapshot.docs
+            .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
+            .toList();
+        
+        _filterNearbyPharmacies(allPharmacies);
+        _createMarkers();
+      },
+      onError: (error) {
+        setState(() {
+          _errorMessage = 'Error al cargar las farmacias. Inténtalo de nuevo.';
+          _isLoading = false;
+        });
+      },
+    );
+  }
+
+  void _filterNearbyPharmacies(List<PuntoFisico> allPharmacies) {
     if (_currentPosition == null) return;
 
     final userLocation = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
     
-    _nearbyPharmacies = _mockPharmacies
+    _nearbyPharmacies = allPharmacies
         .where((pharmacy) {
-          final distance = _haversineKm(userLocation, pharmacy.location);
+          final pharmacyLocation = LatLng(pharmacy.latitud, pharmacy.longitud);
+          final distance = _haversineKm(userLocation, pharmacyLocation);
           return distance <= 5.0; // Only pharmacies within 5km
         })
         .toList()
       ..sort((a, b) {
-        final distanceA = _haversineKm(userLocation, a.location);
-        final distanceB = _haversineKm(userLocation, b.location);
+        final locationA = LatLng(a.latitud, a.longitud);
+        final locationB = LatLng(b.latitud, b.longitud);
+        final distanceA = _haversineKm(userLocation, locationA);
+        final distanceB = _haversineKm(userLocation, locationB);
         return distanceA.compareTo(distanceB);
       });
 
@@ -173,19 +138,20 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _createMarkers() async {
+  void _createMarkers() {
     if (_currentPosition == null) return;
 
     final userLocation = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
     final Set<Marker> markers = {};
 
     for (final pharmacy in _nearbyPharmacies) {
-      final distance = _haversineKm(userLocation, pharmacy.location);
+      final pharmacyLocation = LatLng(pharmacy.latitud, pharmacy.longitud);
+      final distance = _haversineKm(userLocation, pharmacyLocation);
       
       markers.add(
         Marker(
           markerId: MarkerId(pharmacy.id),
-          position: pharmacy.location,
+          position: pharmacyLocation,
           infoWindow: InfoWindow(
             title: pharmacy.nombre,
             snippet: '${pharmacy.cadena} • ${distance.toStringAsFixed(1)} km',
@@ -198,10 +164,11 @@ class _MapScreenState extends State<MapScreen> {
 
     setState(() {
       _markers = markers;
+      _isLoading = false;
     });
   }
 
-  void _showPharmacyDetails(PuntoFisicoMock pharmacy, double distance) {
+  void _showPharmacyDetails(PuntoFisico pharmacy, double distance) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -209,38 +176,28 @@ class _MapScreenState extends State<MapScreen> {
       builder: (context) => PharmacyMarkerSheet(
         pharmacy: pharmacy,
         distance: distance,
-        onNavigate: () => _navigateToPharmacy(pharmacy),
+        onDelivery: () => _goToDelivery(pharmacy),
         onViewInventory: () => _viewInventory(pharmacy),
       ),
     );
   }
 
-  Future<void> _navigateToPharmacy(PuntoFisicoMock pharmacy) async {
-    final url = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitud},${pharmacy.longitud}'
+  void _goToDelivery(PuntoFisico pharmacy) {
+    Navigator.pushNamed(
+      context,
+      '/delivery',
+      arguments: pharmacy,
     );
-    
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo abrir Google Maps'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
-  void _viewInventory(PuntoFisicoMock pharmacy) {
+
+
+  void _viewInventory(PuntoFisico pharmacy) {
     Navigator.pop(context); // Close bottom sheet
-    // TODO: Wire inventory route '/storeInventory'
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Inventario de ${pharmacy.nombre} - Próximamente'),
-        backgroundColor: AppTheme.primaryColor,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PharmacyInventoryPage(pharmacy: pharmacy),
       ),
     );
   }

@@ -6,17 +6,9 @@ class MedicamentoRepository {
   final String _collection = 'medicamentos';
 
 
-  // Create a new medicamento - requires prescripcionId and puntoFisicoId per UML
+  // Create a new medicamento - no longer requires foreign keys as they're managed via relationships
   Future<void> create(Medicamento medicamento) async {
     try {
-      // Validation: both FKs must be provided per UML
-      if (medicamento.prescripcionId.isEmpty) {
-        throw Exception('prescripcionId is required - UML constraint');
-      }
-      if (medicamento.puntoFisicoId.isEmpty) {
-        throw Exception('puntoFisicoId is required - UML constraint');
-      }
-      
       await _firestore.collection(_collection).doc(medicamento.id).set(medicamento.toMap());
     } catch (e) {
       throw Exception('Error creating medicamento: $e');
@@ -66,48 +58,11 @@ class MedicamentoRepository {
     }
   }
 
-  // UML relationship: Prescripcion (1) —— (1..*) Medicamento
-  Future<List<Medicamento>> findByPrescripcionId(String prescripcionId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('prescripcionId', isEqualTo: prescripcionId)
-          .get();
-      
-      return querySnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
-          .toList();
-    } catch (e) {
-      throw Exception('Error finding medicamentos by prescripcion ID: $e');
-    }
-  }
-
-  // Stream version for reactive UIs
-  Stream<List<Medicamento>> streamByPrescripcionId(String prescripcionId) {
-    return _firestore
-        .collection(_collection)
-        .where('prescripcionId', isEqualTo: prescripcionId)
-        .snapshots()
-        .map((querySnapshot) => querySnapshot.docs
-            .map((doc) => Medicamento.fromMap(doc.data()))
-            .toList());
-  }
-
-  // UML relationship: Medicamento (0..*) —— (1) PuntoFisico  
-  Future<List<Medicamento>> findByPuntoFisicoId(String puntoFisicoId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('puntoFisicoId', isEqualTo: puntoFisicoId)
-          .get();
-      
-      return querySnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
-          .toList();
-    } catch (e) {
-      throw Exception('Error finding medicamentos by punto fisico ID: $e');
-    }
-  }
+  // NOTE: Prescripcion-Medicamento relationship is now managed via List<Medicamento> in Prescripcion
+  // Use PrescripcionRepository.getMedicamentosDePrescripcion() instead
+  
+  // NOTE: Medicamento-PuntoFisico relationship is now many-to-many via MedicamentoPuntoFisico
+  // Use MedicamentoPuntoFisicoRepository for these relationships
 
   // Find medicamentos by restriction status
   Future<List<Medicamento>> findByEsRestringido(bool esRestringido) async {
@@ -141,51 +96,18 @@ class MedicamentoRepository {
     }
   }
 
-  // Helper method for getting distinct puntos by user (via prescripciones → medicamentos)
+  // Helper method for getting distinct puntos by user (via prescripciones → medicamentos → MedicamentoPuntoFisico)
+  // NOTE: This now requires using MedicamentoPuntoFisicoRepository
+  @Deprecated('Use MedicamentoPuntoFisicoRepository and PrescripcionRepository to get this information')
   Future<List<String>> findDistinctPuntosByUserId(String userId) async {
-    try {
-      // First get user's prescripciones, then their medicamentos, then distinct puntos
-      final prescripcionesSnapshot = await _firestore
-          .collection('prescripciones')
-          .where('userId', isEqualTo: userId)
-          .get();
-      
-      Set<String> distinctPuntos = <String>{};
-      
-      for (var prescripcionDoc in prescripcionesSnapshot.docs) {
-        final medicamentosSnapshot = await _firestore
-            .collection(_collection)
-            .where('prescripcionId', isEqualTo: prescripcionDoc.id)
-            .get();
-        
-        for (var medicamentoDoc in medicamentosSnapshot.docs) {
-          final puntoFisicoId = medicamentoDoc.data()['puntoFisicoId'] as String?;
-          if (puntoFisicoId != null && puntoFisicoId.isNotEmpty) {
-            distinctPuntos.add(puntoFisicoId);
-          }
-        }
-      }
-      
-      return distinctPuntos.toList();
-    } catch (e) {
-      throw Exception('Error finding distinct puntos by user ID: $e');
-    }
+    throw Exception('DEPRECATED: Use MedicamentoPuntoFisicoRepository.getPuntosFisicosForMedicamento() and PrescripcionRepository.findByUserId() to get this information');
   }
 
-  // Delete medicamentos by prescription ID
+  // NOTE: Medicamentos are no longer deleted by prescripcionId
+  // They are managed via the List<Medicamento> in Prescripcion
+  @Deprecated('Medicamentos are now managed via List<Medicamento> in Prescripcion')
   Future<void> deleteByPrescripcionId(String prescripcionId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('prescripcionId', isEqualTo: prescripcionId)
-          .get();
-      
-      for (var doc in querySnapshot.docs) {
-        await doc.reference.delete();
-      }
-    } catch (e) {
-      throw Exception('Error deleting medicamentos by prescripcion ID: $e');
-    }
+    throw Exception('DEPRECATED: Medicamentos are now managed via List<Medicamento> in Prescripcion');
   }
 
   // Check if medicamento exists
@@ -220,9 +142,8 @@ class MedicamentoRepository {
     throw Exception('DEPRECATED: Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly');
   }
 
-  @Deprecated('Use findByPuntoFisicoId instead')
+  @Deprecated('Use MedicamentoPuntoFisicoRepository for many-to-many relationships')
   Future<List<Medicamento>> findByPuntoFisico(String puntoFisicoId) async {
-    // Redirect to new method
-    return await findByPuntoFisicoId(puntoFisicoId);
+    throw Exception('DEPRECATED: Use MedicamentoPuntoFisicoRepository.findByPuntoFisicoId() and then fetch individual medicamentos');
   }
 }
