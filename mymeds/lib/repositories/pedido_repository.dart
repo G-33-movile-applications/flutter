@@ -7,6 +7,36 @@ class PedidoRepository {
   final String _collection = 'pedidos';
   final PrescripcionRepository _prescripcionRepository = PrescripcionRepository();
 
+  bool _isValidPedidoData(Map<String, dynamic> data) {
+    try {
+      // Check for required timestamps
+      final fechaDespacho = data['fechaDespacho'];
+      final fechaEntrega = data['fechaEntrega'];
+      
+      if (fechaDespacho == null || fechaEntrega == null) {
+        print('Warning: Missing required date fields');
+        return false;
+      }
+      
+      if (fechaDespacho is! Timestamp || fechaEntrega is! Timestamp) {
+        print('Warning: Invalid date field types');
+        return false;
+      }
+
+      // Check for other required fields
+      final entregaEnTienda = data['entregaEnTienda'];
+      if (entregaEnTienda == null) {
+        print('Warning: Missing entregaEnTienda field');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      print('Warning: Error validating pedido data: $e');
+      return false;
+    }
+  }
+
   // Create a new pedido
   Future<void> create(Pedido pedido) async {
     try {
@@ -41,13 +71,26 @@ class PedidoRepository {
       List<Pedido> pedidos = [];
       
       for (var doc in querySnapshot.docs) {
-        final pedidoData = doc.data();
-        final identificadorPedido = pedidoData['identificadorPedido'] as String;
-        
-        // Fetch related prescription for each pedido
-        final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-        
-        pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+        try {
+          final pedidoData = doc.data();
+          
+          // Skip invalid data
+          if (!_isValidPedidoData(pedidoData)) {
+            print('Warning: Invalid pedido data in document ${doc.id}');
+            continue;
+          }
+
+          final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
+          
+          // Fetch related prescription for each pedido
+          final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
+          
+          pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+        } catch (e) {
+          print('Warning: Error processing pedido ${doc.id}: $e');
+          // Continue processing other pedidos
+          continue;
+        }
       }
       
       return pedidos;

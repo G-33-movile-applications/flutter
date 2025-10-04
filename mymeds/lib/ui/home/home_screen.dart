@@ -3,6 +3,7 @@ import 'widgets/feature_card.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
+import '../analytics/delivery_analytics_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,18 @@ class HomeScreen extends StatelessWidget {
           },
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics_outlined),
+            tooltip: 'Ver estadísticas',
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (context) => const DeliveryAnalyticsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
