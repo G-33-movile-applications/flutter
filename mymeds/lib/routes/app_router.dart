@@ -6,6 +6,7 @@ import '../ui/map/map_screen.dart';
 import '../ui/upload/upload_screen_stub.dart';
 import '../ui/profile/profile_screen_stub.dart';
 import '../ui/auth/login_screen.dart';
+import '../models/punto_fisico.dart';
 
 class AppRouter {
   static const String login = '/';
@@ -48,8 +49,9 @@ class AppRouter {
           settings: settings,
         );
       case delivery:
+        final pharmacy = settings.arguments as PuntoFisico?;
         return MaterialPageRoute(
-          builder: (_) => const DeliveryScreen(),
+          builder: (_) => DeliveryScreen(pharmacy: pharmacy),
           settings: settings,
         );
       default:

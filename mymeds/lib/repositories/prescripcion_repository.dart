@@ -1,11 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/prescripcion.dart';
-import 'medicamento_repository.dart';
+import '../models/medicamento.dart';
 
 class PrescripcionRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'prescripciones';
-  final MedicamentoRepository _medicamentoRepository = MedicamentoRepository();
 
   // Create a new prescripcion
   Future<void> create(Prescripcion prescripcion) async {
@@ -23,10 +22,8 @@ class PrescripcionRepository {
       if (doc.exists && doc.data() != null) {
         final prescripcionData = doc.data()!;
         
-        // Fetch related medications
-        final medicamentos = await _medicamentoRepository.findByPrescripcionId(id);
-        
-        return Prescripcion.fromMap(prescripcionData, medicamentos: medicamentos);
+        // Medicamentos are now embedded in the prescripcion document
+        return Prescripcion.fromMap(prescripcionData);
       }
       return null;
     } catch (e) {
@@ -38,19 +35,10 @@ class PrescripcionRepository {
   Future<List<Prescripcion>> readAll() async {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
-      List<Prescripcion> prescripciones = [];
       
-      for (var doc in querySnapshot.docs) {
-        final prescripcionData = doc.data();
-        final id = prescripcionData['id'] as String;
-        
-        // Fetch related medications for each prescripcion
-        final medicamentos = await _medicamentoRepository.findByPrescripcionId(id);
-        
-        prescripciones.add(Prescripcion.fromMap(prescripcionData, medicamentos: medicamentos));
-      }
-      
-      return prescripciones;
+      return querySnapshot.docs
+          .map((doc) => Prescripcion.fromMap(doc.data()))
+          .toList();
     } catch (e) {
       throw Exception('Error reading all prescripciones: $e');
     }
@@ -68,8 +56,8 @@ class PrescripcionRepository {
   // Delete a prescripcion
   Future<void> delete(String id) async {
     try {
-      // Delete related medications first
-      await _medicamentoRepository.deleteByPrescripcionId(id);
+      // NOTE: Medicamentos are now managed via List<Medicamento> in Prescripcion
+      // No need to delete them separately as they're part of the document
       
       // Delete the prescripcion
       await _firestore.collection(_collection).doc(id).delete();
@@ -89,12 +77,7 @@ class PrescripcionRepository {
       
       if (querySnapshot.docs.isNotEmpty) {
         final prescripcionData = querySnapshot.docs.first.data();
-        final id = prescripcionData['id'] as String;
-        
-        // Fetch related medications
-        final medicamentos = await _medicamentoRepository.findByPrescripcionId(id);
-        
-        return Prescripcion.fromMap(prescripcionData, medicamentos: medicamentos);
+        return Prescripcion.fromMap(prescripcionData);
       }
       return null;
     } catch (e) {
@@ -110,19 +93,9 @@ class PrescripcionRepository {
           .where('recetadoPor', isEqualTo: doctor)
           .get();
       
-      List<Prescripcion> prescripciones = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final prescripcionData = doc.data();
-        final id = prescripcionData['id'] as String;
-        
-        // Fetch related medications for each prescripcion
-        final medicamentos = await _medicamentoRepository.findByPrescripcionId(id);
-        
-        prescripciones.add(Prescripcion.fromMap(prescripcionData, medicamentos: medicamentos));
-      }
-      
-      return prescripciones;
+      return querySnapshot.docs
+          .map((doc) => Prescripcion.fromMap(doc.data()))
+          .toList();
     } catch (e) {
       throw Exception('Error finding prescripciones by doctor: $e');
     }
@@ -160,11 +133,10 @@ class PrescripcionRepository {
         .collection(_collection)
         .doc(id)
         .snapshots()
-        .asyncMap((doc) async {
+        .map((doc) {
           if (doc.exists && doc.data() != null) {
             final prescripcionData = doc.data()!;
-            final medicamentos = await _medicamentoRepository.findByPrescripcionId(id);
-            return Prescripcion.fromMap(prescripcionData, medicamentos: medicamentos);
+            return Prescripcion.fromMap(prescripcionData);
           }
           return null;
         });
@@ -178,14 +150,9 @@ class PrescripcionRepository {
           .where('userId', isEqualTo: userId)
           .get();
       
-      List<Prescripcion> prescripciones = [];
-      
-      for (var doc in querySnapshot.docs) {
-        final medicamentos = await _medicamentoRepository.findByPrescripcionId(doc.id);
-        prescripciones.add(Prescripcion.fromMap(doc.data(), medicamentos: medicamentos));
-      }
-      
-      return prescripciones;
+      return querySnapshot.docs
+          .map((doc) => Prescripcion.fromMap(doc.data()))
+          .toList();
     } catch (e) {
       throw Exception('Error finding prescripciones by user ID: $e');
     }
@@ -197,16 +164,37 @@ class PrescripcionRepository {
         .collection(_collection)
         .where('userId', isEqualTo: userId)
         .snapshots()
-        .asyncMap((querySnapshot) async {
-          List<Prescripcion> prescripciones = [];
-          
-          for (var doc in querySnapshot.docs) {
-            final medicamentos = await _medicamentoRepository.findByPrescripcionId(doc.id);
-            prescripciones.add(Prescripcion.fromMap(doc.data(), medicamentos: medicamentos));
-          }
-          
-          return prescripciones;
-        });
+        .map((querySnapshot) => querySnapshot.docs
+            .map((doc) => Prescripcion.fromMap(doc.data()))
+            .toList());
+  }
+
+  // Update medicamentos in a prescripcion
+  Future<void> updateMedicamentos(String prescripcionId, List<dynamic> medicamentos) async {
+    try {
+      final prescripcion = await read(prescripcionId);
+      if (prescripcion != null) {
+        final medicamentosObjects = medicamentos
+            .map((medMap) => Medicamento.fromMap(medMap as Map<String, dynamic>))
+            .toList();
+        final updatedPrescripcion = prescripcion.copyWith(medicamentos: medicamentosObjects);
+        await update(updatedPrescripcion);
+      } else {
+        throw Exception('Prescripcion not found');
+      }
+    } catch (e) {
+      throw Exception('Error updating medicamentos in prescripcion: $e');
+    }
+  }
+
+  // Get medicamentos for a prescripcion
+  Future<List<dynamic>> getMedicamentosDePrescripcion(String prescripcionId) async {
+    try {
+      final prescripcion = await read(prescripcionId);
+      return prescripcion?.medicamentos.map((med) => med.toMap()).toList() ?? [];
+    } catch (e) {
+      throw Exception('Error getting medicamentos for prescripcion: $e');
+    }
   }
 
   // Alias method for UserSession compatibility
