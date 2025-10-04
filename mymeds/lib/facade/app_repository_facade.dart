@@ -1,3 +1,5 @@
+import 'package:mymeds/models/medicamento_punto_fisico.dart';
+
 import '../models/user_model.dart';
 import '../models/pedido.dart';
 import '../models/prescripcion.dart';
@@ -160,39 +162,56 @@ class AppRepositoryFacade {
   // ==================== MEDICATION OPERATIONS ====================
 
   /// Get medications available at physical points (pharmacies)
-  Future<List<Medicamento>> getMedicamentosDisponiblesEnPuntosFisicos({
-    String? puntoFisicoId,
-    bool? esRestringido,
-    String? tipo,
-  }) async {
-    List<Medicamento> medicamentos = [];
+Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
+  String? puntoFisicoId,
+  bool? esRestringido,
+  String? tipo,
+}) async {
+  List<Map<String, dynamic>> medicamentosConDetalles = [];
 
-    if (puntoFisicoId != null) {
-      // Get medicamento IDs available at this punto fisico
-      final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoFisicoId);
-      // Fetch individual medicamentos
-      for (String medId in medicamentoIds) {
-        final med = await _medicamentoRepository.read(medId);
-        if (med != null) {
-          medicamentos.add(med);
-        }
-      }
-    } else {
-      // Get all medications
-      medicamentos = await _medicamentoRepository.readAll();
-    }
+  // 🔹 Fetch relationships with stock
+  List<MedicamentoPuntoFisico> relaciones = [];
 
-    // Apply filters
-    if (esRestringido != null) {
-      medicamentos = medicamentos.where((m) => m.esRestringido == esRestringido).toList();
-    }
-
-    if (tipo != null) {
-      medicamentos = medicamentos.where((m) => m.toMap()['tipo'] == tipo).toList();
-    }
-
-    return medicamentos;
+  if (puntoFisicoId != null) {
+    relaciones = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisicoMed(puntoFisicoId);
+  } else {
+    relaciones = await _medicamentoPuntoFisicoRepository.readAll();
+    relaciones = relaciones.where((rel) => rel.cantidad > 0).toList();
   }
+
+  // 🔹 Iterate through relations and fetch medicamento details
+  for (final relacion in relaciones) {
+    final medicamento = await _medicamentoRepository.read(relacion.medicamentoId);
+
+    if (medicamento != null) {
+      // Apply filters
+      if (esRestringido != null && medicamento.esRestringido != esRestringido) continue;
+      if (tipo != null && medicamento.toMap()['tipo'] != tipo) continue;
+
+      // Get precio (for now mocked, later from another repository)
+      final precio = await _getPrecioDeMedicamento(relacion.medicamentoId, puntoFisicoId);
+
+      medicamentosConDetalles.add({
+        'id': medicamento.id,
+        'nombre': medicamento.nombre,
+        'descripcion': medicamento.descripcion,
+        'tipo': medicamento.toMap()['tipo'],
+        'cantidad': relacion.cantidad,
+        'precio': precio,
+      });
+    }
+  }
+
+  return medicamentosConDetalles;
+}
+
+
+/// 🔹 Helper: Fetch price (placeholder logic — can be replaced later)
+Future<double> _getPrecioDeMedicamento(String medicamentoId, String? puntoFisicoId) async {
+  // Example: Fetch from another repository or collection
+  // For now, we simulate a lookup with a default value
+  return 15000.0; // Replace later with real repo query
+}
 
   /// Add medication to pharmacy (establish availability) - DEPRECATED in UML
   @Deprecated('Use new UML (0..*:1) relationship - update medicamento.puntoFisicoId directly')

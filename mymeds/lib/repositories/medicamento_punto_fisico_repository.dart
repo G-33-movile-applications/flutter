@@ -232,4 +232,14 @@ class MedicamentoPuntoFisicoRepository {
       throw Exception('Error getting medicamentos at punto fisico: $e');
     }
   }
+  Future<List<MedicamentoPuntoFisico>> getMedicamentosAtPuntoFisicoMed(String puntoFisicoId) async {
+  try {
+    final relationships = await findByPuntoFisicoId(puntoFisicoId);
+
+    // Only return those that have stock available
+    return relationships.where((rel) => rel.cantidad > 0).toList();
+  } catch (e) {
+    throw Exception('Error getting medicamentos at punto físico: $e');
+  }
+}
 }
