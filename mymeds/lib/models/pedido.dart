@@ -28,16 +28,21 @@ class Pedido {
 
   // Create Pedido from Firestore document
   factory Pedido.fromMap(Map<String, dynamic> map, {Prescripcion? prescripcion}) {
+    // Safely convert timestamps
+    DateTime convertTimestamp(Timestamp? timestamp) {
+      return timestamp?.toDate() ?? DateTime.now();
+    }
+
     return Pedido(
-      identificadorPedido: map['identificadorPedido'] ?? '',
-      fechaEntrega: (map['fechaEntrega'] as Timestamp).toDate(),
-      fechaDespacho: (map['fechaDespacho'] as Timestamp).toDate(),
-      direccionEntrega: map['direccionEntrega'] ?? '',
-      entregado: map['entregado'] ?? false,
-      entregaEnTienda: map['entregaEnTienda'] ?? false,
-      usuarioId: map['usuarioId'] ?? '',
-      puntoFisicoId: map['puntoFisicoId'] ?? '',
-      prescripcionId: map['prescripcionId'] ?? '',
+      identificadorPedido: map['identificadorPedido']?.toString() ?? '',
+      fechaEntrega: convertTimestamp(map['fechaEntrega'] as Timestamp?),
+      fechaDespacho: convertTimestamp(map['fechaDespacho'] as Timestamp?),
+      direccionEntrega: map['direccionEntrega']?.toString() ?? '',
+      entregado: map['entregado'] as bool? ?? false,
+      entregaEnTienda: map['entregaEnTienda'] as bool? ?? false,
+      usuarioId: map['usuarioId']?.toString() ?? '',
+      puntoFisicoId: map['puntoFisicoId']?.toString() ?? '',
+      prescripcionId: map['prescripcionId']?.toString() ?? '',
       prescripcion: prescripcion,
     );
   }
