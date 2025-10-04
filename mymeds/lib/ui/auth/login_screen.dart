@@ -133,6 +133,24 @@ class _LoginScreenState extends State<LoginScreen> {
 								),
 							),
 							const SizedBox(height: 24),
+              
+              Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/forgot-password');
+                      },
+                      child: Text(
+                        '¿Olvidaste tu contraseña?',
+                        style: GoogleFonts.balsamiqSans(
+                          color: theme.colorScheme.primary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
 							// Login Button
 							SizedBox(
 								width: double.infinity,
