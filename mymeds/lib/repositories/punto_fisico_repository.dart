@@ -21,7 +21,7 @@ class PuntoFisicoRepository {
     try {
       final doc = await _firestore.collection(_collection).doc(id).get();
       if (doc.exists && doc.data() != null) {
-        return PuntoFisico.fromMap(doc.data()!);
+        return PuntoFisico.fromMap(doc.data()!, documentId: doc.id);
       }
       return null;
     } catch (e) {
@@ -34,7 +34,7 @@ class PuntoFisicoRepository {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
       return querySnapshot.docs
-          .map((doc) => PuntoFisico.fromMap(doc.data()))
+          .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
           .toList();
     } catch (e) {
       throw Exception('Error reading all puntos fisicos: $e');
@@ -68,7 +68,7 @@ class PuntoFisicoRepository {
           .get();
       
       return querySnapshot.docs
-          .map((doc) => PuntoFisico.fromMap(doc.data()))
+          .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
           .toList();
     } catch (e) {
       throw Exception('Error finding puntos fisicos by cadena: $e');
@@ -85,7 +85,7 @@ class PuntoFisicoRepository {
       List<PuntoFisico> nearbyPuntos = [];
       
       for (var doc in querySnapshot.docs) {
-        final punto = PuntoFisico.fromMap(doc.data());
+        final punto = PuntoFisico.fromMap(doc.data(), documentId: doc.id);
         final distance = _calculateDistance(centerLat, centerLng, punto.latitud, punto.longitud);
         
         if (distance <= radiusKm) {
@@ -112,7 +112,7 @@ class PuntoFisicoRepository {
       final querySnapshot = await _firestore.collection(_collection).get();
       
       return querySnapshot.docs
-          .map((doc) => PuntoFisico.fromMap(doc.data()))
+          .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
           .where((punto) => 
               punto.nombre.toLowerCase().contains(query.toLowerCase()) ||
               punto.direccion.toLowerCase().contains(query.toLowerCase()) ||
@@ -140,7 +140,7 @@ class PuntoFisicoRepository {
         .doc(id)
         .snapshots()
         .map((doc) => doc.exists && doc.data() != null 
-            ? PuntoFisico.fromMap(doc.data()!) 
+            ? PuntoFisico.fromMap(doc.data()!, documentId: doc.id) 
             : null);
   }
 
@@ -150,7 +150,7 @@ class PuntoFisicoRepository {
         .collection(_collection)
         .snapshots()
         .map((querySnapshot) => querySnapshot.docs
-            .map((doc) => PuntoFisico.fromMap(doc.data()))
+            .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
             .toList());
   }
 

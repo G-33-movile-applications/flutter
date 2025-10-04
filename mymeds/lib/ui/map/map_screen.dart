@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
@@ -97,7 +96,7 @@ class _MapScreenState extends State<MapScreen> {
         .listen(
       (snapshot) {
         final allPharmacies = snapshot.docs
-            .map((doc) => PuntoFisico.fromMap(doc.data()))
+            .map((doc) => PuntoFisico.fromMap(doc.data(), documentId: doc.id))
             .toList();
         
         _filterNearbyPharmacies(allPharmacies);
@@ -176,30 +175,21 @@ class _MapScreenState extends State<MapScreen> {
       builder: (context) => PharmacyMarkerSheet(
         pharmacy: pharmacy,
         distance: distance,
-        onNavigate: () => _navigateToPharmacy(pharmacy),
+        onDelivery: () => _goToDelivery(pharmacy),
         onViewInventory: () => _viewInventory(pharmacy),
       ),
     );
   }
 
-  Future<void> _navigateToPharmacy(PuntoFisico pharmacy) async {
-    final url = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${pharmacy.latitud},${pharmacy.longitud}'
+  void _goToDelivery(PuntoFisico pharmacy) {
+    Navigator.pushNamed(
+      context,
+      '/delivery',
+      arguments: pharmacy,
     );
-    
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo abrir Google Maps'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
+
+
 
   void _viewInventory(PuntoFisico pharmacy) {
     Navigator.pop(context); // Close bottom sheet

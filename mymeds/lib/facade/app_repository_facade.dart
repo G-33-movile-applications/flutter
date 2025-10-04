@@ -492,7 +492,32 @@ class AppRepositoryFacade {
     return relationship?.cantidad;
   }
   
+  /// Create a pedido with existing prescription (DOES NOT create new prescriptions)
+  Future<void> createPedido(Pedido pedido) async {
+    // Validate required fields
+    if (pedido.prescripcionId.isEmpty) {
+      throw Exception('prescripcionId cannot be empty - must link to existing prescription');
+    }
+    if (pedido.usuarioId.isEmpty) {
+      throw Exception('usuarioId is required');
+    }
+    if (pedido.puntoFisicoId.isEmpty) {
+      throw Exception('puntoFisicoId is required');
+    }
+
+    // Verify the prescription exists
+    final prescriptionExists = await _prescripcionRepository.exists(pedido.prescripcionId);
+    if (!prescriptionExists) {
+      throw Exception('Prescription with id ${pedido.prescripcionId} does not exist');
+    }
+
+    // Create only the pedido - no prescription creation
+    await _pedidoRepository.create(pedido);
+  }
+
   /// Create a complete pedido (order) with prescription, medicamentos, and punto fisico assignment
+  /// @deprecated Use createPedido instead to avoid prescription duplication
+  @Deprecated('Use createPedido with existing prescripcionId to avoid creating duplicate prescriptions')
   Future<void> createCompletePedido({
     required Pedido pedido,
     required Prescripcion prescripcion,
@@ -501,11 +526,18 @@ class AppRepositoryFacade {
     // Ensure pedido has the punto fisico assigned
     final updatedPedido = pedido.copyWith(puntoFisicoId: puntoFisicoId);
     
-    // Create the pedido
+    // Create the pedido first
     await _pedidoRepository.create(updatedPedido);
     
+    // Create a new prescription specifically for this pedido with a unique ID
+    final newPrescripcionId = '${updatedPedido.identificadorPedido}_prescription';
+    final newPrescripcion = prescripcion.copyWith(
+      id: newPrescripcionId,
+      pedidoId: updatedPedido.identificadorPedido,
+    );
+    
     // Create the prescription with embedded medicamentos
-    await _prescripcionRepository.create(prescripcion);
+    await _prescripcionRepository.create(newPrescripcion);
     
     // Ensure all medicamentos are available at the assigned punto fisico
     for (var medicamento in prescripcion.medicamentos) {
