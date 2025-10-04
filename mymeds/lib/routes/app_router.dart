@@ -4,7 +4,7 @@ import 'package:mymeds/ui/delivery/delivery_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/map/map_screen.dart';
 import '../ui/upload/upload_screen_stub.dart';
-import '../ui/profile/profile_screen_stub.dart';
+import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
 
 class AppRouter {
@@ -43,8 +43,9 @@ class AppRouter {
           settings: settings,
         );
       case profile:
+        final args = settings.arguments as String;
         return MaterialPageRoute(
-          builder: (_) => const ProfileScreenStub(),
+          builder: (_) => ProfilePage(uid: args),
           settings: settings,
         );
       case delivery:

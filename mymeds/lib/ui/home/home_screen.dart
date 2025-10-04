@@ -82,7 +82,11 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.person_rounded,
                   buttonText: 'Ver perfil',
                   onPressed: () {
-                    Navigator.pushNamed(context, '/profile');
+                    Navigator.pushNamed(
+                    context,
+                    '/profile',
+                    arguments: UserSession().currentUser.value?.uid,
+                  );;
                   },
                 ),
                 
