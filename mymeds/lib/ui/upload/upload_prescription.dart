@@ -109,10 +109,13 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
         ),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
-        actions: const [
-          Icon(Icons.home_outlined),
-          SizedBox(width: 10),
-          Icon(Icons.more_vert),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_outlined),
+            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+          ),
+          const SizedBox(width: 10),
+          const Icon(Icons.more_vert),
         ],
       ),
       drawer: const Drawer(),

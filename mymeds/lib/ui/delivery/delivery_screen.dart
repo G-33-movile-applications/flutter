@@ -387,7 +387,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        value: _selectedPrescripcion == null 
+                        initialValue: _selectedPrescripcion == null 
                             ? null 
                             : (_selectedPrescripcion!.id.isEmpty 
                                 ? 'prescripcion_${_prescripciones.indexOf(_selectedPrescripcion!)}' 

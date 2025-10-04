@@ -86,7 +86,7 @@ class HomeScreen extends StatelessWidget {
                     context,
                     '/profile',
                     arguments: UserSession().currentUser.value?.uid,
-                  );;
+                  );
                   },
                 ),
                 
