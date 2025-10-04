@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
+import '../pharmacy/pharmacy_inventory_page.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -193,11 +194,10 @@ class _MapScreenState extends State<MapScreen> {
 
   void _viewInventory(PuntoFisico pharmacy) {
     Navigator.pop(context); // Close bottom sheet
-    // TODO: Wire inventory route '/storeInventory'
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Inventario de ${pharmacy.nombre} - Próximamente'),
-        backgroundColor: AppTheme.primaryColor,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PharmacyInventoryPage(pharmacy: pharmacy),
       ),
     );
   }
