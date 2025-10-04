@@ -4,7 +4,7 @@ import 'package:mymeds/ui/auth/register_screen.dart';
 import 'package:mymeds/ui/delivery/delivery_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/map/map_screen.dart';
-import '../ui/upload/upload_screen_stub.dart';
+import '../ui/upload/upload_prescription.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
 import '../models/punto_fisico.dart';

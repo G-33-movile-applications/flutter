@@ -64,7 +64,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   String _getRecommendation() {
     final hour = DateTime.now().hour;
-    if (hour < 12) {
+    if (8 < hour && hour < 18) {
       return "Recomendación: Recoger en farmacia";
     } else {
       return "Recomendación: Entrega a domicilio";
@@ -399,7 +399,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           return DropdownMenuItem<String>(
                             value: itemValue,
                             child: Text(
-                              'Dr. ${prescripcion.recetadoPor} - ${prescripcion.fechaEmision.day}/${prescripcion.fechaEmision.month}/${prescripcion.fechaEmision.year}',
+                              '${prescripcion.recetadoPor} - ${prescripcion.fechaEmision.day}/${prescripcion.fechaEmision.month}/${prescripcion.fechaEmision.year}',
                             ),
                           );
                         }).toList(),

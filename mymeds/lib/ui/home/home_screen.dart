@@ -143,7 +143,7 @@ class HomeScreen extends StatelessWidget {
               // Status message
               Text(
                 user != null 
-                    ? 'Tienes 2 prescripciones activas' // TODO: get active Prescripcion count from Firestore
+                    ? '¿Qué deseas hacer hoy?'
                     : 'Inicia sesión para ver tus prescripciones',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppTheme.textSecondary.withValues(alpha: 0.8),
