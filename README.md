@@ -67,6 +67,6 @@ G-33 Mobile Applications Team
 
 Santiago Castro
 
-JuanSarS
+Juan Diego Sarmiento
 
 Pablo Martínez
