@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,6 +9,9 @@ import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
+import 'package:provider/provider.dart'; 
+import '../../providers/motion_provider.dart';
+import '../../services/motion_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -265,13 +269,58 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final motionState = context.watch<MotionProvider>().motionState;
+    final isDriving = motionState == MotionState.driving;
+
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('MAPA'),
+     backgroundColor: AppTheme.scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text('MAPA')),
+      body: Stack(
+        children: [
+          _buildBody(),
+          if (isDriving)
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                child: Container(
+                  color: Colors.black.withOpacity(0.5),
+                  alignment: Alignment.center,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.directions_car_filled,
+                            color: Colors.white, size: 70),
+                        const SizedBox(height: 20),
+                        Text(
+                          "Modo conducción detectado",
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Por tu seguridad, el mapa está bloqueado mientras conduces.",
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      body: _buildBody(),
-      floatingActionButton: _buildFABStack(),
+      floatingActionButton: isDriving ? null : _buildFABStack(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
