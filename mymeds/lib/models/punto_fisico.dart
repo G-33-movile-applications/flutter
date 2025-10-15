@@ -1,78 +1,112 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+
 class PuntoFisico {
   final String id;
-  final double latitud;
-  final double longitud;
-  final String direccion;
-  final String cadena;
   final String nombre;
-  final List<String> horarioAtencion; // UML required field
-  final List<String> diasAtencion; // UML required field
+  final String direccion;
+  final String? telefono;
+  final GeoPoint ubicacion; // lat, lng as GeoPoint
+  final String? horario;
+  // Note: inventario is now stored as a subcollection, not embedded
 
   PuntoFisico({
     required this.id,
-    required this.latitud,
-    required this.longitud,
-    required this.direccion,
-    required this.cadena,
     required this.nombre,
-    this.horarioAtencion = const [],
-    this.diasAtencion = const [],
+    required this.direccion,
+    this.telefono,
+    required this.ubicacion,
+    this.horario,
   });
+
+  // Getters for backward compatibility
+  double get latitud => ubicacion.latitude;
+  double get longitud => ubicacion.longitude;
+  
+  @Deprecated('Field removed from new model')
+  String get cadena => '';
+  
+  @Deprecated('Use horario field instead')  
+  List<String> get horarioAtencion => horario != null ? [horario!] : [];
+  
+  @Deprecated('Use horario field instead')
+  List<String> get diasAtencion => [];
 
   // Create PuntoFisico from Firestore document
   factory PuntoFisico.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    // Handle different ways location can be stored
+    GeoPoint ubicacion;
+    if (map['ubicacion'] is GeoPoint) {
+      ubicacion = map['ubicacion'] as GeoPoint;
+    } else if (map['ubicacion'] is Map) {
+      final ubicacionMap = map['ubicacion'] as Map<String, dynamic>;
+      ubicacion = GeoPoint(
+        (ubicacionMap['lat'] ?? ubicacionMap['latitude'] ?? 0.0).toDouble(),
+        (ubicacionMap['lng'] ?? ubicacionMap['longitude'] ?? 0.0).toDouble(),
+      );
+    } else {
+      // Backward compatibility with separate latitud/longitud fields
+      ubicacion = GeoPoint(
+        (map['latitud'] ?? 0.0).toDouble(),
+        (map['longitud'] ?? 0.0).toDouble(),
+      );
+    }
+
     return PuntoFisico(
       id: documentId ?? map['id'] ?? '',
-      latitud: (map['latitud'] ?? 0.0).toDouble(),
-      longitud: (map['longitud'] ?? 0.0).toDouble(),
-      direccion: map['direccion'] ?? '',
-      cadena: map['cadena'] ?? '',
       nombre: map['nombre'] ?? '',
-      horarioAtencion: List<String>.from(map['horarioAtencion'] ?? []),
-      diasAtencion: List<String>.from(map['diasAtencion'] ?? []),
+      direccion: map['direccion'] ?? '',
+      telefono: map['telefono'],
+      ubicacion: ubicacion,
+      horario: map['horario'] ?? 
+               (map['horarioAtencion'] != null && map['diasAtencion'] != null
+                   ? '${(map['diasAtencion'] as List).join(', ')}: ${(map['horarioAtencion'] as List).join(', ')}'
+                   : null), // backward compatibility
     );
   }
 
   // Convert PuntoFisico to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'latitud': latitud,
-      'longitud': longitud,
-      'direccion': direccion,
-      'cadena': cadena,
       'nombre': nombre,
-      'horarioAtencion': horarioAtencion,
-      'diasAtencion': diasAtencion,
+      'direccion': direccion,
+      if (telefono != null) 'telefono': telefono,
+      'ubicacion': ubicacion,
+      if (horario != null) 'horario': horario,
     };
   }
+
+  // Create from JSON string
+  factory PuntoFisico.fromJson(String jsonStr) {
+    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    return PuntoFisico.fromMap(map);
+  }
+
+  // Convert to JSON string
+  String toJson() => jsonEncode(toMap());
 
   // Create a copy with some fields updated
   PuntoFisico copyWith({
     String? id,
-    double? latitud,
-    double? longitud,
-    String? direccion,
-    String? cadena,
     String? nombre,
-    List<String>? horarioAtencion,
-    List<String>? diasAtencion,
+    String? direccion,
+    String? telefono,
+    GeoPoint? ubicacion,
+    String? horario,
   }) {
     return PuntoFisico(
       id: id ?? this.id,
-      latitud: latitud ?? this.latitud,
-      longitud: longitud ?? this.longitud,
-      direccion: direccion ?? this.direccion,
-      cadena: cadena ?? this.cadena,
       nombre: nombre ?? this.nombre,
-      horarioAtencion: horarioAtencion ?? this.horarioAtencion,
-      diasAtencion: diasAtencion ?? this.diasAtencion,
+      direccion: direccion ?? this.direccion,
+      telefono: telefono ?? this.telefono,
+      ubicacion: ubicacion ?? this.ubicacion,
+      horario: horario ?? this.horario,
     );
   }
 
   @override
   String toString() {
-    return 'PuntoFisico(id: $id, nombre: $nombre, cadena: $cadena)';
+    return 'PuntoFisico(id: $id, nombre: $nombre, direccion: $direccion)';
   }
 
   @override

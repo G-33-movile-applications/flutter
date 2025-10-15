@@ -41,6 +41,9 @@ class _LoginScreenState extends State<LoginScreen> {
 					);
 				}
 			} catch (e) {
+				debugPrint('🚨🚨 LOGIN SCREEN EXCEPTION HANDLER TRIGGERED 🚨🚨');
+				debugPrint('🚨 Exception Type: ${e.runtimeType}');
+				debugPrint('🚨 Exception Message: ${e.toString()}');
 				if (!mounted) return;
 				ScaffoldMessenger.of(context).showSnackBar(
 					SnackBar(

@@ -5,7 +5,7 @@ import '../models/medicamento.dart';
 
 class PuntoFisicoRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _collection = 'puntos_fisicos';
+  final String _collection = 'puntosFisicos';
 
   // Create a new punto fisico
   Future<void> create(PuntoFisico puntoFisico) async {

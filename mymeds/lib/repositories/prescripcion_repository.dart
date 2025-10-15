@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/prescripcion.dart';
-import '../models/medicamento.dart';
 
 class PrescripcionRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -143,15 +142,23 @@ class PrescripcionRepository {
   }
 
   // UML relationship method: Usuario (1) —— (0..*) Prescripcion
+  // Updated to work with subcollection approach: usuarios/{userId}/prescripciones
   Future<List<Prescripcion>> findByUserId(String userId) async {
     try {
+      if (userId.isEmpty) {
+        throw ArgumentError('User ID cannot be empty');
+      }
+      
       final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('userId', isEqualTo: userId)
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
           .get();
       
       return querySnapshot.docs
-          .map((doc) => Prescripcion.fromMap(doc.data()))
+          .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+          .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+          .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
           .toList();
     } catch (e) {
       throw Exception('Error finding prescripciones by user ID: $e');
@@ -159,42 +166,36 @@ class PrescripcionRepository {
   }
 
   // Stream version of findByUserId for reactive UIs
+  // Updated to work with subcollection approach: usuarios/{userId}/prescripciones
   Stream<List<Prescripcion>> streamByUserId(String userId) {
+    if (userId.isEmpty) {
+      return Stream.error(ArgumentError('User ID cannot be empty'));
+    }
+    
     return _firestore
-        .collection(_collection)
-        .where('userId', isEqualTo: userId)
+        .collection('usuarios')
+        .doc(userId)
+        .collection('prescripciones')
         .snapshots()
         .map((querySnapshot) => querySnapshot.docs
-            .map((doc) => Prescripcion.fromMap(doc.data()))
+            .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+            .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+            .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
             .toList());
   }
 
   // Update medicamentos in a prescripcion
+  @Deprecated('Medicamentos are now stored in subcollections')
   Future<void> updateMedicamentos(String prescripcionId, List<dynamic> medicamentos) async {
-    try {
-      final prescripcion = await read(prescripcionId);
-      if (prescripcion != null) {
-        final medicamentosObjects = medicamentos
-            .map((medMap) => Medicamento.fromMap(medMap as Map<String, dynamic>))
-            .toList();
-        final updatedPrescripcion = prescripcion.copyWith(medicamentos: medicamentosObjects);
-        await update(updatedPrescripcion);
-      } else {
-        throw Exception('Prescripcion not found');
-      }
-    } catch (e) {
-      throw Exception('Error updating medicamentos in prescripcion: $e');
-    }
+    // Medicamentos are now in subcollections, this method is deprecated
+    throw UnimplementedError('Medicamentos are now stored in subcollections. Use subcollection-based operations.');
   }
 
   // Get medicamentos for a prescripcion
+  @Deprecated('Medicamentos are now stored in subcollections')
   Future<List<dynamic>> getMedicamentosDePrescripcion(String prescripcionId) async {
-    try {
-      final prescripcion = await read(prescripcionId);
-      return prescripcion?.medicamentos.map((med) => med.toMap()).toList() ?? [];
-    } catch (e) {
-      throw Exception('Error getting medicamentos for prescripcion: $e');
-    }
+    // Medicamentos are now in subcollections, return empty list for backward compatibility
+    return <dynamic>[];
   }
 
   // Alias method for UserSession compatibility
