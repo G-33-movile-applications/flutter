@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mymeds/models/user_preferencias.dart';
 import '../models/user_model.dart';
 
 class AuthService {
@@ -20,7 +21,7 @@ class AuthService {
     required String address,
     required String city,
     required String department,
-    required String zipCode,
+    required String zipCode, required UserPreferencias preferencias,
   }) async {
     try {
       // Create user with Firebase Auth
@@ -43,6 +44,7 @@ class AuthService {
             'department': department,
             'zipCode': zipCode,
             'createdAt': FieldValue.serverTimestamp(),
+            'preferencias': preferencias.toMap(),
           };
           
           await _firestore.collection('usuarios').doc(user.uid).set(userData);
@@ -128,6 +130,8 @@ class AuthService {
       String errorMessage;
       switch (e.code) {
         case 'invalid-credential':
+          errorMessage = 'Correo o contraseña incorrecta.';
+          break;
         case 'wrong-password':
           errorMessage = 'Correo o contraseña incorrectos.';
           break;

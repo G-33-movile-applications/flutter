@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
 								},
 								decoration: InputDecoration(
 									labelText: 'Correo electrónico',
-									hintText: 'ejemplo@mail.com',
+									hintText: 'ejemplo1@mail.com',
 									filled: true,
 									fillColor: const Color(0xFFFFF1D5),
 									border: OutlineInputBorder(
