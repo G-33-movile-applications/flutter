@@ -121,7 +121,7 @@ class _MapScreenState extends State<MapScreen> {
         .where((pharmacy) {
           final pharmacyLocation = LatLng(pharmacy.latitud, pharmacy.longitud);
           final distance = _haversineKm(userLocation, pharmacyLocation);
-          return distance <= 5.0; // Only pharmacies within 5km
+          return distance <= 100.0; // Only pharmacies within 5km
         })
         .toList()
       ..sort((a, b) {
@@ -154,7 +154,7 @@ class _MapScreenState extends State<MapScreen> {
           position: pharmacyLocation,
           infoWindow: InfoWindow(
             title: pharmacy.nombre,
-            snippet: '${pharmacy.cadena} • ${distance.toStringAsFixed(1)} km',
+            snippet: '${pharmacy.nombre} • ${distance.toStringAsFixed(1)} km',
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           onTap: () => _showPharmacyDetails(pharmacy, distance),

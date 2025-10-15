@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/prescripcion.dart';
-import '../models/medicamento.dart';
 
 class PrescripcionRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -170,31 +169,17 @@ class PrescripcionRepository {
   }
 
   // Update medicamentos in a prescripcion
+  @Deprecated('Medicamentos are now stored in subcollections')
   Future<void> updateMedicamentos(String prescripcionId, List<dynamic> medicamentos) async {
-    try {
-      final prescripcion = await read(prescripcionId);
-      if (prescripcion != null) {
-        final medicamentosObjects = medicamentos
-            .map((medMap) => Medicamento.fromMap(medMap as Map<String, dynamic>))
-            .toList();
-        final updatedPrescripcion = prescripcion.copyWith(medicamentos: medicamentosObjects);
-        await update(updatedPrescripcion);
-      } else {
-        throw Exception('Prescripcion not found');
-      }
-    } catch (e) {
-      throw Exception('Error updating medicamentos in prescripcion: $e');
-    }
+    // Medicamentos are now in subcollections, this method is deprecated
+    throw UnimplementedError('Medicamentos are now stored in subcollections. Use subcollection-based operations.');
   }
 
   // Get medicamentos for a prescripcion
+  @Deprecated('Medicamentos are now stored in subcollections')
   Future<List<dynamic>> getMedicamentosDePrescripcion(String prescripcionId) async {
-    try {
-      final prescripcion = await read(prescripcionId);
-      return prescripcion?.medicamentos.map((med) => med.toMap()).toList() ?? [];
-    } catch (e) {
-      throw Exception('Error getting medicamentos for prescripcion: $e');
-    }
+    // Medicamentos are now in subcollections, return empty list for backward compatibility
+    return <dynamic>[];
   }
 
   // Alias method for UserSession compatibility

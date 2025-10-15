@@ -137,16 +137,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
       // Create pedido with reference to existing prescription - NO PRESCRIPTION CREATION
       final pedido = Pedido(
-        identificadorPedido: DateTime.now().millisecondsSinceEpoch.toString(),
-        fechaEntrega: fechaEntrega,
-        fechaDespacho: fechaDespacho,
-        direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
-        entregado: false,
-        entregaEnTienda: _isPickup,
-        usuarioId: userId,
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        prescripcionId: _selectedPrescripcion!.id,
         puntoFisicoId: widget.pharmacy!.id,
-        prescripcionId: _selectedPrescripcion!.id, // Link to existing prescription
-        prescripcion: _selectedPrescripcion, // For in-memory use only
+        tipoEntrega: _isPickup ? 'recogida' : 'domicilio',
+        direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
+        estado: 'pendiente',
+        fechaPedido: fechaDespacho,
+        fechaEntrega: fechaEntrega,
       );
 
       // Create only the pedido - no prescription duplication
@@ -281,7 +279,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                widget.pharmacy!.cadena,
+                                widget.pharmacy!.direccion,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.textSecondary,
                                 ),
@@ -426,28 +424,29 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                           style: theme.textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: _selectedPrescripcion!.medicamentos.map((med) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.medication, size: 16),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: Text(med.nombre)),
-                                      if (med.esRestringido)
-                                        const Icon(Icons.warning, color: Colors.orange, size: 16),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
+                        if (_selectedPrescripcion!.medicamentos.isNotEmpty)
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _selectedPrescripcion!.medicamentos.map((med) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.medication, size: 16),
+                                        const SizedBox(width: 8),
+                                        Expanded(child: Text(med.nombre)),
+                                        if (med.esRestringido)
+                                          const Icon(Icons.warning, color: Colors.orange, size: 16),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ),
-                        ),
                       ],
 
                       const SizedBox(height: 30),

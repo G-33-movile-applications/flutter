@@ -166,15 +166,12 @@ class UserSession {
     if (authUser != null) {
       final fallbackUser = UserModel(
         uid: uid,
-        fullName: authUser.displayName ?? 
+        nombre: authUser.displayName ?? 
                  authUser.email?.split('@').first.replaceAll(RegExp(r'[^a-zA-Z]'), '') ?? 
                  'Usuario',
         email: authUser.email ?? '',
-        phoneNumber: authUser.phoneNumber ?? '',
-        address: '',
-        city: '',
-        department: '',
-        zipCode: '',
+        telefono: authUser.phoneNumber ?? '',
+        direccion: '',
         createdAt: DateTime.now(),
       );
       currentUser.value = fallbackUser;

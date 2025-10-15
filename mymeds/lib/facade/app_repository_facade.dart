@@ -438,15 +438,19 @@ Future<double> _getPrecioDeMedicamento(String medicamentoId, String? puntoFisico
   }
 
   /// UML: Prescripcion (1) —— (1..*) Medicamento  
+  /// NOTE: Medicamentos are now in subcollections, this method returns empty list for backward compatibility
+  @Deprecated('Medicamentos are now stored in subcollections. Use new subcollection-based queries.')
   Future<List<Medicamento>> getMedicamentosDePrescripcion(String prescripcionId) async {
-    final prescripcion = await _prescripcionRepository.read(prescripcionId);
-    return prescripcion?.medicamentos ?? [];
+    // Medicamentos are now in subcollections, return empty list for backward compatibility
+    return <Medicamento>[];
   }
 
   /// Stream version of getMedicamentosDePrescripcion
+  /// NOTE: Medicamentos are now in subcollections, this method returns empty stream for backward compatibility
+  @Deprecated('Medicamentos are now stored in subcollections. Use new subcollection-based queries.')
   Stream<List<Medicamento>> streamMedicamentosDePrescripcion(String prescripcionId) {
-    return _prescripcionRepository.streamPrescripcion(prescripcionId)
-        .map((prescripcion) => prescripcion?.medicamentos ?? []);
+    // Medicamentos are now in subcollections, return empty stream for backward compatibility
+    return Stream.value(<Medicamento>[]);
   }
 
   /// UML: Medicamento (0..*) —— (*) PuntoFisico (now many-to-many)
@@ -552,7 +556,6 @@ Future<double> _getPrecioDeMedicamento(String medicamentoId, String? puntoFisico
     final newPrescripcionId = '${updatedPedido.identificadorPedido}_prescription';
     final newPrescripcion = prescripcion.copyWith(
       id: newPrescripcionId,
-      pedidoId: updatedPedido.identificadorPedido,
     );
     
     // Create the prescription with embedded medicamentos

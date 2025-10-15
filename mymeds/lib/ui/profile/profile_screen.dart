@@ -34,9 +34,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (user != null) {
         setState(() {
           _user = user;
-          _nameController.text = user.fullName;
+          _nameController.text = user.nombre;
           _emailController.text = user.email;
-          _phoneController.text = user.phoneNumber ;
+          _phoneController.text = user.telefono;
           _loading = false;
         });
       }
@@ -55,9 +55,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       final updatedUser = _user!.copyWith(
-        fullName: _nameController.text,
+        nombre: _nameController.text,
         email: _emailController.text,
-        phoneNumber: _phoneController.text,
+        telefono: _phoneController.text,
       );
 
       await _usuarioRepository.update(updatedUser);
@@ -123,8 +123,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 radius: 60,
                 backgroundColor: Colors.grey[400],
                 child: Text(
-                  _user?.fullName.isNotEmpty == true
-                      ? _user!.fullName[0].toUpperCase()
+                  _user?.nombre.isNotEmpty == true
+                      ? _user!.nombre[0].toUpperCase()
                       : "U",
                   style: const TextStyle(
                     color: Colors.white,
