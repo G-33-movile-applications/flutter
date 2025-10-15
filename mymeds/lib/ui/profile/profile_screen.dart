@@ -224,6 +224,7 @@
       required TextEditingController controller,
       String? Function(String?)? validator,
       TextInputType type = TextInputType.text,
+      bool enabled = true
     }) {
       final isEnabled = _editable;
 
@@ -231,7 +232,7 @@
         controller: controller,
         validator: validator,
         keyboardType: type,
-        enabled: isEnabled,
+        enabled: isEnabled && enabled, // Disable if not editable
         onChanged: (value) =>_markChanged(),
         style: TextStyle(
           fontSize: 16,
@@ -382,15 +383,8 @@
                       label: "Correo electrónico", 
                       controller: _emailController, 
                       type: TextInputType.emailAddress,
-                      validator: (v) {
-                          if (_onlySpaces(v)) return "Campo requerido";
-                          v = v!.trim();
-                          if (!RegExp(r'^[\w\.\-]+@[a-zA-Z\d\-]+\.[a-zA-Z]{2,}$').hasMatch(v)) {
-                            return "Correo electrónico inválido";
-                          }
-                          return null;
-                        },
-                      ),
+                      enabled: false, // Email is not editable
+                    ),
                     const SizedBox(height: 12),
                     // Phone
                     _buildTextField(
