@@ -142,15 +142,23 @@ class PrescripcionRepository {
   }
 
   // UML relationship method: Usuario (1) —— (0..*) Prescripcion
+  // Updated to work with subcollection approach: usuarios/{userId}/prescripciones
   Future<List<Prescripcion>> findByUserId(String userId) async {
     try {
+      if (userId.isEmpty) {
+        throw ArgumentError('User ID cannot be empty');
+      }
+      
       final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('userId', isEqualTo: userId)
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
           .get();
       
       return querySnapshot.docs
-          .map((doc) => Prescripcion.fromMap(doc.data()))
+          .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+          .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+          .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
           .toList();
     } catch (e) {
       throw Exception('Error finding prescripciones by user ID: $e');
@@ -158,13 +166,21 @@ class PrescripcionRepository {
   }
 
   // Stream version of findByUserId for reactive UIs
+  // Updated to work with subcollection approach: usuarios/{userId}/prescripciones
   Stream<List<Prescripcion>> streamByUserId(String userId) {
+    if (userId.isEmpty) {
+      return Stream.error(ArgumentError('User ID cannot be empty'));
+    }
+    
     return _firestore
-        .collection(_collection)
-        .where('userId', isEqualTo: userId)
+        .collection('usuarios')
+        .doc(userId)
+        .collection('prescripciones')
         .snapshots()
         .map((querySnapshot) => querySnapshot.docs
-            .map((doc) => Prescripcion.fromMap(doc.data()))
+            .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+            .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+            .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
             .toList());
   }
 

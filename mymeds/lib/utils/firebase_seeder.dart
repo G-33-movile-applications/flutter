@@ -103,7 +103,7 @@ class FirebaseSeeder {
         nombre: 'Farmacia Central',
         direccion: 'Cra 7 #12-34, Bogotá',
         telefono: '6011234567',
-        ubicacion: const GeoPoint(4.6123, -74.0721),
+        ubicacion: const GeoPoint(4.604578, -74.070849),
         horario: 'Lunes a Sábado 8am - 8pm',
       ),
       PuntoFisico(
@@ -111,7 +111,7 @@ class FirebaseSeeder {
         nombre: 'Drogas La Rebaja',
         direccion: 'Calle 72 #10-15, Bogotá',
         telefono: '6019876543',
-        ubicacion: const GeoPoint(4.6510, -74.0587),
+        ubicacion: const GeoPoint(4.604145, -74.067078),
         horario: '24 horas',
       ),
       PuntoFisico(
@@ -119,7 +119,7 @@ class FirebaseSeeder {
         nombre: 'Cruz Verde',
         direccion: 'Av. Boyacá #145-30, Bogotá',
         telefono: '6015555555',
-        ubicacion: const GeoPoint(4.6890, -74.1050),
+        ubicacion: const GeoPoint(4.601230, -74.069964),
         horario: 'Lunes a Domingo 7am - 10pm',
       ),
     ];
@@ -188,11 +188,14 @@ class FirebaseSeeder {
     
     final usuarios = [
       UserModel(
-        uid: 'user_001',
+        uid: 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
         nombre: 'Pablo Martínez',
         email: 'pablomartinez@gmail.com',
         telefono: '3101234567',
         direccion: 'Cra 10 #45-12, Bogotá',
+        city: 'Bogotá',
+        department: 'Bogotá D.C.',
+        zipCode: '11001',
         preferencias: const UserPreferencias(
           modoEntregaPreferido: 'domicilio',
           notificaciones: true,
@@ -200,11 +203,14 @@ class FirebaseSeeder {
         createdAt: DateTime(2025, 1, 15),
       ),
       UserModel(
-        uid: 'user_002',
+        uid: '5AEcQ2c8InV7RHNwsodFsxQoZIs1',
         nombre: 'María García',
         email: 'maria.garcia@example.com',
         telefono: '3209876543',
         direccion: 'Calle 85 #20-30, Bogotá',
+        city: 'Bogotá',
+        department: 'Bogotá D.C.',
+        zipCode: '11001',
         preferencias: const UserPreferencias(
           modoEntregaPreferido: 'recogida',
           notificaciones: false,
@@ -229,7 +235,7 @@ class FirebaseSeeder {
     
     final prescripciones = [
       {
-        'userId': 'user_001',
+        'userId': 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
         'prescripcion': Prescripcion(
           id: 'pres_001',
           fechaCreacion: DateTime(2025, 10, 14),
@@ -249,7 +255,7 @@ class FirebaseSeeder {
             fechaFin: DateTime(2025, 11, 13),
             observaciones: 'Tomar después del desayuno',
             activo: true,
-            userId: 'user_001',
+            userId: 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
             prescripcionId: 'pres_001',
           ),
         ],
@@ -292,7 +298,7 @@ class FirebaseSeeder {
     
     final pedidos = [
       {
-        'userId': 'user_001',
+        'userId': 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
         'pedido': Pedido(
           id: 'ped_001',
           prescripcionId: 'pres_001',
@@ -311,7 +317,7 @@ class FirebaseSeeder {
             cantidad: 10,
             precioUnitario: 1200,
             total: 12000,
-            userId: 'user_001',
+            userId: 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
             pedidoId: 'ped_001',
           ),
         ],
@@ -353,7 +359,7 @@ class FirebaseSeeder {
     
     final medicamentosUsuario = [
       {
-        'userId': 'user_001',
+        'userId': 'F4LBQvlAGUSkmRPAZxXU4KhAxzc2',
         'medicamento': MedicamentoUsuario(
           id: 'med_001',
           medicamentoRef: '/medicamentosGlobales/med_001',

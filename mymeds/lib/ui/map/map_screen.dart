@@ -92,7 +92,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _setupFirestoreListener() {
     _firestoreSubscription = _firestore
-        .collection('puntos_fisicos')
+        .collection('puntosFisicos')
         .snapshots()
         .listen(
       (snapshot) {
@@ -121,7 +121,7 @@ class _MapScreenState extends State<MapScreen> {
         .where((pharmacy) {
           final pharmacyLocation = LatLng(pharmacy.latitud, pharmacy.longitud);
           final distance = _haversineKm(userLocation, pharmacyLocation);
-          return distance <= 100.0; // Only pharmacies within 5km
+          return distance <= 100.0; // Only pharmacies within 100km for testing
         })
         .toList()
       ..sort((a, b) {

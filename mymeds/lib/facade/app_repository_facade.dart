@@ -1,4 +1,4 @@
-import 'package:mymeds/models/medicamento_punto_fisico.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_model.dart';
 import '../models/pedido.dart';
@@ -169,48 +169,49 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
 }) async {
   List<Map<String, dynamic>> medicamentosConDetalles = [];
 
-  // 🔹 Fetch relationships with stock
-  List<MedicamentoPuntoFisico> relaciones = [];
-
   if (puntoFisicoId != null) {
-    relaciones = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisicoMed(puntoFisicoId);
-  } else {
-    relaciones = await _medicamentoPuntoFisicoRepository.readAll();
-    relaciones = relaciones.where((rel) => rel.cantidad > 0).toList();
-  }
+    // 🔹 Fetch inventory from subcollection approach (as seeded)
+    try {
+      final inventorySnapshot = await FirebaseFirestore.instance
+          .collection('puntosFisicos')
+          .doc(puntoFisicoId)
+          .collection('inventario')
+          .get();
 
-  // 🔹 Iterate through relations and fetch medicamento details
-  for (final relacion in relaciones) {
-    final medicamento = await _medicamentoRepository.read(relacion.medicamentoId);
+      for (final doc in inventorySnapshot.docs) {
+        final inventoryData = doc.data();
+        
+        // Only include items with stock
+        final stock = inventoryData['stock'] ?? 0;
+        if (stock <= 0) continue;
 
-    if (medicamento != null) {
-      // Apply filters
-      if (esRestringido != null && medicamento.esRestringido != esRestringido) continue;
-      if (tipo != null && medicamento.toMap()['tipo'] != tipo) continue;
+        // Apply filters if provided
+        if (esRestringido != null) {
+          // For now, skip filtering by esRestringido since it's not in inventory data
+        }
+        if (tipo != null) {
+          // For now, skip filtering by tipo since it's not in inventory data  
+        }
 
-      // Get precio (for now mocked, later from another repository)
-      final precio = await _getPrecioDeMedicamento(relacion.medicamentoId, puntoFisicoId);
-
-      medicamentosConDetalles.add({
-        'id': medicamento.id,
-        'nombre': medicamento.nombre,
-        'descripcion': medicamento.descripcion,
-        'tipo': medicamento.toMap()['tipo'],
-        'cantidad': relacion.cantidad,
-        'precio': precio,
-      });
+        medicamentosConDetalles.add({
+          'id': doc.id,
+          'nombre': inventoryData['nombre'] ?? 'Sin nombre',
+          'descripcion': 'Medicamento disponible en farmacia', // Default description
+          'tipo': 'medicamento', // Default type
+          'cantidad': stock,
+          'precio': (inventoryData['precioUnidad'] ?? 0) / 100.0, // Convert cents to currency
+        });
+      }
+    } catch (e) {
+      print('Error fetching inventory for punto fisico $puntoFisicoId: $e');
     }
+  } else {
+    // 🔹 Fetch from all pharmacies - this is more complex with subcollections
+    // For now, return empty list when no specific punto fisico is provided
+    print('Fetching from all pharmacies not implemented with subcollection approach');
   }
 
   return medicamentosConDetalles;
-}
-
-
-/// 🔹 Helper: Fetch price (placeholder logic — can be replaced later)
-Future<double> _getPrecioDeMedicamento(String medicamentoId, String? puntoFisicoId) async {
-  // Example: Fetch from another repository or collection
-  // For now, we simulate a lookup with a default value
-  return 15000.0; // Replace later with real repo query
 }
 
   /// Add medication to pharmacy (establish availability) - DEPRECATED in UML
@@ -516,26 +517,46 @@ Future<double> _getPrecioDeMedicamento(String medicamentoId, String? puntoFisico
   }
   
   /// Create a pedido with existing prescription (DOES NOT create new prescriptions)
-  Future<void> createPedido(Pedido pedido) async {
+  /// Updated to work with subcollection approach: usuarios/{userId}/pedidos
+  Future<void> createPedido(Pedido pedido, {required String userId}) async {
     // Validate required fields
     if (pedido.prescripcionId.isEmpty) {
       throw Exception('prescripcionId cannot be empty - must link to existing prescription');
     }
-    if (pedido.usuarioId.isEmpty) {
-      throw Exception('usuarioId is required');
+    if (userId.isEmpty) {
+      throw Exception('userId is required');
     }
     if (pedido.puntoFisicoId.isEmpty) {
       throw Exception('puntoFisicoId is required');
     }
 
-    // Verify the prescription exists
-    final prescriptionExists = await _prescripcionRepository.exists(pedido.prescripcionId);
-    if (!prescriptionExists) {
-      throw Exception('Prescription with id ${pedido.prescripcionId} does not exist');
+    // Verify the prescription exists in the user's subcollection
+    try {
+      final prescriptionDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(pedido.prescripcionId)
+          .get();
+          
+      if (!prescriptionDoc.exists) {
+        throw Exception('Prescription with id ${pedido.prescripcionId} does not exist for user $userId');
+      }
+    } catch (e) {
+      throw Exception('Error verifying prescription: $e');
     }
 
-    // Create only the pedido - no prescription creation
-    await _pedidoRepository.create(pedido);
+    // Create the pedido in the user's subcollection
+    try {
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('pedidos')
+          .doc(pedido.id)
+          .set(pedido.toMap());
+    } catch (e) {
+      throw Exception('Error creating pedido: $e');
+    }
   }
 
   /// Create a complete pedido (order) with prescription, medicamentos, and punto fisico assignment

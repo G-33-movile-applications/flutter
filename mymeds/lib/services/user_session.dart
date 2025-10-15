@@ -172,6 +172,9 @@ class UserSession {
         email: authUser.email ?? '',
         telefono: authUser.phoneNumber ?? '',
         direccion: '',
+        city: '',
+        department: '',
+        zipCode: '',
         createdAt: DateTime.now(),
       );
       currentUser.value = fallbackUser;

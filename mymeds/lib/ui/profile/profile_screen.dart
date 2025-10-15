@@ -17,6 +17,10 @@ class _ProfilePageState extends State<ProfilePage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _zipCodeController = TextEditingController();
 
   bool _loading = true;
   bool _updating = false;
@@ -28,6 +32,18 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUser();
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _departmentController.dispose();
+    _zipCodeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadUser() async {
     try {
       final user = await _usuarioRepository.read(widget.uid);
@@ -37,6 +53,10 @@ class _ProfilePageState extends State<ProfilePage> {
           _nameController.text = user.nombre;
           _emailController.text = user.email;
           _phoneController.text = user.telefono;
+          _addressController.text = user.direccion;
+          _cityController.text = user.city;
+          _departmentController.text = user.department;
+          _zipCodeController.text = user.zipCode;
           _loading = false;
         });
       }
@@ -58,6 +78,10 @@ class _ProfilePageState extends State<ProfilePage> {
         nombre: _nameController.text,
         email: _emailController.text,
         telefono: _phoneController.text,
+        direccion: _addressController.text,
+        city: _cityController.text,
+        department: _departmentController.text,
+        zipCode: _zipCodeController.text,
       );
 
       await _usuarioRepository.update(updatedUser);
@@ -138,6 +162,14 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildTextField(label: "Email", controller: _emailController),
               const SizedBox(height: 12),
               _buildTextField(label: "Phone", controller: _phoneController),
+              const SizedBox(height: 12),
+              _buildTextField(label: "Address", controller: _addressController),
+              const SizedBox(height: 12),
+              _buildTextField(label: "City", controller: _cityController),
+              const SizedBox(height: 12),
+              _buildTextField(label: "Department", controller: _departmentController),
+              const SizedBox(height: 12),
+              _buildTextField(label: "ZIP Code", controller: _zipCodeController),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

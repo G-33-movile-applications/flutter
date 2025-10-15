@@ -32,8 +32,15 @@ class Prescripcion {
 
   // Create Prescripcion from Firestore document
   factory Prescripcion.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    // Use documentId first (from Firestore document), then map['id'], then generate a fallback
+    String finalId = documentId?.isNotEmpty == true 
+        ? documentId! 
+        : (map['id']?.toString().isNotEmpty == true 
+            ? map['id'].toString() 
+            : 'prescripcion_${DateTime.now().millisecondsSinceEpoch}');
+    
     return Prescripcion(
-      id: documentId ?? map['id'] ?? '',
+      id: finalId,
       fechaCreacion: map['fechaCreacion'] != null 
           ? (map['fechaCreacion'] as Timestamp).toDate()
           : (map['fechaEmision'] != null 
@@ -48,6 +55,7 @@ class Prescripcion {
   // Convert Prescripcion to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
+      'id': id, // Include ID in the document data for consistency
       'fechaCreacion': Timestamp.fromDate(fechaCreacion),
       'diagnostico': diagnostico,
       'medico': medico,

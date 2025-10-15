@@ -8,6 +8,9 @@ class UserModel {
   final String email;
   final String telefono;
   final String direccion;
+  final String city;
+  final String department;
+  final String zipCode;
   final UserPreferencias? preferencias;
   final DateTime? createdAt;
 
@@ -17,32 +20,36 @@ class UserModel {
     required this.email,
     required this.telefono,
     required this.direccion,
+    required this.city,
+    required this.department,
+    required this.zipCode,
     this.preferencias,
     this.createdAt,
   });
 
-  // Getters for backward compatibility
+  // Getters for backward compatibility with different naming conventions
   String get fullName => nombre;
   String get phoneNumber => telefono;
   String get address => direccion;
-  
-  @Deprecated('Field removed from new model')
-  String get city => '';
-  
-  @Deprecated('Field removed from new model')  
-  String get department => '';
-  
-  @Deprecated('Field removed from new model')
-  String get zipCode => '';
 
   // Create UserModel from Firestore document
   factory UserModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    // Use documentId first (from Firestore document), then map['uid'], then generate a fallback
+    String finalUid = documentId?.isNotEmpty == true 
+        ? documentId! 
+        : (map['uid']?.toString().isNotEmpty == true 
+            ? map['uid'].toString() 
+            : 'user_${DateTime.now().millisecondsSinceEpoch}');
+    
     return UserModel(
-      uid: documentId ?? map['uid'] ?? '',
+      uid: finalUid,
       nombre: map['nombre'] ?? map['fullName'] ?? '', // Support both new and old field names
       email: map['email'] ?? '',
       telefono: map['telefono'] ?? map['phoneNumber'] ?? '',
       direccion: map['direccion'] ?? map['address'] ?? '',
+      city: map['city'] ?? '',
+      department: map['department'] ?? '',
+      zipCode: map['zipCode'] ?? '',
       preferencias: map['preferencias'] != null 
           ? UserPreferencias.fromMap(map['preferencias'] as Map<String, dynamic>)
           : null,
@@ -55,10 +62,14 @@ class UserModel {
   // Convert UserModel to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
+      'uid': uid, // Include uid for consistency
       'nombre': nombre,
       'email': email,
       'telefono': telefono,
       'direccion': direccion,
+      'city': city,
+      'department': department,
+      'zipCode': zipCode,
       if (preferencias != null) 'preferencias': preferencias!.toMap(),
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
     };
@@ -80,6 +91,9 @@ class UserModel {
     String? email,
     String? telefono,
     String? direccion,
+    String? city,
+    String? department,
+    String? zipCode,
     UserPreferencias? preferencias,
     DateTime? createdAt,
   }) {
@@ -89,6 +103,9 @@ class UserModel {
       email: email ?? this.email,
       telefono: telefono ?? this.telefono,
       direccion: direccion ?? this.direccion,
+      city: city ?? this.city,
+      department: department ?? this.department,
+      zipCode: zipCode ?? this.zipCode,
       preferencias: preferencias ?? this.preferencias,
       createdAt: createdAt ?? this.createdAt,
     );

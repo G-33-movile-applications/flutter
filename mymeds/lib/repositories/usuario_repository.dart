@@ -17,9 +17,13 @@ class UsuarioRepository {
   // Read a user by ID
   Future<UserModel?> read(String uid) async {
     try {
+      if (uid.isEmpty) {
+        throw ArgumentError('User ID cannot be empty');
+      }
+      
       final doc = await _firestore.collection(_collection).doc(uid).get();
       if (doc.exists && doc.data() != null) {
-        return UserModel.fromMap(doc.data()!);
+        return UserModel.fromMap(doc.data()!, documentId: uid);
       }
       return null;
     } catch (e) {
@@ -32,7 +36,8 @@ class UsuarioRepository {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
       return querySnapshot.docs
-          .map((doc) => UserModel.fromMap(doc.data()))
+          .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+          .map((doc) => UserModel.fromMap(doc.data(), documentId: doc.id))
           .toList();
     } catch (e) {
       throw Exception('Error reading all users: $e');
@@ -60,6 +65,10 @@ class UsuarioRepository {
   // Find user by email
   Future<UserModel?> findByEmail(String email) async {
     try {
+      if (email.isEmpty) {
+        throw ArgumentError('Email cannot be empty');
+      }
+      
       final querySnapshot = await _firestore
           .collection(_collection)
           .where('email', isEqualTo: email)
@@ -67,7 +76,8 @@ class UsuarioRepository {
           .get();
       
       if (querySnapshot.docs.isNotEmpty) {
-        return UserModel.fromMap(querySnapshot.docs.first.data());
+        final doc = querySnapshot.docs.first;
+        return UserModel.fromMap(doc.data(), documentId: doc.id);
       }
       return null;
     } catch (e) {
@@ -87,12 +97,16 @@ class UsuarioRepository {
 
   // Stream of user changes
   Stream<UserModel?> streamUser(String uid) {
+    if (uid.isEmpty) {
+      return Stream.error(ArgumentError('User ID cannot be empty'));
+    }
+    
     return _firestore
         .collection(_collection)
         .doc(uid)
         .snapshots()
         .map((doc) => doc.exists && doc.data() != null 
-            ? UserModel.fromMap(doc.data()!) 
+            ? UserModel.fromMap(doc.data()!, documentId: uid) 
             : null);
   }
 }
