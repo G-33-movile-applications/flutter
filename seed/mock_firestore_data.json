@@ -1,0 +1,840 @@
+{
+  "puntos_fisicos": {
+    "pf_1": {
+      "cadena": "Farmatodo",
+      "nombre": "Punto Físico 1",
+      "direccion": "Cra 14 # 14-45",
+      "latitud": 4.70447462041565,
+      "longitud": -74.06592170193203,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_2": {
+      "cadena": "Cruz Verde",
+      "nombre": "Punto Físico 2",
+      "direccion": "Cra 18 # 19-18",
+      "latitud": 4.712113799001842,
+      "longitud": -74.08099634885606,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_3": {
+      "cadena": "Walgreens",
+      "nombre": "Punto Físico 3",
+      "direccion": "Cra 13 # 4-47",
+      "latitud": 4.7054541334694955,
+      "longitud": -74.08208764313984,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_4": {
+      "cadena": "CVS Health",
+      "nombre": "Punto Físico 4",
+      "direccion": "Cra 30 # 20-45",
+      "latitud": 4.703127766622377,
+      "longitud": -74.07166743366358,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_5": {
+      "cadena": "Farmacias Similares",
+      "nombre": "Punto Físico 5",
+      "direccion": "Cra 1 # 14-4",
+      "latitud": 4.705340595097846,
+      "longitud": -74.06846250126074,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_6": {
+      "cadena": "Farmacias del Ahorro",
+      "nombre": "Punto Físico 6",
+      "direccion": "Cra 29 # 4-38",
+      "latitud": 4.701157116827008,
+      "longitud": -74.07085792696539,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_7": {
+      "cadena": "Droguerías La Rebaja",
+      "nombre": "Punto Físico 7",
+      "direccion": "Cra 5 # 3-44",
+      "latitud": 4.71677121783376,
+      "longitud": -74.06581323162604,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    },
+    "pf_8": {
+      "cadena": "Cafam",
+      "nombre": "Punto Físico 8",
+      "direccion": "Cra 29 # 2-5",
+      "latitud": 4.703769072600639,
+      "longitud": -74.07562959536745,
+      "horarioAtencion": "Lunes a Sábado 8:00 a.m. - 8:00 p.m.",
+      "diasAtencion": "Lunes a Sábado"
+    }
+  },
+  "medicamentos": {
+    "med_1": {
+      "nombre": "Ibuprofeno 400mg",
+      "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "855 ",
+      "esRestringido": false,
+      "tipo": "tabletas"
+    },
+    "med_2": {
+      "nombre": "Paracetamol 500mg",
+      "descripcion": "Medicamento Paracetamol 500mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "891 ",
+      "esRestringido": true,
+      "tipo": "tabletas"
+    },
+    "med_3": {
+      "nombre": "Amoxicilina 875mg",
+      "descripcion": "Medicamento Amoxicilina 875mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "2032 ",
+      "esRestringido": true,
+      "tipo": "tabletas"
+    },
+    "med_4": {
+      "nombre": "Loratadina 10mg",
+      "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "2366 ",
+      "esRestringido": false,
+      "tipo": "tabletas"
+    },
+    "med_5": {
+      "nombre": "Omeprazol 20mg",
+      "descripcion": "Medicamento Omeprazol 20mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "355 ",
+      "esRestringido": false,
+      "tipo": "tabletas"
+    },
+    "med_6": {
+      "nombre": "Losartán 50mg",
+      "descripcion": "Medicamento Losartán 50mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "212 ",
+      "esRestringido": false,
+      "tipo": "tabletas"
+    },
+    "med_7": {
+      "nombre": "Atorvastatina 20mg",
+      "descripcion": "Medicamento Atorvastatina 20mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "2413 ",
+      "esRestringido": true,
+      "tipo": "tabletas"
+    },
+    "med_8": {
+      "nombre": "Metformina 850mg",
+      "descripcion": "Medicamento Metformina 850mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "2517 ",
+      "esRestringido": false,
+      "tipo": "tabletas"
+    },
+    "med_9": {
+      "nombre": "Salbutamol Inhalador",
+      "descripcion": "Medicamento Salbutamol Inhalador usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "500 ",
+      "esRestringido": true,
+      "tipo": "tabletas"
+    },
+    "med_10": {
+      "nombre": "Ácido Fólico 5mg",
+      "descripcion": "Medicamento Ácido Fólico 5mg usado comúnmente para tratar diversas condiciones.",
+      "dosisMg": "484 ",
+      "esRestringido": true,
+      "tipo": "tabletas"
+    }
+  },
+  "medicamento_punto_fisico": {
+    "2mhjz6mi2k8": {
+      "puntoFisicoId": "pf_1",
+      "medicamentoId": "med_10",
+      "cantidad": 44,
+      "fechaActualizacion": "2025-11-05T08:21:45.315Z",
+      "id": "2mhjz6mi2k8"
+    },
+    "njdprznyob": {
+      "puntoFisicoId": "pf_1",
+      "medicamentoId": "med_8",
+      "cantidad": 43,
+      "fechaActualizacion": "2025-10-30T03:05:26.595Z",
+      "id": "njdprznyob"
+    },
+    "6o59gg55cn9": {
+      "puntoFisicoId": "pf_1",
+      "medicamentoId": "med_6",
+      "cantidad": 36,
+      "fechaActualizacion": "2025-11-24T11:53:45.970Z",
+      "id": "6o59gg55cn9"
+    },
+    "6ka5u4gc2f": {
+      "puntoFisicoId": "pf_1",
+      "medicamentoId": "med_1",
+      "cantidad": 51,
+      "fechaActualizacion": "2025-11-03T21:23:08.478Z",
+      "id": "6ka5u4gc2f"
+    },
+    "yw1c20loia": {
+      "puntoFisicoId": "pf_2",
+      "medicamentoId": "med_6",
+      "cantidad": 15,
+      "fechaActualizacion": "2025-10-11T16:51:47.770Z",
+      "id": "yw1c20loia"
+    },
+    "wmfj7fud02q": {
+      "puntoFisicoId": "pf_2",
+      "medicamentoId": "med_10",
+      "cantidad": 52,
+      "fechaActualizacion": "2025-11-07T21:50:31.687Z",
+      "id": "wmfj7fud02q"
+    },
+    "ks5li9ciuqc": {
+      "puntoFisicoId": "pf_2",
+      "medicamentoId": "med_4",
+      "cantidad": 34,
+      "fechaActualizacion": "2025-10-16T13:33:12.528Z",
+      "id": "ks5li9ciuqc"
+    },
+    "wv0ggl2try": {
+      "puntoFisicoId": "pf_2",
+      "medicamentoId": "med_5",
+      "cantidad": 40,
+      "fechaActualizacion": "2025-11-17T00:38:03.669Z",
+      "id": "wv0ggl2try"
+    },
+    "fevlxktarsb": {
+      "puntoFisicoId": "pf_3",
+      "medicamentoId": "med_3",
+      "cantidad": 51,
+      "fechaActualizacion": "2025-09-08T23:49:18.249Z",
+      "id": "fevlxktarsb"
+    },
+    "wd08jtgdux": {
+      "puntoFisicoId": "pf_3",
+      "medicamentoId": "med_7",
+      "cantidad": 39,
+      "fechaActualizacion": "2025-11-03T18:32:27.731Z",
+      "id": "wd08jtgdux"
+    },
+    "n9vj1vj3px8": {
+      "puntoFisicoId": "pf_3",
+      "medicamentoId": "med_8",
+      "cantidad": 48,
+      "fechaActualizacion": "2025-09-18T17:10:51.770Z",
+      "id": "n9vj1vj3px8"
+    },
+    "2pwlorhr6gi": {
+      "puntoFisicoId": "pf_3",
+      "medicamentoId": "med_6",
+      "cantidad": 50,
+      "fechaActualizacion": "2025-10-14T06:21:48.462Z",
+      "id": "2pwlorhr6gi"
+    },
+    "1sjvgfum7vn": {
+      "puntoFisicoId": "pf_4",
+      "medicamentoId": "med_1",
+      "cantidad": 12,
+      "fechaActualizacion": "2025-10-01T18:25:59.794Z",
+      "id": "1sjvgfum7vn"
+    },
+    "llmbf6a950t": {
+      "puntoFisicoId": "pf_4",
+      "medicamentoId": "med_2",
+      "cantidad": 55,
+      "fechaActualizacion": "2025-11-16T03:53:10.152Z",
+      "id": "llmbf6a950t"
+    },
+    "87s9ypovij5": {
+      "puntoFisicoId": "pf_4",
+      "medicamentoId": "med_3",
+      "cantidad": 19,
+      "fechaActualizacion": "2025-11-17T00:56:43.574Z",
+      "id": "87s9ypovij5"
+    },
+    "az1kkpty8w5": {
+      "puntoFisicoId": "pf_4",
+      "medicamentoId": "med_9",
+      "cantidad": 34,
+      "fechaActualizacion": "2025-10-05T04:57:22.959Z",
+      "id": "az1kkpty8w5"
+    },
+    "3sn4vl8gjcb": {
+      "puntoFisicoId": "pf_5",
+      "medicamentoId": "med_8",
+      "cantidad": 30,
+      "fechaActualizacion": "2025-11-19T04:56:28.542Z",
+      "id": "3sn4vl8gjcb"
+    },
+    "7lz3fbf1i05": {
+      "puntoFisicoId": "pf_5",
+      "medicamentoId": "med_7",
+      "cantidad": 42,
+      "fechaActualizacion": "2025-11-03T10:52:09.880Z",
+      "id": "7lz3fbf1i05"
+    },
+    "0xxmtdzpkd89": {
+      "puntoFisicoId": "pf_5",
+      "medicamentoId": "med_6",
+      "cantidad": 44,
+      "fechaActualizacion": "2025-11-13T00:17:04.662Z",
+      "id": "0xxmtdzpkd89"
+    },
+    "tn4ldvlf0h": {
+      "puntoFisicoId": "pf_5",
+      "medicamentoId": "med_5",
+      "cantidad": 34,
+      "fechaActualizacion": "2025-10-21T06:23:57.507Z",
+      "id": "tn4ldvlf0h"
+    },
+    "atmq58uv1gj": {
+      "puntoFisicoId": "pf_6",
+      "medicamentoId": "med_10",
+      "cantidad": 11,
+      "fechaActualizacion": "2025-11-24T17:09:30.907Z",
+      "id": "atmq58uv1gj"
+    },
+    "p9cd9n9vvip": {
+      "puntoFisicoId": "pf_6",
+      "medicamentoId": "med_6",
+      "cantidad": 56,
+      "fechaActualizacion": "2025-11-28T18:13:49.796Z",
+      "id": "p9cd9n9vvip"
+    },
+    "dj4aizog8qh": {
+      "puntoFisicoId": "pf_6",
+      "medicamentoId": "med_8",
+      "cantidad": 29,
+      "fechaActualizacion": "2025-11-21T12:01:29.341Z",
+      "id": "dj4aizog8qh"
+    },
+    "593ixv0g96p": {
+      "puntoFisicoId": "pf_6",
+      "medicamentoId": "med_7",
+      "cantidad": 54,
+      "fechaActualizacion": "2025-10-17T13:32:58.702Z",
+      "id": "593ixv0g96p"
+    },
+    "x40xcd4niag": {
+      "puntoFisicoId": "pf_7",
+      "medicamentoId": "med_6",
+      "cantidad": 29,
+      "fechaActualizacion": "2025-09-23T10:56:46.616Z",
+      "id": "x40xcd4niag"
+    },
+    "pswq74szd5p": {
+      "puntoFisicoId": "pf_7",
+      "medicamentoId": "med_5",
+      "cantidad": 50,
+      "fechaActualizacion": "2025-11-25T10:59:01.255Z",
+      "id": "pswq74szd5p"
+    },
+    "tubdcady5tk": {
+      "puntoFisicoId": "pf_7",
+      "medicamentoId": "med_8",
+      "cantidad": 20,
+      "fechaActualizacion": "2025-10-16T18:54:02.912Z",
+      "id": "tubdcady5tk"
+    },
+    "ue4i789p4fs": {
+      "puntoFisicoId": "pf_7",
+      "medicamentoId": "med_2",
+      "cantidad": 33,
+      "fechaActualizacion": "2025-10-21T09:51:23.007Z",
+      "id": "ue4i789p4fs"
+    },
+    "7sh7k92hf3d": {
+      "puntoFisicoId": "pf_8",
+      "medicamentoId": "med_1",
+      "cantidad": 58,
+      "fechaActualizacion": "2025-10-12T00:54:51.491Z",
+      "id": "7sh7k92hf3d"
+    },
+    "50qn492mkff": {
+      "puntoFisicoId": "pf_8",
+      "medicamentoId": "med_4",
+      "cantidad": 26,
+      "fechaActualizacion": "2025-11-24T02:03:59.133Z",
+      "id": "50qn492mkff"
+    },
+    "gjokabwl5j": {
+      "puntoFisicoId": "pf_8",
+      "medicamentoId": "med_10",
+      "cantidad": 38,
+      "fechaActualizacion": "2025-11-03T15:10:09.556Z",
+      "id": "gjokabwl5j"
+    },
+    "uvxm7u8s2np": {
+      "puntoFisicoId": "pf_8",
+      "medicamentoId": "med_7",
+      "cantidad": 45,
+      "fechaActualizacion": "2025-11-26T01:42:31.102Z",
+      "id": "uvxm7u8s2np"
+    }
+  },
+  "prescripciones": {
+    "presc_1": {
+      "id": "presc_1",
+      "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "fechaEmision": "2025-11-02T13:02:03.050Z",
+      "recetadoPor": "Dr. Rodríguez",
+      "medicamentos": [
+        {
+          "nombre": "Ibuprofeno 400mg",
+          "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "855 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "aop67986okr"
+    },
+    "presc_2": {
+      "id": "presc_2",
+      "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "fechaEmision": "2025-10-30T16:32:21.241Z",
+      "recetadoPor": "Dr. Martínez",
+      "medicamentos": [
+        {
+          "nombre": "Ibuprofeno 400mg",
+          "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "855 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Losartán 50mg",
+          "descripcion": "Medicamento Losartán 50mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "212 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "s8h7ynfxjif"
+    },
+    "presc_3": {
+      "id": "presc_3",
+      "userId": "6NfEXvyZbZZpZs8wqcL05BpSO7r1",
+      "fechaEmision": "2025-11-09T15:28:04.303Z",
+      "recetadoPor": "Dr. Martínez",
+      "medicamentos": [
+        {
+          "nombre": "Metformina 850mg",
+          "descripcion": "Medicamento Metformina 850mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2517 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Atorvastatina 20mg",
+          "descripcion": "Medicamento Atorvastatina 20mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2413 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "78pv21abwzj"
+    },
+    "presc_4": {
+      "id": "presc_4",
+      "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "fechaEmision": "2025-09-06T23:22:45.980Z",
+      "recetadoPor": "Dr. Martínez",
+      "medicamentos": [
+        {
+          "nombre": "Ibuprofeno 400mg",
+          "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "855 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Atorvastatina 20mg",
+          "descripcion": "Medicamento Atorvastatina 20mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2413 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "g3i3k606nyi"
+    },
+    "presc_5": {
+      "id": "presc_5",
+      "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "fechaEmision": "2025-09-30T23:03:11.620Z",
+      "recetadoPor": "Dr. Gómez",
+      "medicamentos": [
+        {
+          "nombre": "Loratadina 10mg",
+          "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2366 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Ibuprofeno 400mg",
+          "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "855 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "tgp9n8vpoeh"
+    },
+    "presc_6": {
+      "id": "presc_6",
+      "userId": "2QUsa2vgcKQlqMAJ9WbuXFoYIN72",
+      "fechaEmision": "2025-10-26T12:44:26.001Z",
+      "recetadoPor": "Dr. Martínez",
+      "medicamentos": [
+        {
+          "nombre": "Paracetamol 500mg",
+          "descripcion": "Medicamento Paracetamol 500mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "891 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Losartán 50mg",
+          "descripcion": "Medicamento Losartán 50mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "212 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "hiki0og18y5"
+    },
+    "presc_7": {
+      "id": "presc_7",
+      "userId": "iVgLkJimWQNM9jdo20D76O23VDF2",
+      "fechaEmision": "2025-11-20T04:08:40.867Z",
+      "recetadoPor": "Dr. Rodríguez",
+      "medicamentos": [
+        {
+          "nombre": "Loratadina 10mg",
+          "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2366 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Salbutamol Inhalador",
+          "descripcion": "Medicamento Salbutamol Inhalador usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "500 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Amoxicilina 875mg",
+          "descripcion": "Medicamento Amoxicilina 875mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2032 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "fr1l4qc25e"
+    },
+    "presc_8": {
+      "id": "presc_8",
+      "userId": "xTNWOUMQ19Udl7DCyfDPovIFVO82",
+      "fechaEmision": "2025-09-25T15:54:10.949Z",
+      "recetadoPor": "Dr. Rodríguez",
+      "medicamentos": [
+        {
+          "nombre": "Ácido Fólico 5mg",
+          "descripcion": "Medicamento Ácido Fólico 5mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "484 ",
+          "esRestringido": true,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Loratadina 10mg",
+          "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2366 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        },
+        {
+          "nombre": "Metformina 850mg",
+          "descripcion": "Medicamento Metformina 850mg usado comúnmente para tratar diversas condiciones.",
+          "dosisMg": "2517 ",
+          "esRestringido": false,
+          "tipo": "tabletas"
+        }
+      ],
+      "pedidoId": "rw96kymwma"
+    }
+  },
+  "pedidos": {
+    "aop67986okr": {
+      "id": "aop67986okr",
+      "usuarioId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "puntoFisicoId": "pf_5",
+      "prescripcion": {
+        "id": "presc_1",
+        "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+        "fechaEmision": "2025-11-02T13:02:03.050Z",
+        "recetadoPor": "Dr. Rodríguez",
+        "medicamentos": [
+          {
+            "nombre": "Ibuprofeno 400mg",
+            "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "855 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "aop67986okr"
+      },
+      "direccionEntrega": "Cra 18 # 14-7",
+      "fechaDespacho": "2025-11-10T22:13:52.584Z",
+      "fechaEntrega": "2025-09-20T15:30:11.632Z",
+      "entregaEnTienda": false,
+      "entregado": false
+    },
+    "s8h7ynfxjif": {
+      "id": "s8h7ynfxjif",
+      "usuarioId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "puntoFisicoId": "pf_6",
+      "prescripcion": {
+        "id": "presc_2",
+        "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+        "fechaEmision": "2025-10-30T16:32:21.241Z",
+        "recetadoPor": "Dr. Martínez",
+        "medicamentos": [
+          {
+            "nombre": "Ibuprofeno 400mg",
+            "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "855 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Losartán 50mg",
+            "descripcion": "Medicamento Losartán 50mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "212 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "s8h7ynfxjif"
+      },
+      "direccionEntrega": "Cra 1 # 10-2",
+      "fechaDespacho": "2025-10-19T14:36:08.152Z",
+      "fechaEntrega": "2025-09-06T09:23:23.688Z",
+      "entregaEnTienda": false,
+      "entregado": true
+    },
+    "78pv21abwzj": {
+      "id": "78pv21abwzj",
+      "usuarioId": "6NfEXvyZbZZpZs8wqcL05BpSO7r1",
+      "puntoFisicoId": "pf_2",
+      "prescripcion": {
+        "id": "presc_3",
+        "userId": "6NfEXvyZbZZpZs8wqcL05BpSO7r1",
+        "fechaEmision": "2025-11-09T15:28:04.303Z",
+        "recetadoPor": "Dr. Martínez",
+        "medicamentos": [
+          {
+            "nombre": "Metformina 850mg",
+            "descripcion": "Medicamento Metformina 850mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2517 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Atorvastatina 20mg",
+            "descripcion": "Medicamento Atorvastatina 20mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2413 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "78pv21abwzj"
+      },
+      "direccionEntrega": "Cra 8 # 17-4",
+      "fechaDespacho": "2025-10-10T12:32:19.400Z",
+      "fechaEntrega": "2025-10-30T20:17:18.227Z",
+      "entregaEnTienda": true,
+      "entregado": true
+    },
+    "g3i3k606nyi": {
+      "id": "g3i3k606nyi",
+      "usuarioId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "puntoFisicoId": "pf_4",
+      "prescripcion": {
+        "id": "presc_4",
+        "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+        "fechaEmision": "2025-09-06T23:22:45.980Z",
+        "recetadoPor": "Dr. Martínez",
+        "medicamentos": [
+          {
+            "nombre": "Ibuprofeno 400mg",
+            "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "855 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Atorvastatina 20mg",
+            "descripcion": "Medicamento Atorvastatina 20mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2413 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "g3i3k606nyi"
+      },
+      "direccionEntrega": "Cra 1 # 24-39",
+      "fechaDespacho": "2025-10-22T09:43:02.163Z",
+      "fechaEntrega": "2025-09-25T12:18:25.556Z",
+      "entregaEnTienda": true,
+      "entregado": true
+    },
+    "tgp9n8vpoeh": {
+      "id": "tgp9n8vpoeh",
+      "usuarioId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+      "puntoFisicoId": "pf_4",
+      "prescripcion": {
+        "id": "presc_5",
+        "userId": "xI9v6LjpeYORwNz9xJwQ7rnbv2p2",
+        "fechaEmision": "2025-09-30T23:03:11.620Z",
+        "recetadoPor": "Dr. Gómez",
+        "medicamentos": [
+          {
+            "nombre": "Loratadina 10mg",
+            "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2366 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Ibuprofeno 400mg",
+            "descripcion": "Medicamento Ibuprofeno 400mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "855 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "tgp9n8vpoeh"
+      },
+      "direccionEntrega": "Cra 8 # 26-46",
+      "fechaDespacho": "2025-09-20T11:19:53.011Z",
+      "fechaEntrega": "2025-11-25T17:21:02.149Z",
+      "entregaEnTienda": false,
+      "entregado": false
+    },
+    "hiki0og18y5": {
+      "id": "hiki0og18y5",
+      "usuarioId": "2QUsa2vgcKQlqMAJ9WbuXFoYIN72",
+      "puntoFisicoId": "pf_5",
+      "prescripcion": {
+        "id": "presc_6",
+        "userId": "2QUsa2vgcKQlqMAJ9WbuXFoYIN72",
+        "fechaEmision": "2025-10-26T12:44:26.001Z",
+        "recetadoPor": "Dr. Martínez",
+        "medicamentos": [
+          {
+            "nombre": "Paracetamol 500mg",
+            "descripcion": "Medicamento Paracetamol 500mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "891 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Losartán 50mg",
+            "descripcion": "Medicamento Losartán 50mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "212 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "hiki0og18y5"
+      },
+      "direccionEntrega": "Cra 6 # 10-10",
+      "fechaDespacho": "2025-10-26T15:05:29.241Z",
+      "fechaEntrega": "2025-10-04T15:28:15.287Z",
+      "entregaEnTienda": false,
+      "entregado": false
+    },
+    "fr1l4qc25e": {
+      "id": "fr1l4qc25e",
+      "usuarioId": "iVgLkJimWQNM9jdo20D76O23VDF2",
+      "puntoFisicoId": "pf_4",
+      "prescripcion": {
+        "id": "presc_7",
+        "userId": "iVgLkJimWQNM9jdo20D76O23VDF2",
+        "fechaEmision": "2025-11-20T04:08:40.867Z",
+        "recetadoPor": "Dr. Rodríguez",
+        "medicamentos": [
+          {
+            "nombre": "Loratadina 10mg",
+            "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2366 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Salbutamol Inhalador",
+            "descripcion": "Medicamento Salbutamol Inhalador usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "500 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Amoxicilina 875mg",
+            "descripcion": "Medicamento Amoxicilina 875mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2032 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "fr1l4qc25e"
+      },
+      "direccionEntrega": "Cra 2 # 18-25",
+      "fechaDespacho": "2025-10-13T05:31:54.054Z",
+      "fechaEntrega": "2025-10-16T06:02:56.061Z",
+      "entregaEnTienda": true,
+      "entregado": false
+    },
+    "rw96kymwma": {
+      "id": "rw96kymwma",
+      "usuarioId": "xTNWOUMQ19Udl7DCyfDPovIFVO82",
+      "puntoFisicoId": "pf_4",
+      "prescripcion": {
+        "id": "presc_8",
+        "userId": "xTNWOUMQ19Udl7DCyfDPovIFVO82",
+        "fechaEmision": "2025-09-25T15:54:10.949Z",
+        "recetadoPor": "Dr. Rodríguez",
+        "medicamentos": [
+          {
+            "nombre": "Ácido Fólico 5mg",
+            "descripcion": "Medicamento Ácido Fólico 5mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "484 ",
+            "esRestringido": true,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Loratadina 10mg",
+            "descripcion": "Medicamento Loratadina 10mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2366 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          },
+          {
+            "nombre": "Metformina 850mg",
+            "descripcion": "Medicamento Metformina 850mg usado comúnmente para tratar diversas condiciones.",
+            "dosisMg": "2517 ",
+            "esRestringido": false,
+            "tipo": "tabletas"
+          }
+        ],
+        "pedidoId": "rw96kymwma"
+      },
+      "direccionEntrega": "Cra 30 # 10-19",
+      "fechaDespacho": "2025-10-27T03:15:59.877Z",
+      "fechaEntrega": "2025-09-22T12:45:39.031Z",
+      "entregaEnTienda": true,
+      "entregado": true
+    }
+  }
+}
