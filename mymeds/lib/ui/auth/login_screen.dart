@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
 		final _emailController = TextEditingController();
 		final _passwordController = TextEditingController();
 		bool _isLoading = false;
+		bool _isPasswordVisible = false; // Add this state variable
 
 		Future<void> _login() async {
 			if (!_formKey.currentState!.validate()) return;
@@ -40,6 +41,9 @@ class _LoginScreenState extends State<LoginScreen> {
 					);
 				}
 			} catch (e) {
+				debugPrint('🚨🚨 LOGIN SCREEN EXCEPTION HANDLER TRIGGERED 🚨🚨');
+				debugPrint('🚨 Exception Type: ${e.runtimeType}');
+				debugPrint('🚨 Exception Message: ${e.toString()}');
 				if (!mounted) return;
 				ScaffoldMessenger.of(context).showSnackBar(
 					SnackBar(
@@ -99,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
 								},
 								decoration: InputDecoration(
 									labelText: 'Correo electrónico',
-									hintText: 'ejemplo@mail.com',
+									hintText: 'ejemplo1@mail.com',
 									filled: true,
 									fillColor: const Color(0xFFFFF1D5),
 									border: OutlineInputBorder(
@@ -111,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
 							// Password Field
 							TextFormField(
 								controller: _passwordController,
-								obscureText: true,
+								obscureText: !_isPasswordVisible, // Use the state variable here
 								style: GoogleFonts.balsamiqSans(),
 								validator: (value) {
 									if (value == null || value.isEmpty) {
@@ -129,6 +133,21 @@ class _LoginScreenState extends State<LoginScreen> {
 									fillColor: const Color(0xFFFFF1D5),
 									border: OutlineInputBorder(
 										borderRadius: BorderRadius.circular(16),
+									),
+									suffixIcon: GestureDetector(
+										onTapDown: (_) {
+											setState(() {
+												_isPasswordVisible = true; // Show password on button press
+											});
+										},
+										onTapUp: (_) {
+											setState(() {
+												_isPasswordVisible = false; // Hide password when button is released
+											});
+										},
+										child: Icon(
+											_isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+										),
 									),
 								),
 							),

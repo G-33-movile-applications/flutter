@@ -42,19 +42,24 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Future<void> _loadUserPrescripciones() async {
     try {
       final userId = UserSession().currentUser.value?.uid;
-      if (userId != null) {
+      print('🔍 Loading prescriptions for user: $userId'); // Debug log
+      
+      if (userId != null && userId.isNotEmpty) {
         final prescripciones = await _facade.getUserPrescripciones(userId);
+        print('✅ Loaded ${prescripciones.length} prescriptions'); // Debug log
+        
         setState(() {
           _prescripciones = prescripciones;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _errorMessage = 'Usuario no autenticado';
+          _errorMessage = 'Usuario no autenticado o ID de usuario vacío';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('❌ Error loading prescriptions: $e'); // Debug log
       setState(() {
         _errorMessage = 'Error cargando prescripciones: $e';
         _isLoading = false;
@@ -137,20 +142,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
       // Create pedido with reference to existing prescription - NO PRESCRIPTION CREATION
       final pedido = Pedido(
-        identificadorPedido: DateTime.now().millisecondsSinceEpoch.toString(),
-        fechaEntrega: fechaEntrega,
-        fechaDespacho: fechaDespacho,
-        direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
-        entregado: false,
-        entregaEnTienda: _isPickup,
-        usuarioId: userId,
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        prescripcionId: _selectedPrescripcion!.id,
         puntoFisicoId: widget.pharmacy!.id,
-        prescripcionId: _selectedPrescripcion!.id, // Link to existing prescription
-        prescripcion: _selectedPrescripcion, // For in-memory use only
+        tipoEntrega: _isPickup ? 'recogida' : 'domicilio',
+        direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
+        estado: 'pendiente',
+        fechaPedido: fechaDespacho,
+        fechaEntrega: fechaEntrega,
       );
 
-      // Create only the pedido - no prescription duplication
-      await _facade.createPedido(pedido);
+      // Create only the pedido - no prescription creation
+      await _facade.createPedido(pedido, userId: userId);
 
       if (mounted) {
         // Show success message
@@ -281,7 +284,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                widget.pharmacy!.cadena,
+                                widget.pharmacy!.direccion,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.textSecondary,
                                 ),
@@ -418,33 +421,50 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                         },
                       ),
 
-                      // Show selected prescription medications
+                      // Show selected prescription info
                       if (_selectedPrescripcion != null) ...[
                         const SizedBox(height: 16),
-                        Text(
-                          'Medicamentos en la prescripción:',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
                         Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: _selectedPrescripcion!.medicamentos.map((med) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.medication, size: 16),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: Text(med.nombre)),
-                                      if (med.esRestringido)
-                                        const Icon(Icons.warning, color: Colors.orange, size: 16),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
+                              children: [
+                                Text(
+                                  'Prescripción seleccionada:',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.medical_services, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text('Diagnóstico: ${_selectedPrescripcion!.diagnostico}'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.person, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text('Médico: ${_selectedPrescripcion!.medico}'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text('Fecha: ${_selectedPrescripcion!.fechaCreacion.day}/${_selectedPrescripcion!.fechaCreacion.month}/${_selectedPrescripcion!.fechaCreacion.year}'),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),

@@ -58,7 +58,7 @@ class PharmacyMarkerSheet extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      pharmacy.cadena,
+                      pharmacy.nombre,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: AppTheme.textSecondary,
                         fontWeight: FontWeight.w600,

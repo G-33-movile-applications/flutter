@@ -24,7 +24,7 @@ android {
         applicationId = "com.mobile.mymeds"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21 // Required for file_picker
+        minSdk = flutter.minSdkVersion // Required for file_picker
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
