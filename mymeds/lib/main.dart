@@ -17,7 +17,7 @@ Future<void> main() async {
   );
 
   // 🌱 SEEDING: Uncomment to seed database (run once then comment out)
-  await FirebaseSeeder().seedAll();
+  //await FirebaseSeeder().seedAll();
 
   // Initialize user session management
   await UserSession().init();

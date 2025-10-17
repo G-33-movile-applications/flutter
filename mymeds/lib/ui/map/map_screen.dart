@@ -11,7 +11,6 @@ import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
 import 'package:provider/provider.dart'; 
 import '../../providers/motion_provider.dart';
-import '../../services/motion_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -269,8 +268,8 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final motionState = context.watch<MotionProvider>().motionState;
-    final isDriving = motionState == MotionState.driving;
+    final motionProvider = context.watch<MotionProvider>();
+    final isDriving = motionProvider.isDriving;
 
     return Scaffold(
      backgroundColor: AppTheme.scaffoldBackgroundColor,

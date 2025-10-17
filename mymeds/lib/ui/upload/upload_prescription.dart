@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:mymeds/services/motion_service.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -102,7 +101,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
 
     return Consumer<MotionProvider>(
       builder: (context, motionProvider, child) {
-        final isDriving = motionProvider.motionState == MotionState.driving;
+        final isDriving = motionProvider.isDriving;
 
         return Scaffold(
           backgroundColor: AppTheme.scaffoldBackgroundColor,
@@ -197,7 +196,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                           Icon(Icons.directions_car_rounded, color: Colors.white, size: 80),
                           SizedBox(height: 20),
                           Text(
-                            "🚗 Conduce seguro",
+                            "Modo conducción detectado",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 24,
@@ -206,7 +205,7 @@ class _UploadPrescriptionPageState extends State<UploadPrescriptionPage> {
                           ),
                           SizedBox(height: 10),
                           Text(
-                            "Por seguridad, esta función se desactiva mientras conduces.",
+                            "Por seguridad, no puedes subir prescripciones mientras conduces.",
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white70, fontSize: 16),
                           ),

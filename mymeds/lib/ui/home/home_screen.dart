@@ -1,22 +1,112 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
+import 'widgets/motion_debug_bar.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
 import '../analytics/delivery_analytics_screen.dart';
 import 'package:provider/provider.dart';
 import '../../providers/motion_provider.dart';
-import '../../services/motion_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _dialogOpen = false; // Guard to prevent duplicate dialogs
+
+  @override
+  void initState() {
+    super.initState();
+    // Check for driving confirmation needs after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkDrivingConfirmation();
+    });
+  }
+
+  void _checkDrivingConfirmation() {
+    if (!mounted) return;
+    
+    final motionProvider = context.read<MotionProvider>();
+    
+    // Guard: only show dialog if needed and not already open
+    if (motionProvider.needsUserConfirmation && 
+        !motionProvider.alertShown && 
+        !_dialogOpen) {
+      _showDrivingConfirmationDialog();
+    }
+  }
+
+  void _showDrivingConfirmationDialog() {
+    if (_dialogOpen) return; // Extra safety guard
+    
+    final motionProvider = context.read<MotionProvider>();
+    
+    // Mark as shown BEFORE showing dialog to prevent duplicates
+    motionProvider.markDialogShown();
+    _dialogOpen = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.directions_car_rounded, color: Colors.orange, size: 32),
+            SizedBox(width: 12),
+            Text('¿Estás conduciendo?'),
+          ],
+        ),
+        content: const Text(
+          'Detectamos que podrías estar conduciendo. Por tu seguridad, '
+          'algunas funciones se desactivarán si confirmas que estás al volante.',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              context.read<MotionProvider>().setIsDrivingConfirmed(false);
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'No, no estoy conduciendo',
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              context.read<MotionProvider>().setIsDrivingConfirmed(true);
+              Navigator.pop(context);
+            },
+            child: const Text('Sí, estoy conduciendo'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      // Reset guard when dialog closes
+      if (mounted) {
+        context.read<MotionProvider>().markDialogClosed();
+        _dialogOpen = false;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final motionProvider = context.watch<MotionProvider>();
-    final motionState = motionProvider.motionState;
-    final manualState = motionProvider.manualState;
+    
+    // Watch for provider changes and check for confirmation needs
+    context.watch<MotionProvider>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkDrivingConfirmation();
+    });
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -58,63 +148,68 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Greeting section
-                _buildGreetingSection(theme),
-                const SizedBox(height: 24),
-                // Motion status panel
-                _buildMotionStatusPanel(context, motionState, manualState),
-                const SizedBox(height: 24),
-                // Feature cards
-                FeatureCard(
-                  overline: 'FUNCIONALIDAD',
-                  title: 'Ver mapa de farmacias',
-                  description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
-                  icon: Icons.map_rounded,
-                  buttonText: 'Abrir mapa',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/map');
-                  },
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Greeting section
+                      _buildGreetingSection(theme),
+                      const SizedBox(height: 24),
+                      // Feature cards
+                      FeatureCard(
+                        overline: 'FUNCIONALIDAD',
+                        title: 'Ver mapa de farmacias',
+                        description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
+                        icon: Icons.map_rounded,
+                        buttonText: 'Abrir mapa',
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/map');
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      FeatureCard(
+                        overline: 'FUNCIONALIDAD',
+                        title: 'Sube tu prescripción',
+                        description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
+                        icon: Icons.upload_file_rounded,
+                        buttonText: 'Subir',
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/upload');
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      FeatureCard(
+                        overline: 'CUENTA',
+                        title: 'Ver tu perfil',
+                        description: 'Datos del usuario, preferencias y accesibilidad.',
+                        icon: Icons.person_rounded,
+                        buttonText: 'Ver perfil',
+                        onPressed: () {
+                          Navigator.pushNamed(
+                          context,
+                          '/profile',
+                          arguments: UserSession().currentUser.value?.uid,
+                        );
+                        },
+                      ),
+                      
+                      // Bottom spacing for better scroll experience
+                      const SizedBox(height: 24),
+                    ]),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                
-                FeatureCard(
-                  overline: 'FUNCIONALIDAD',
-                  title: 'Sube tu prescripción',
-                  description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
-                  icon: Icons.upload_file_rounded,
-                  buttonText: 'Subir',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/upload');
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                FeatureCard(
-                  overline: 'CUENTA',
-                  title: 'Ver tu perfil',
-                  description: 'Datos del usuario, preferencias y accesibilidad.',
-                  icon: Icons.person_rounded,
-                  buttonText: 'Ver perfil',
-                  onPressed: () {
-                    Navigator.pushNamed(
-                    context,
-                    '/profile',
-                    arguments: UserSession().currentUser.value?.uid,
-                  );
-                  },
-                ),
-                
-                // Bottom spacing for better scroll experience
-                const SizedBox(height: 24),
-              ]),
+              ],
             ),
           ),
+          // Debug status bar at bottom
+          const MotionDebugBar(),
         ],
       ),
     );
@@ -175,93 +270,4 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-
-Widget _buildMotionStatusPanel(
-    BuildContext context,
-    MotionState current,
-    MotionState? manual,
-  ) {
-    final motionProvider = context.read<MotionProvider>();
-
-    String stateToEmoji(MotionState s) {
-      switch (s) {
-        case MotionState.idle:
-          return '🪑';
-        case MotionState.walking:
-          return '🚶‍♂️';
-        case MotionState.running:
-          return '🏃‍♂️';
-        case MotionState.driving:
-          return '🚗';
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Estado del movimiento',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-
-          // Current sensor reading
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Sensor detecta:'),
-              Text('${stateToEmoji(current)} ${current.name.toUpperCase()}'),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Manual mode info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Modo manual:'),
-              Text(manual != null
-                  ? '${stateToEmoji(manual)} ${manual.name.toUpperCase()}'
-                  : 'Ninguno'),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Manual buttons
-          Wrap(
-            spacing: 8,
-            children: MotionState.values.map((state) {
-              final isActive = manual == state;
-              return ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      isActive ? Colors.blueAccent : Colors.grey[300],
-                  foregroundColor: isActive ? Colors.white : Colors.black,
-                ),
-                onPressed: () {
-                  motionProvider.setManualState(isActive ? null : state);
-                },
-                child: Text(state.name.toUpperCase()),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-}  
 }
