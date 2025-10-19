@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/prescripcion.dart';
+import '../models/prescripcion_with_medications.dart';
+import 'medicamento_prescripcion_repository.dart';
 
 class PrescripcionRepository {
+  final MedicamentoPrescripcionRepository _medicamentoRepo = MedicamentoPrescripcionRepository();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collection = 'prescripciones';
 
@@ -201,5 +204,166 @@ class PrescripcionRepository {
   // Alias method for UserSession compatibility
   Future<List<Prescripcion>> getPrescripcionesByUser(String userId) async {
     return await findByUserId(userId);
+  }
+
+  // ==================== NEW: Load prescriptions with medications ====================
+
+  /// Load a single prescription with its medications from the subcollection
+  /// 
+  /// Path: usuarios/{userId}/prescripciones/{prescripcionId}
+  /// Medications path: usuarios/{userId}/prescripciones/{prescripcionId}/medicamentos
+  Future<PrescripcionWithMedications?> getPrescripcionWithMedications({
+    required String userId,
+    required String prescripcionId,
+  }) async {
+    try {
+      // Load the prescription from subcollection
+      final doc = await _firestore
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(prescripcionId)
+          .get();
+
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
+
+      final prescripcion = Prescripcion.fromMap(doc.data()!, documentId: doc.id);
+
+      // Load medications from subcollection
+      final medicamentos = await _medicamentoRepo.getMedicamentosByPrescripcion(
+        userId: userId,
+        prescripcionId: prescripcionId,
+      );
+
+      return PrescripcionWithMedications(
+        prescripcion: prescripcion,
+        medicamentos: medicamentos,
+      );
+    } catch (e) {
+      throw Exception('Error loading prescription with medications: $e');
+    }
+  }
+
+  /// Load all prescriptions for a user with their medications
+  /// 
+  /// This loads prescriptions from usuarios/{userId}/prescripciones
+  /// and medications from the subcollections
+  Future<List<PrescripcionWithMedications>> getPrescripcionesWithMedicationsByUser(String userId) async {
+    try {
+      if (userId.isEmpty) {
+        throw ArgumentError('User ID cannot be empty');
+      }
+
+      // Load all prescriptions for user
+      final prescripciones = await findByUserId(userId);
+
+      // Load medications for each prescription
+      final List<PrescripcionWithMedications> result = [];
+      
+      for (final prescripcion in prescripciones) {
+        final medicamentos = await _medicamentoRepo.getMedicamentosByPrescripcion(
+          userId: userId,
+          prescripcionId: prescripcion.id,
+        );
+
+        result.add(PrescripcionWithMedications(
+          prescripcion: prescripcion,
+          medicamentos: medicamentos,
+        ));
+      }
+
+      return result;
+    } catch (e) {
+      throw Exception('Error loading prescriptions with medications for user: $e');
+    }
+  }
+
+  /// Stream prescriptions with medications for real-time updates
+  /// 
+  /// Note: This streams prescription updates, but medications are fetched on each update
+  /// For frequently changing medications, consider a more sophisticated streaming approach
+  Stream<List<PrescripcionWithMedications>> streamPrescripcionesWithMedicationsByUser(String userId) async* {
+    if (userId.isEmpty) {
+      yield* Stream.error(ArgumentError('User ID cannot be empty'));
+      return;
+    }
+
+    await for (final prescripciones in streamByUserId(userId)) {
+      final List<PrescripcionWithMedications> result = [];
+      
+      for (final prescripcion in prescripciones) {
+        try {
+          final medicamentos = await _medicamentoRepo.getMedicamentosByPrescripcion(
+            userId: userId,
+            prescripcionId: prescripcion.id,
+          );
+
+          result.add(PrescripcionWithMedications(
+            prescripcion: prescripcion,
+            medicamentos: medicamentos,
+          ));
+        } catch (e) {
+          // Log error but continue with other prescriptions
+          print('Error loading medications for prescription ${prescripcion.id}: $e');
+          // Add prescription with empty medications list
+          result.add(PrescripcionWithMedications(
+            prescripcion: prescripcion,
+            medicamentos: [],
+          ));
+        }
+      }
+      
+      yield result;
+    }
+  }
+
+  /// Create prescription with medications (saves to subcollections)
+  /// 
+  /// This is the recommended way to create a prescription with medications
+  Future<void> createWithMedicamentos({
+    required String userId,
+    required Prescripcion prescripcion,
+    required List<dynamic> medicamentos, // Can be MedicamentoPrescripcion or Map
+  }) async {
+    try {
+      // 1. Create the prescription document
+      await _firestore
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(prescripcion.id)
+          .set(prescripcion.toMap());
+
+      // 2. Add medications to subcollection
+      if (medicamentos.isNotEmpty) {
+        final batch = _firestore.batch();
+        
+        for (final medicamento in medicamentos) {
+          // Convert to Map if it's a MedicamentoPrescripcion object
+          final medicamentoMap = medicamento is Map<String, dynamic> 
+              ? medicamento 
+              : (medicamento as dynamic).toMap();
+          
+          final medicamentoId = medicamentoMap['id'] ?? medicamentoMap['medicamentoRef']?.split('/').last ?? 
+              'med_${DateTime.now().millisecondsSinceEpoch}_${medicamentos.indexOf(medicamento)}';
+          
+          final docRef = _firestore
+              .collection('usuarios')
+              .doc(userId)
+              .collection('prescripciones')
+              .doc(prescripcion.id)
+              .collection('medicamentos')
+              .doc(medicamentoId);
+          
+          batch.set(docRef, medicamentoMap);
+        }
+        
+        await batch.commit();
+      }
+    } catch (e) {
+      throw Exception('Error creating prescription with medications: $e');
+    }
   }
 }
