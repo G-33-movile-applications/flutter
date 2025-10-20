@@ -1,0 +1,24 @@
+# Node modules
+node_modules/
+
+# Firebase Service Account Keys (SENSITIVE - DO NOT COMMIT!)
+mymeds-application-f99dd-firebase-adminsdk-fbsvc-2e9bfb7fb0.json
+mymeds-application-f99dd-firebase-adminsdk-fbsvc-2f530ed294.json
+*.json
+!package.json
+!package-lock.json
+
+# Generated mock data
+mock_data.json
+
+# Geocoding cache (contains API responses)
+geocoding_cache.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
