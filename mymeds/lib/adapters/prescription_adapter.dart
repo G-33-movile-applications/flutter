@@ -10,9 +10,17 @@ class PrescriptionAdapter {
   
   /// Convert Prescripcion to JSON string for NFC storage
   static String toNdefJson(Prescripcion prescripcion) {
+    // Handle fechaCreacion - could be DateTime or Timestamp from Firestore
+    DateTime fechaCreacion;
+    if (prescripcion.fechaCreacion is Timestamp) {
+      fechaCreacion = (prescripcion.fechaCreacion as Timestamp).toDate();
+    } else {
+      fechaCreacion = prescripcion.fechaCreacion;
+    }
+    
     final Map<String, dynamic> data = {
       'id': prescripcion.id,
-      'fechaCreacion': prescripcion.fechaCreacion.toIso8601String(),
+      'fechaCreacion': fechaCreacion.toIso8601String(),
       'diagnostico': prescripcion.diagnostico,
       'medico': prescripcion.medico,
       'activa': prescripcion.activa,

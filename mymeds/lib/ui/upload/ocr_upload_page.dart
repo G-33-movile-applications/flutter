@@ -130,14 +130,23 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
 
       setState(() => _extractedText = text);
 
-      // Parse prescription data
+      // Parse prescription data with improved algorithm
       final parsedData = await _ocrService.parsePrescriptionText(text);
+      
+      // Get confidence score
+      final confidence = parsedData['_confidence'] as int? ?? 0;
       
       // Populate controllers with parsed data
       _medicoController.text = parsedData['doctor'] ?? '';
       _diagnosticoController.text = parsedData['diagnosis'] ?? '';
       
       if (parsedData['date'] != null) {
+        _selectedDate = parsedData['date'] as DateTime;
+      }
+
+      // Parse medications
+      // Parse date if found
+      if (parsedData['date'] != null && parsedData['date'] is DateTime) {
         _selectedDate = parsedData['date'] as DateTime;
       }
 
@@ -168,11 +177,18 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         _addEmptyMedication();
       }
 
-      _showSuccessSnackBar('Texto extraído exitosamente');
+      // Show success with confidence score
+      if (confidence >= 70) {
+        _showSuccessSnackBar('Texto extraído exitosamente (Confianza: $confidence%)');
+      } else if (confidence >= 40) {
+        _showInfoSnackBar('Texto extraído con confianza media ($confidence%). Por favor revisa los datos.');
+      } else {
+        _showErrorSnackBar('Confianza baja ($confidence%). Por favor revisa y corrige los datos manualmente.');
+      }
       
-      // Show confirmation dialog to review extracted data
+      // Show improved confirmation dialog to review extracted data
       await Future.delayed(const Duration(milliseconds: 500));
-      _showExtractedDataReview();
+      _showExtractedDataReview(confidence: confidence, parsedData: parsedData);
     } catch (e) {
       debugPrint('OCR processing error: $e');
       _showErrorSnackBar('Error al procesar imagen: ${e.toString()}');
@@ -211,15 +227,34 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     });
   }
 
-  void _showExtractedDataReview() {
+  void _showExtractedDataReview({required int confidence, required Map<String, dynamic> parsedData}) {
+    // Determine confidence level
+    Color confidenceColor;
+    IconData confidenceIcon;
+    String confidenceText;
+    
+    if (confidence >= 70) {
+      confidenceColor = Colors.green;
+      confidenceIcon = Icons.check_circle;
+      confidenceText = 'Alta';
+    } else if (confidence >= 40) {
+      confidenceColor = Colors.orange;
+      confidenceIcon = Icons.warning;
+      confidenceText = 'Media';
+    } else {
+      confidenceColor = Colors.red;
+      confidenceIcon = Icons.error;
+      confidenceText = 'Baja';
+    }
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.info, color: AppTheme.primaryColor),
-            SizedBox(width: 12),
-            Text('Datos Extraídos'),
+            Icon(confidenceIcon, color: confidenceColor),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Datos Extraídos')),
           ],
         ),
         content: SingleChildScrollView(
@@ -227,26 +262,75 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Se ha extraído el siguiente texto de la imagen:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
+              // Confidence indicator
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: confidenceColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: confidenceColor, width: 2),
                 ),
-                child: Text(
-                  _extractedText ?? 'Sin texto',
-                  style: const TextStyle(fontSize: 12),
+                child: Row(
+                  children: [
+                    Icon(confidenceIcon, color: confidenceColor, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Confianza: $confidenceText ($confidence%)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: confidenceColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            confidence >= 70 
+                                ? 'Los datos se ven bien, pero revísalos antes de guardar.'
+                                : 'Por favor revisa y corrige los campos manualmente.',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
+              
+              // Extracted fields summary
               const Text(
-                'Por favor, revisa y edita los datos extraídos a continuación.',
-                style: TextStyle(fontSize: 14),
+                'Campos detectados:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              
+              _buildFieldStatus('Médico', parsedData['doctor']),
+              _buildFieldStatus('Diagnóstico', parsedData['diagnosis']),
+              _buildFieldStatus('Fecha', parsedData['date'] != null ? 'Detectada' : 'No detectada'),
+              _buildFieldStatus('Medicamentos', '${(parsedData['medications'] as List?)?.length ?? 0} encontrados'),
+              
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Puedes editar todos los campos en el formulario de abajo.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -254,9 +338,38 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text('Revisar y Editar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldStatus(String label, dynamic value) {
+    final bool detected = value != null && 
+                         value.toString().isNotEmpty && 
+                         !value.toString().contains('No detectado');
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(
+            detected ? Icons.check_circle : Icons.cancel,
+            size: 16,
+            color: detected ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$label: ${detected ? (value is DateTime ? 'Detectado' : value.toString()) : 'No detectado'}',
+              style: TextStyle(
+                fontSize: 13,
+                color: detected ? Colors.black87 : Colors.red.shade700,
+              ),
             ),
           ),
         ],
@@ -394,10 +507,10 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(confirmText),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: Text(confirmText),
           ),
         ],
       ),
@@ -419,10 +532,10 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -478,10 +591,10 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               // Note: Opening settings requires permission_handler package
               // For now, user needs to manually go to settings
             },
-            child: const Text('Entendido'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Entendido'),
           ),
         ],
       ),

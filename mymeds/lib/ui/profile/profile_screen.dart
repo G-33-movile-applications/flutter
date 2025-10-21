@@ -412,7 +412,7 @@
                     IgnorePointer(
                       ignoring: !_editable,
                       child: DropdownButtonFormField<String>(
-                        value: _selectedDepartamento,
+                        initialValue: _selectedDepartamento,
                         decoration: InputDecoration(
                           labelText: "Departamento de residencia",
                           filled: true,
@@ -437,7 +437,7 @@
                     IgnorePointer(
                       ignoring: !_editable,
                       child: DropdownButtonFormField<String>(
-                        value: _selectedCiudad,
+                        initialValue: _selectedCiudad,
                         decoration: InputDecoration(
                           labelText: "Ciudad de residencia",
                           filled: true,
@@ -466,7 +466,7 @@
                     // Preferences
                     // Delivery Method
                     DropdownButtonFormField<String>(
-                      value: _modoEntregaPreferido,
+                      initialValue: _modoEntregaPreferido,
                       decoration: InputDecoration(
                         labelText: "Modo de entrega preferido",
                         filled: true,
@@ -495,7 +495,7 @@
                     SwitchListTile(
                       title: const Text("Recibir notificaciones"),
                       value: _aceptaNotificaciones,
-                      activeColor: Theme.of(context).colorScheme.primary,
+                      activeThumbColor: Theme.of(context).colorScheme.primary,
                       onChanged: _editable
                         ? (val) {
                             setState(() => _aceptaNotificaciones = val);

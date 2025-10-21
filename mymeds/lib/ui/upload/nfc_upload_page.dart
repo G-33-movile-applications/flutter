@@ -37,6 +37,13 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
     _checkNfcAvailability();
   }
 
+  @override
+  void dispose() {
+    // Cancel any ongoing NFC session when leaving the page
+    _nfcService.cancelSession();
+    super.dispose();
+  }
+
   Future<void> _checkNfcAvailability() async {
     try {
       final available = await _nfcService.isAvailable();
@@ -71,10 +78,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Entendido'),
           ),
         ],
       ),
@@ -98,10 +105,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Entendido'),
           ),
         ],
       ),
@@ -124,6 +131,9 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       _readPrescription = null;
       _mockPrescription = null;
     });
+
+    // Cancel any previous NFC session before starting new one
+    await _nfcService.cancelSession();
 
     try {
       _showInfoSnackBar('Acerca tu dispositivo al tag NFC...');
@@ -206,6 +216,9 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       return;
     }
 
+    // Cancel any previous NFC session
+    await _nfcService.cancelSession();
+
     // Show selection dialog: existing prescription or create mock
     final choice = await _showWriteOptionsDialog();
     
@@ -235,10 +248,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'existing'),
-            child: const Text('Prescripción Existente'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Prescripción Existente'),
           ),
         ],
       ),
@@ -414,10 +427,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               );
               Navigator.pop(context, prescription);
             },
-            child: const Text('Crear'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Crear'),
           ),
         ],
       ),
@@ -503,6 +516,9 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
     if (confirmed != true) return;
 
     setState(() => _isProcessing = true);
+
+    // Cancel any previous NFC session
+    await _nfcService.cancelSession();
 
     try {
       _showInfoSnackBar('Acerca tu dispositivo al tag NFC...');
@@ -623,10 +639,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(confirmText),
             style: ElevatedButton.styleFrom(
               backgroundColor: isDestructive ? Colors.red : AppTheme.primaryColor,
             ),
+            child: Text(confirmText),
           ),
         ],
       ),
@@ -648,10 +664,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -760,10 +776,10 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               // Note: Opening settings requires permission_handler package
               // For now, user needs to manually go to settings
             },
-            child: const Text('Entendido'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
             ),
+            child: const Text('Entendido'),
           ),
         ],
       ),

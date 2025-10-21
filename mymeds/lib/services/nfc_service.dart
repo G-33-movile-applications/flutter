@@ -45,21 +45,56 @@ class NfcService {
         // Check if record has payload
         if (record.payload != null && record.payload!.isNotEmpty) {
           try {
-            // Try to decode the payload as UTF-8 text
             String payload;
             
-            // Check record type - if it's a text record, skip language code
-            if (record.type != null && 
-                String.fromCharCodes(record.type!) == 'T') {
-              // Text record - skip the first 3 bytes (language code)
-              if (record.payload!.length > 3) {
-                payload = utf8.decode(record.payload!.sublist(3));
-              } else {
-                continue;
+            // Check record type to determine how to decode
+            final recordTypeBytes = record.type;
+            final String recordType = recordTypeBytes != null 
+                ? String.fromCharCodes(recordTypeBytes) 
+                : '';
+            
+            debugPrint('NFC Record type: $recordType');
+            
+            // Handle MIME records (our custom type)
+            if (recordTypeBytes != null && recordTypeBytes.isNotEmpty) {
+              final typeString = utf8.decode(recordTypeBytes);
+              if (typeString == mimeType || typeString.contains('mymeds')) {
+                // Direct MIME record payload
+                payload = utf8.decode(record.payload!);
+                debugPrint('Found MyMeds MIME record');
+              }
+              // Handle text records (T = 0x54)
+              else if (recordType == 'T' || recordTypeBytes[0] == 0x54) {
+                // Text record - skip the first byte (status byte) and language code
+                if (record.payload!.length > 3) {
+                  final statusByte = record.payload![0];
+                  final languageCodeLength = statusByte & 0x3F;
+                  final payloadStart = 1 + languageCodeLength;
+                  if (payloadStart < record.payload!.length) {
+                    payload = utf8.decode(record.payload!.sublist(payloadStart));
+                  } else {
+                    continue;
+                  }
+                } else {
+                  continue;
+                }
+              }
+              // Try as raw UTF-8
+              else {
+                try {
+                  payload = utf8.decode(record.payload!);
+                } catch (e) {
+                  debugPrint('Failed to decode as UTF-8: $e');
+                  continue;
+                }
               }
             } else {
-              // Try to decode as regular UTF-8
-              payload = utf8.decode(record.payload!);
+              // No type info, try direct UTF-8 decode
+              try {
+                payload = utf8.decode(record.payload!);
+              } catch (e) {
+                continue;
+              }
             }
             
             // Verify it's valid JSON
@@ -68,7 +103,7 @@ class NfcService {
               final jsonData = jsonDecode(payload) as Map<String, dynamic>;
               if (jsonData.containsKey('_type') && 
                   jsonData['_type'] == prescriptionIdentifier) {
-                debugPrint('Found prescription data on NFC tag');
+                debugPrint('Found prescription data with identifier on NFC tag');
                 return payload;
               }
               // Also accept if it has prescription-like fields
@@ -108,6 +143,8 @@ class NfcService {
   /// Write prescription JSON to an NFC tag as NDEF record
   /// Throws exception on write errors
   Future<void> writeNdefJson(String jsonPayload, {bool overwrite = false}) async {
+    NFCTag? tag;
+    
     try {
       // Validate JSON before writing
       if (!_isValidJson(jsonPayload)) {
@@ -119,8 +156,8 @@ class NfcService {
       jsonData['_type'] = prescriptionIdentifier;
       final enhancedPayload = jsonEncode(jsonData);
 
-      // Poll for NFC tag
-      final tag = await FlutterNfcKit.poll(
+      // Poll for NFC tag - use shorter timeout to avoid conflicts
+      tag = await FlutterNfcKit.poll(
         timeout: const Duration(seconds: 10),
         iosMultipleTagMessage: 'Multiple tags detected, please keep only one near the device',
         iosAlertMessage: 'Hold your iPhone near the tag to write',
@@ -134,23 +171,28 @@ class NfcService {
         throw Exception('NFC tag is not writable');
       }
 
-      // Create NDEF text record with JSON data
-      final textRecord = ndef.TextRecord(
-        text: enhancedPayload,
-        encoding: ndef.TextEncoding.UTF8,
-        language: 'en',
+      // Create NDEF MIME record with custom MIME type for MyMeds prescriptions
+      // This ensures Android opens the tag directly in MyMeds app
+      final mimeRecord = ndef.MimeRecord(
+        decodedType: mimeType,
+        payload: utf8.encode(enhancedPayload),
       );
 
-      // Write to tag using ndef.NDEFRecord
-      await FlutterNfcKit.writeNDEFRecords([textRecord]);
+      // Write to tag using MIME record (not text record)
+      await FlutterNfcKit.writeNDEFRecords([mimeRecord]);
       
       debugPrint('Prescription written to NFC tag successfully');
       
-      // Finish the NFC session
+      // Finish the NFC session immediately to prevent reopen conflicts
       await FlutterNfcKit.finish(iosAlertMessage: 'Prescription written successfully');
     } catch (e) {
       debugPrint('NFC write error: $e');
-      await FlutterNfcKit.finish(iosErrorMessage: 'Failed to write to tag');
+      // Try to finish session even on error
+      try {
+        await FlutterNfcKit.finish(iosErrorMessage: 'Failed to write to tag');
+      } catch (finishError) {
+        debugPrint('Error finishing NFC session: $finishError');
+      }
       rethrow;
     }
   }
@@ -158,17 +200,28 @@ class NfcService {
   /// Delete/format the NFC tag by writing empty NDEF
   Future<void> clearTag() async {
     try {
+      // Poll for tag
       await FlutterNfcKit.poll(
         timeout: const Duration(seconds: 10),
+        iosAlertMessage: 'Hold your iPhone near the tag to clear',
       );
 
+      // Write an empty text record to clear the tag
       final emptyRecord = ndef.TextRecord(text: '');
       await FlutterNfcKit.writeNDEFRecords([emptyRecord]);
       
-      await FlutterNfcKit.finish(iosAlertMessage: 'Tag cleared');
+      debugPrint('NFC tag cleared successfully');
+      
+      // Finish session immediately
+      await FlutterNfcKit.finish(iosAlertMessage: 'Tag cleared successfully');
     } catch (e) {
       debugPrint('Failed to clear tag: $e');
-      await FlutterNfcKit.finish(iosErrorMessage: 'Failed to clear tag');
+      // Try to finish session even on error
+      try {
+        await FlutterNfcKit.finish(iosErrorMessage: 'Failed to clear tag');
+      } catch (finishError) {
+        debugPrint('Error finishing NFC session: $finishError');
+      }
       rethrow;
     }
   }
