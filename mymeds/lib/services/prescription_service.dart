@@ -7,6 +7,16 @@ class PrescripcionService {
   final PrescripcionRepository _prescripcionRepository = PrescripcionRepository();
   final Uuid _uuid = Uuid();
 
+  /// Verifica si el usuario tiene prescripciones activas
+  Future<bool> tieneRecetasActivas() async {
+    try {
+      final prescripciones = await _prescripcionRepository.readAll();
+      return prescripciones.any((p) => p.activa);
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Procesa un JSON y guarda la prescripción en Firestore
   Future<void> procesarYGuardarJson(String jsonString) async {
     try {

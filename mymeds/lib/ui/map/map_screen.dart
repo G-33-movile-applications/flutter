@@ -11,6 +11,7 @@ import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
 import 'package:provider/provider.dart'; 
 import '../../providers/motion_provider.dart';
+import '../../services/prescription_service.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -171,7 +172,12 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _showPharmacyDetails(PuntoFisico pharmacy, double distance) {
+  Future<void> _showPharmacyDetails(PuntoFisico pharmacy, double distance) async {
+    final prescriptionService = PrescripcionService();
+    final hasActivePrescriptions = await prescriptionService.tieneRecetasActivas();
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -181,11 +187,27 @@ class _MapScreenState extends State<MapScreen> {
         distance: distance,
         onDelivery: () => _goToDelivery(pharmacy),
         onViewInventory: () => _viewInventory(pharmacy),
+        deliveryAvailable: hasActivePrescriptions,
       ),
     );
   }
 
-  void _goToDelivery(PuntoFisico pharmacy) {
+  Future<void> _goToDelivery(PuntoFisico pharmacy) async {
+    final prescriptionService = PrescripcionService();
+    final hasActivePrescriptions = await prescriptionService.tieneRecetasActivas();
+
+    if (!mounted) return;
+
+    if (!hasActivePrescriptions) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Necesitas tener recetas activas para solicitar delivery'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     Navigator.pushNamed(
       context,
       '/delivery',
