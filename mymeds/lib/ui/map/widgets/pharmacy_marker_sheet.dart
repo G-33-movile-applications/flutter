@@ -9,12 +9,14 @@ class PharmacyMarkerSheet extends StatelessWidget {
     required this.distance,
     required this.onDelivery,
     required this.onViewInventory,
+    required this.deliveryAvailable,
   });
 
   final PuntoFisico pharmacy;
   final double distance;
   final VoidCallback onDelivery;
   final VoidCallback onViewInventory;
+  final bool deliveryAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -99,20 +101,22 @@ class PharmacyMarkerSheet extends StatelessWidget {
                 // Action buttons
                 Row(
                   children: [
-                    Expanded(
-                      child: Semantics(
-                        label: 'Delivery desde ${pharmacy.nombre}',
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            onDelivery();
-                          },
-                          icon: const Icon(Icons.local_shipping_rounded),
-                          label: const Text('Delivery'),
+                    if (deliveryAvailable) ...[
+                      Expanded(
+                        child: Semantics(
+                          label: 'Delivery desde ${pharmacy.nombre}',
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              onDelivery();
+                            },
+                            icon: const Icon(Icons.local_shipping_rounded),
+                            label: const Text('Delivery'),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: Semantics(
                         label: 'Ver inventario de ${pharmacy.nombre}',
