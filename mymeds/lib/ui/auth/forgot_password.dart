@@ -11,15 +11,12 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
   Future<void> _resetPassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    
     final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Por favor ingresa tu correo")),
-      );
-      return;
-    }
 
     final result = await AuthService.sendPasswordResetEmail(email);
     if (result.success) {
@@ -42,28 +39,42 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: "Correo electrónico",
-                filled: true,
-                fillColor: const Color(0xFFFFF1D5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Por favor ingresa tu correo';
+                  }
+                  value = value.trim();
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (!emailRegex.hasMatch(value)) {
+                    return 'Ingresa un correo electrónico válido';
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
+                  labelText: "Correo electrónico",
+                  filled: true,
+                  fillColor: const Color(0xFFFFF1D5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
+                style: GoogleFonts.balsamiqSans(),
               ),
-              style: GoogleFonts.balsamiqSans(),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _resetPassword,
-              child: Text("Enviar correo", style: GoogleFonts.balsamiqSans()),
-            ),
-          ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _resetPassword,
+                child: Text("Enviar correo", style: GoogleFonts.balsamiqSans()),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -92,9 +92,10 @@ class _LoginScreenState extends State<LoginScreen> {
 								keyboardType: TextInputType.emailAddress,
 								style: GoogleFonts.balsamiqSans(),
 								validator: (value) {
-									if (value == null || value.isEmpty) {
+									if (value == null || value.trim().isEmpty) {
 										return 'Ingresa tu correo electrónico';
 									}
+									value = value.trim();
 									final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 									if (!emailRegex.hasMatch(value)) {
 										return 'Ingresa un correo electrónico válido';
@@ -121,6 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
 									if (value == null || value.isEmpty) {
 										return 'Ingresa tu contraseña';
 									}
+									// Note: Passwords should not be trimmed during validation
+									// as leading/trailing spaces might be part of the password
 									if (value.length < 6) {
 										return 'La contraseña debe tener al menos 6 caracteres';
 									}

@@ -31,8 +31,10 @@ class MotionProvider with ChangeNotifier {
   bool get alertShown => _alertShown;
   bool get needsUserConfirmation => _needsUserConfirmation;
   
-  // Get current accelerometer magnitude for debugging
+  // Get current sensor data for debugging
   double get currentMagnitude => _motionService.lastMagnitude;
+  double get currentSpeed => _motionService.lastSpeed;
+  bool get isSpeedDetectionActive => _motionService.isSpeedDetectionActive;
 
   void setIsDrivingConfirmed(bool value) {
     if (value) {
@@ -66,12 +68,18 @@ class MotionProvider with ChangeNotifier {
   void start() {
     _motionService.start();
     _motionService.motionStream.listen((state) {
+      bool stateChanged = false;
+      
       // Clear manual override when sensor changes significantly
       if (_manualState != null && state != _manualState) {
         _manualState = null;
+        stateChanged = true;
       }
 
-      _motionState = state;
+      if (_motionState != state) {
+        _motionState = state;
+        stateChanged = true;
+      }
 
       if (state == MotionState.driving) {
         // Cancel any not-driving settle timer
@@ -94,7 +102,7 @@ class MotionProvider with ChangeNotifier {
           
           // Trigger confirmation dialog
           _needsUserConfirmation = true;
-          notifyListeners();
+          notifyListeners(); // Only notify from timer callback
         });
       } else {
         // Not driving - cancel driving debounce
@@ -108,16 +116,22 @@ class MotionProvider with ChangeNotifier {
             if (_motionState != MotionState.driving) {
               _isDrivingConfirmed = false;
               _needsUserConfirmation = false;
-              notifyListeners();
+              notifyListeners(); // Only notify from timer callback
             }
           });
         } else {
           // Not confirmed as driving, ensure no pending confirmation
-          _needsUserConfirmation = false;
+          if (_needsUserConfirmation) {
+            _needsUserConfirmation = false;
+            stateChanged = true;
+          }
         }
       }
 
-      notifyListeners();
+      // Only notify if state actually changed (avoid redundant rebuilds)
+      if (stateChanged) {
+        notifyListeners();
+      }
     });
   }
 
@@ -128,6 +142,8 @@ class MotionProvider with ChangeNotifier {
   }
 
   void setManualState(MotionState? state) {
+    // Capture previous manual state before updating
+    final previousManualState = _manualState;
     _manualState = state;
     
     // If manually setting to driving, auto-confirm
@@ -136,8 +152,8 @@ class MotionProvider with ChangeNotifier {
       _alertShown = false;
       _needsUserConfirmation = false;
       _notDrivingSettleTimer?.cancel();
-    } else if (state != MotionState.driving && _manualState == MotionState.driving) {
-      // Manually exiting driving mode
+    } else if (state != MotionState.driving && previousManualState == MotionState.driving) {
+      // Manually exiting driving mode (compare to previous state)
       _isDrivingConfirmed = false;
       _needsUserConfirmation = false;
     }
