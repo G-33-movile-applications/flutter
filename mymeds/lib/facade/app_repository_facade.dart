@@ -519,6 +519,8 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
   /// Create a pedido with existing prescription (DOES NOT create new prescriptions)
   /// Updated to work with subcollection approach: usuarios/{userId}/pedidos
   Future<void> createPedido(Pedido pedido, {required String userId}) async {
+    print('🔍 [AppRepositoryFacade] Starting pedido creation - ID: ${pedido.id}, User: $userId');
+    
     // Validate required fields
     if (pedido.prescripcionId.isEmpty) {
       throw Exception('prescripcionId cannot be empty - must link to existing prescription');
@@ -529,9 +531,17 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
     if (pedido.puntoFisicoId.isEmpty) {
       throw Exception('puntoFisicoId is required');
     }
+    
+    // Additional validation for the new required fields
+    if (pedido.direccionEntrega.isEmpty) {
+      throw Exception('direccionEntrega cannot be empty');
+    }
+    
+    print('🔍 [AppRepositoryFacade] Validating pedido data - estado: ${pedido.estado}, tipoEntrega: ${pedido.tipoEntrega}');
 
     // Verify the prescription exists in the user's subcollection
     try {
+      print('🔍 [AppRepositoryFacade] Verifying prescription exists: usuarios/$userId/prescripciones/${pedido.prescripcionId}');
       final prescriptionDoc = await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(userId)
@@ -542,19 +552,24 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
       if (!prescriptionDoc.exists) {
         throw Exception('Prescription with id ${pedido.prescripcionId} does not exist for user $userId');
       }
+      print('✅ [AppRepositoryFacade] Prescription verified successfully');
     } catch (e) {
+      print('❌ [AppRepositoryFacade] Error verifying prescription: $e');
       throw Exception('Error verifying prescription: $e');
     }
 
     // Create the pedido in the user's subcollection
     try {
+      print('🔍 [AppRepositoryFacade] Saving pedido to Firestore: usuarios/$userId/pedidos/${pedido.id}');
       await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(userId)
           .collection('pedidos')
           .doc(pedido.id)
           .set(pedido.toMap());
+      print('✅ [AppRepositoryFacade] Pedido successfully saved to Firestore with estado: ${pedido.estado}');
     } catch (e) {
+      print('❌ [AppRepositoryFacade] Error creating pedido in Firestore: $e');
       throw Exception('Error creating pedido: $e');
     }
   }
