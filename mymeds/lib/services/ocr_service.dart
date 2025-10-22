@@ -128,10 +128,12 @@ class OcrService {
       final line = lines[i];
       final lowered = line.toLowerCase();
 
-      // Doctor name (multiple patterns)
+      // Doctor name (multiple patterns - ENHANCED for Colombian prescriptions)
       if (!parsed.containsKey('doctor') && 
           (lowered.contains('doctor') || lowered.contains('médico') || 
-           lowered.contains('dr.') || lowered.contains('dra.'))) {
+           lowered.contains('dr.') || lowered.contains('dra.') ||
+           lowered.contains('nombre del médico') || 
+           lowered.contains('nombre completo') && i > 5)) { // "nombre completo" after user section likely means doctor
         String? value = _extractValueAfterColon(line);
         if (value == null || value.isEmpty) {
           value = _cleanDoctorName(line);
@@ -145,10 +147,25 @@ class OcrService {
         }
       }
       
-      // Diagnosis (multiple patterns)
+      // Check for doctor near "Registro médico" or "Documento identidad" (Colombian format)
+      if (!parsed.containsKey('doctor') &&
+          (lowered.contains('registromédico') || lowered.contains('registro médico') ||
+           lowered.contains('registromedico'))) {
+        // Doctor name is usually 2-3 lines before registration number
+        if (i >= 2) {
+          final potentialName = lines[i - 2];
+          if (_looksLikeDoctorName(potentialName)) {
+            parsed['doctor'] = potentialName;
+            debugPrint('✅ Found doctor near registration: $potentialName');
+          }
+        }
+      }
+      
+      // Diagnosis (multiple patterns - ENHANCED for Colombian prescriptions)
       if (!parsed.containsKey('diagnosis') &&
           (lowered.contains('diagnóstico') || lowered.contains('diagnostico') || 
-           lowered.contains('diagnosis') || lowered.contains('padecimiento'))) {
+           lowered.contains('diagnosis') || lowered.contains('padecimiento') ||
+           lowered.contains('cie-10') || lowered.contains('cie 10'))) {
         String? value = _extractValueAfterColon(line);
         if (value == null || value.isEmpty) {
           value = _extractNextLine(lines, i);
@@ -198,8 +215,8 @@ class OcrService {
 
     // Build final result
     final result = {
-      'doctor': parsed['doctor'] ?? 'No detectado - Por favor ingresa manualmente',
-      'diagnosis': parsed['diagnosis'] ?? 'No detectado - Por favor ingresa manualmente',
+      'doctor': parsed['doctor'] ?? '', // Empty string - UI will show placeholder
+      'diagnosis': parsed['diagnosis'] ?? '', // Empty string - UI will show placeholder
       'date': parsed['date'],
       'medications': medicamentos,
       'activa': true,
@@ -217,8 +234,9 @@ class OcrService {
   int _calculateConfidence(Map<String, dynamic> parsed, List<Map<String, dynamic>> meds) {
     int score = 0;
     
-    if (parsed.containsKey('doctor') && parsed['doctor'] != 'No detectado') score += 30;
-    if (parsed.containsKey('diagnosis') && parsed['diagnosis'] != 'No detectado') score += 30;
+    // Check if values are non-empty (not just present)
+    if (parsed.containsKey('doctor') && parsed['doctor'] != null && parsed['doctor'].toString().isNotEmpty) score += 30;
+    if (parsed.containsKey('diagnosis') && parsed['diagnosis'] != null && parsed['diagnosis'].toString().isNotEmpty) score += 30;
     if (parsed.containsKey('date')) score += 20;
     if (meds.isNotEmpty) score += 20;
     
@@ -278,7 +296,7 @@ class OcrService {
   /// Clean doctor name by removing "Dr." prefix
   String? _cleanDoctorName(String line) {
     final cleaned = line
-        .replaceAll(RegExp(r'dr\.?|dra\.?|doctor|doctora', caseSensitive: false), '')
+        .replaceAll(RegExp(r'dr\.?|dra\.?|doctor|doctora|medico|medica|médico|médica', caseSensitive: false), '')
         .replaceAll(':', '')
         .trim();
     return cleaned.isNotEmpty ? cleaned : null;
@@ -307,31 +325,56 @@ class OcrService {
   }
 
   /// Check if line looks like a medication entry
-  /// IMPROVED: Better pattern matching for real prescriptions
+  /// IMPROVED: Better pattern matching for real prescriptions (Colombian format)
   bool _isMedicationLine(String line) {
     final lowered = line.toLowerCase();
     
-    // Skip if it's a header or label
-    if (lowered.startsWith('medicamento') || 
+    // Skip if it's a section header or label
+    if (lowered.startsWith('medicamento') && lowered.length < 30 || // Header only
         lowered.startsWith('prescripción') ||
-        lowered.startsWith('indicaciones')) {
+        lowered.startsWith('indicaciones') ||
+        lowered.startsWith('nombre genérico') && lowered.length < 30 ||
+        lowered.startsWith('forma farmacéutica') ||
+        lowered.startsWith('dosificación') ||
+        lowered.startsWith('recomendaciones') ||
+        lowered == 'tableta' || lowered == 'polvo' || // Standalone form words
+        lowered.contains('duración del tratamiento') ||
+        lowered.contains('frecuencia de administración') ||
+        lowered.contains('vía de administración')) {
       return false;
     }
     
-    // Strong indicators (dosage with units)
-    if (RegExp(r'\d+\s*(mg|ml|g|mcg|gr|cc)', caseSensitive: false).hasMatch(line)) {
+    // Strong indicators (dosage with units) - ENHANCED
+    if (RegExp(r'\d+\s*(mg|ml|g|mcg|gr|cc|mg/ml)', caseSensitive: false).hasMatch(line)) {
       return true;
     }
     
-    // Common medication forms
+    // Colombian prescription format: medication names often in uppercase
+    // Look for patterns like "HIOSCINA N-BUTIL BROMURO 10 MG"
+    if (RegExp(r'[A-Z]{3,}.*\d+\s*(mg|ml)', caseSensitive: false).hasMatch(line)) {
+      return true;
+    }
+    
+    // Common medication forms (Colombian format)
     if (lowered.contains('comprimido') || lowered.contains('cápsula') ||
         lowered.contains('tableta') || lowered.contains('jarabe') ||
-        lowered.contains('gotas') || lowered.contains('ampolla')) {
+        lowered.contains('gotas') || lowered.contains('ampolla') ||
+        lowered.contains('polvo para reconstituir') ||
+        lowered.contains('solucion oral') || lowered.contains('solución oral') ||
+        lowered.contains('citrato') || lowered.contains('clorhidrato') ||
+        lowered.contains('bromuro') || lowered.contains('sulfato')) {
+      // But must have more context (not just the word alone)
+      if (line.length > 15) return true;
+    }
+    
+    // Frequency patterns (Colombian format)
+    if (RegExp(r'cada\s+\d+\s+(hora|horas)', caseSensitive: false).hasMatch(line)) {
       return true;
     }
     
-    // Frequency patterns
-    if (RegExp(r'cada\s+\d+\s+(hora|horas)', caseSensitive: false).hasMatch(line)) {
+    // Colombian format: "X dias" duration
+    if (RegExp(r'\d+\s+(día|días|dia|dias)', caseSensitive: false).hasMatch(line) &&
+        line.length > 10) { // Avoid matching just "3 días"
       return true;
     }
     
@@ -340,25 +383,48 @@ class OcrService {
       return true;
     }
     
+    // Colombian format: "via oral" or "oral" administration
+    if (lowered.contains('via oral') || 
+        (lowered.contains('oral') && RegExp(r'\d+\s*mg').hasMatch(line))) {
+      return true;
+    }
+    
+    // Common Colombian medication names (partial matching)
+    final commonMeds = [
+      'hioscina', 'loperamida', 'paracetamol', 'ibuprofeno', 'amoxicilina',
+      'acetaminofén', 'acetaminofen', 'diclofenaco', 'losartán', 'losartan',
+      'metformina', 'enalapril', 'omeprazol', 'ranitidina', 'citrato',
+      'clorhidrato', 'bromuro', 'dihidrato', 'glucosa anhidra'
+    ];
+    
+    for (final med in commonMeds) {
+      if (lowered.contains(med)) {
+        return true;
+      }
+    }
+    
     return false;
   }
 
   /// Parse a medication line into structured data
-  /// IMPROVED: Better extraction of name, dosage, frequency, duration
+  /// IMPROVED: Better extraction of name, dosage, frequency, duration (Colombian format)
   Map<String, dynamic>? _parseMedicationLine(String line, List<String> allLines, int index) {
     Map<String, dynamic> medication = {};
     
     debugPrint('  🔍 Parsing medication line: $line');
     
-    // Extract dosage (mg, ml, etc.)
+    // Colombian format often has compound names with dosage
+    // Example: "HIOSCINA N-BUTIL BROMURO 10 MG TABLETAS/N-BUTIL BROMURO DE HIOSCINA"
+    
+    // Extract dosage (mg, ml, etc.) - ENHANCED for Colombian format
     final doseMatch = RegExp(
-      r'(\d+(?:\.\d+)?)\s*(mg|ml|g|mcg|gr|cc)',
+      r'(\d+(?:\.\d+)?)\s*(mg|ml|g|mcg|gr|cc|mg/ml)',
       caseSensitive: false
     ).firstMatch(line);
     
     if (doseMatch != null) {
       final dosageValue = double.tryParse(doseMatch.group(1)!) ?? 0.0;
-      final dosageUnit = doseMatch.group(2)!.toLowerCase();
+      final dosageUnit = doseMatch.group(2)!.toLowerCase().replaceAll('/', '');
       
       // Convert to mg for consistency
       double dosageInMg = dosageValue;
@@ -370,21 +436,48 @@ class OcrService {
       
       medication['dosage'] = dosageInMg;
       
-      // Extract name (text before dosage)
+      // Extract name (text before dosage) - Clean up Colombian format
       final nameEndIndex = doseMatch.start;
-      final name = line.substring(0, nameEndIndex).trim();
+      String name = line.substring(0, nameEndIndex).trim();
+      
+      // Remove common suffixes that appear in Colombian prescriptions
+      name = name.replaceAll(RegExp(r'\s*TABLETAS.*$', caseSensitive: false), '');
+      name = name.replaceAll(RegExp(r'\s*POR\s+\d+.*$', caseSensitive: false), '');
+      name = name.replaceAll(RegExp(r'/.*$'), ''); // Remove everything after slash
+      name = name.trim();
+      
       if (name.isNotEmpty) {
         medication['name'] = name;
       }
     } else {
-      // No dosage found, use whole line as name
-      medication['name'] = line.trim();
+      // No dosage found, try to extract name and look for dosage in next line
+      String name = line.trim();
+      
+      // Clean up name
+      name = name.replaceAll(RegExp(r'\s*TABLETAS.*$', caseSensitive: false), '');
+      name = name.replaceAll(RegExp(r'/.*$'), '');
+      name = name.trim();
+      
+      medication['name'] = name;
       medication['dosage'] = 500.0; // Default dosage
+      
+      // Check next line for dosage ("Dosificación: 10mg")
+      if (index + 1 < allLines.length) {
+        final nextLine = allLines[index + 1];
+        final nextDoseMatch = RegExp(
+          r'(\d+(?:\.\d+)?)\s*(mg|ml|g)',
+          caseSensitive: false
+        ).firstMatch(nextLine);
+        if (nextDoseMatch != null) {
+          final dosageValue = double.tryParse(nextDoseMatch.group(1)!) ?? 500.0;
+          medication['dosage'] = dosageValue;
+        }
+      }
     }
     
-    // Extract frequency (every X hours)
+    // Extract frequency (every X hours) - ENHANCED for Colombian format
     final freqMatch = RegExp(
-      r'cada\s+(\d+)\s+(hora|horas)',
+      r'(\d+)\s+(hora|horas)',
       caseSensitive: false
     ).firstMatch(line);
     if (freqMatch != null) {
@@ -401,7 +494,7 @@ class OcrService {
       }
     }
     
-    // Extract duration (X days)
+    // Extract duration (X days) - ENHANCED
     final durationMatch = RegExp(
       r'(\d+)\s+(día|días|dia|dias)',
       caseSensitive: false
@@ -410,37 +503,71 @@ class OcrService {
       medication['duration'] = int.tryParse(durationMatch.group(1)!) ?? 7;
     }
     
-    // Check next line for additional info (frequency/duration often on next line)
-    if (index + 1 < allLines.length) {
-      final nextLine = allLines[index + 1];
+    // Check next 2-3 lines for additional info (Colombian format spreads data across lines)
+    for (int offset = 1; offset <= 3 && index + offset < allLines.length; offset++) {
+      final nextLine = allLines[index + offset];
       final nextLowered = nextLine.toLowerCase();
       
-      // Look for frequency on next line
-      if (!medication.containsKey('frequency')) {
-        final nextFreqMatch = RegExp(
-          r'cada\s+(\d+)\s+(hora|horas)',
-          caseSensitive: false
-        ).firstMatch(nextLine);
-        if (nextFreqMatch != null) {
-          medication['frequency'] = int.tryParse(nextFreqMatch.group(1)!) ?? 8;
-        }
+      // Skip section headers
+      if (nextLowered.contains('medicamento') || 
+          nextLowered.contains('nombre genérico') ||
+          nextLowered.contains('forma farmacéutica')) {
+        break; // Stop looking if we hit a new section
       }
       
-      // Look for duration on next line
+      // Look for "Duración del tratamiento: X días"
       if (!medication.containsKey('duration')) {
         final nextDurationMatch = RegExp(
-          r'(\d+)\s+(día|días)',
+          r'(\d+)\s+(día|días|dia|dias)',
           caseSensitive: false
         ).firstMatch(nextLine);
         if (nextDurationMatch != null) {
           medication['duration'] = int.tryParse(nextDurationMatch.group(1)!) ?? 7;
+          debugPrint('    ✓ Found duration in next line: ${medication['duration']} days');
+        }
+      }
+      
+      // Look for "Frecuencia de administración: X horas"
+      if (!medication.containsKey('frequency')) {
+        final nextFreqMatch = RegExp(
+          r'(\d+)\s+(hora|horas)',
+          caseSensitive: false
+        ).firstMatch(nextLine);
+        if (nextFreqMatch != null) {
+          medication['frequency'] = int.tryParse(nextFreqMatch.group(1)!) ?? 8;
+          debugPrint('    ✓ Found frequency in next line: every ${medication['frequency']}h');
+        }
+      }
+      
+      // Look for "Vía de administración: ORAL"
+      if (nextLowered.contains('oral') || nextLowered.contains('via de administración')) {
+        if (!medication.containsKey('notes') || medication['notes'] == '') {
+          medication['notes'] = 'Vía: Oral';
+        }
+      }
+      
+      // Look for recommendations/instructions
+      if (nextLowered.contains('recomendaciones') || 
+          nextLowered.contains('una tableta') ||
+          nextLowered.contains('tomar') ||
+          nextLowered.contains('diluir')) {
+        // Next line after "Recomendaciones" label
+        if (index + offset + 1 < allLines.length) {
+          final instructionLine = allLines[index + offset + 1];
+          if (instructionLine.length > 10 && !instructionLine.toLowerCase().contains('medicamento')) {
+            medication['notes'] = (medication['notes'] ?? '') + ' ' + instructionLine.trim();
+            medication['notes'] = medication['notes'].toString().trim();
+          }
         }
       }
       
       // Look for notes/instructions
       if (nextLowered.contains('antes') || nextLowered.contains('después') ||
-          nextLowered.contains('comida') || nextLowered.contains('ayunas')) {
-        medication['notes'] = nextLine.trim();
+          nextLowered.contains('comida') || nextLowered.contains('ayunas') ||
+          nextLowered.contains('desayuno') || nextLowered.contains('almuerzo') ||
+          nextLowered.contains('cena')) {
+        medication['notes'] = (medication['notes'] ?? '') + ' ' + nextLine.trim();
+        medication['notes'] = medication['notes'].toString().trim();
       }
     }
     

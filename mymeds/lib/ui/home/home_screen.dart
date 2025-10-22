@@ -21,10 +21,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Check for driving confirmation needs after first frame
+    // Add listener to MotionProvider for confirmation needs
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkDrivingConfirmation();
+      final motionProvider = context.read<MotionProvider>();
+      motionProvider.addListener(_checkDrivingConfirmation);
+      _checkDrivingConfirmation(); // Initial check
     });
+  }
+
+  @override
+  void dispose() {
+    // Remove listener to prevent memory leaks
+    final motionProvider = context.read<MotionProvider>();
+    motionProvider.removeListener(_checkDrivingConfirmation);
+    super.dispose();
   }
 
   void _checkDrivingConfirmation() {
@@ -102,11 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    // Watch for provider changes and check for confirmation needs
+    // Watch for provider changes (listener will handle confirmation checks)
     context.watch<MotionProvider>();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkDrivingConfirmation();
-    });
+    
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(

@@ -144,84 +144,145 @@ class NfcService {
   /// Throws exception on write errors
   Future<void> writeNdefJson(String jsonPayload, {bool overwrite = false}) async {
     NFCTag? tag;
-    
     try {
       // Validate JSON before writing
       if (!_isValidJson(jsonPayload)) {
-        throw ArgumentError('Invalid JSON payload');
+        throw Exception('JSON inválido: no se puede escribir datos corruptos');
       }
 
       // Add type identifier to the JSON
-      final jsonData = jsonDecode(jsonPayload) as Map<String, dynamic>;
+      Map<String, dynamic> jsonData;
+      try {
+        jsonData = jsonDecode(jsonPayload) as Map<String, dynamic>;
+      } catch (e) {
+        throw Exception('Error al decodificar JSON: $e');
+      }
+      
       jsonData['_type'] = prescriptionIdentifier;
-      final enhancedPayload = jsonEncode(jsonData);
+      
+      String enhancedPayload;
+      try {
+        enhancedPayload = jsonEncode(jsonData);
+      } catch (e) {
+        throw Exception('Error al codificar JSON: $e');
+      }
 
-      // Poll for NFC tag - use shorter timeout to avoid conflicts
+      final payloadBytes = utf8.encode(enhancedPayload);
+      final payloadSize = payloadBytes.length;
+
+      // Check size limits (most NFC tags support 888 bytes for NTAG216)
+      if (payloadSize > 800) {
+        throw Exception('Datos muy grandes ($payloadSize bytes). Máximo: 800 bytes');
+      }
+
+      // Poll for NFC tag with longer timeout
       tag = await FlutterNfcKit.poll(
-        timeout: const Duration(seconds: 10),
+        timeout: const Duration(seconds: 20),
         iosMultipleTagMessage: 'Multiple tags detected, please keep only one near the device',
         iosAlertMessage: 'Hold your iPhone near the tag to write',
       );
 
-      debugPrint('NFC Tag detected for writing: ${tag.type}');
-
       // Check if writable
       if (tag.ndefWritable == false) {
         await FlutterNfcKit.finish(iosErrorMessage: 'Tag is not writable');
-        throw Exception('NFC tag is not writable');
+        throw Exception('Tag de solo lectura. Usa un tag NFC escribible');
       }
 
-      // Create NDEF MIME record with custom MIME type for MyMeds prescriptions
-      // This ensures Android opens the tag directly in MyMeds app
+      // Check tag capacity if available
+      if (tag.ndefCapacity != null && tag.ndefCapacity! > 0) {
+        if (payloadSize > tag.ndefCapacity!) {
+          await FlutterNfcKit.finish(iosErrorMessage: 'Data too large for tag');
+          throw Exception('Tag muy pequeño. Necesitas ${payloadSize} bytes pero el tag tiene ${tag.ndefCapacity} bytes');
+        }
+      }
+
+      // Create NDEF MIME record
       final mimeRecord = ndef.MimeRecord(
         decodedType: mimeType,
-        payload: utf8.encode(enhancedPayload),
+        payload: payloadBytes,
       );
-
-      // Write to tag using MIME record (not text record)
-      await FlutterNfcKit.writeNDEFRecords([mimeRecord]);
       
-      debugPrint('Prescription written to NFC tag successfully');
+      // Write to tag with proper error handling
+      try {
+        await FlutterNfcKit.writeNDEFRecords([mimeRecord]);
+      } catch (e) {
+        throw Exception('Error al escribir en el tag: ${e.toString()}');
+      }
       
-      // Finish the NFC session immediately to prevent reopen conflicts
+      // Finish session with success message
       await FlutterNfcKit.finish(iosAlertMessage: 'Prescription written successfully');
+      
     } catch (e) {
       debugPrint('NFC write error: $e');
-      // Try to finish session even on error
+      debugPrint('Error type: ${e.runtimeType}');
+      
+      // Always try to finish session on error
       try {
         await FlutterNfcKit.finish(iosErrorMessage: 'Failed to write to tag');
       } catch (finishError) {
-        debugPrint('Error finishing NFC session: $finishError');
+        debugPrint('Error finishing NFC session after write error: $finishError');
       }
+      
+      // Provide more specific error messages
+      if (e.toString().contains('Tag connection lost') || 
+          e.toString().contains('IOException')) {
+        throw Exception('Tag connection lost. Please keep the tag close to the device during writing.');
+      } else if (e.toString().contains('read-only') || 
+                 e.toString().contains('not writable')) {
+        throw Exception('This NFC tag is read-only and cannot be written to.');
+      } else if (e.toString().contains('timeout')) {
+        throw Exception('Operation timed out. Please try again and keep the tag close.');
+      }
+      
       rethrow;
     }
   }
 
   /// Delete/format the NFC tag by writing empty NDEF
   Future<void> clearTag() async {
+    NFCTag? tag;
     try {
-      // Poll for tag
-      await FlutterNfcKit.poll(
-        timeout: const Duration(seconds: 10),
+      // Poll for tag with longer timeout
+      tag = await FlutterNfcKit.poll(
+        timeout: const Duration(seconds: 20),
         iosAlertMessage: 'Hold your iPhone near the tag to clear',
       );
 
+      // Check if writable
+      if (tag.ndefWritable == false) {
+        await FlutterNfcKit.finish(iosErrorMessage: 'Tag is not writable');
+        throw Exception('Tag de solo lectura. No se puede limpiar');
+      }
+
       // Write an empty text record to clear the tag
       final emptyRecord = ndef.TextRecord(text: '');
-      await FlutterNfcKit.writeNDEFRecords([emptyRecord]);
       
-      debugPrint('NFC tag cleared successfully');
+      try {
+        await FlutterNfcKit.writeNDEFRecords([emptyRecord]);
+      } catch (e) {
+        throw Exception('Error al limpiar el tag: ${e.toString()}');
+      }
       
-      // Finish session immediately
+      // Finish session with success message
       await FlutterNfcKit.finish(iosAlertMessage: 'Tag cleared successfully');
+      
     } catch (e) {
-      debugPrint('Failed to clear tag: $e');
-      // Try to finish session even on error
+      // Always try to finish session on error
       try {
         await FlutterNfcKit.finish(iosErrorMessage: 'Failed to clear tag');
       } catch (finishError) {
-        debugPrint('Error finishing NFC session: $finishError');
+        debugPrint('Error finishing NFC session after clear error: $finishError');
       }
+      
+      // Provide more specific error messages
+      if (e.toString().contains('connection') || e.toString().contains('IOException')) {
+        throw Exception('Conexión perdida. Mantén el tag cerca durante toda la operación');
+      } else if (e.toString().contains('read-only') || e.toString().contains('not writable')) {
+        throw Exception('Tag de solo lectura. Usa un tag NFC escribible');
+      } else if (e.toString().contains('timeout')) {
+        throw Exception('Tiempo agotado. Intenta de nuevo manteniendo el tag más cerca');
+      }
+      
       rethrow;
     }
   }

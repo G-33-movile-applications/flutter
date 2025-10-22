@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/prescripcion.dart';
 import '../../services/ocr_service.dart';
 import '../../services/user_session.dart';
@@ -18,7 +19,10 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   final OcrService _ocrService = OcrService();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
 
-  File? _selectedImage;
+  // Changed to support multiple images (max 3)
+  final List<File> _selectedImages = [];
+  final int _maxImages = 3;
+  
   String? _extractedText;
   bool _isProcessing = false;
   bool _isUploading = false;
@@ -39,11 +43,14 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   }
 
   Future<void> _handleCameraCapture() async {
+    // Check if we've reached the maximum number of images
+    if (_selectedImages.length >= _maxImages) {
+      _showErrorSnackBar('Máximo $_maxImages imágenes permitidas. Elimina una imagen para agregar otra.');
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
-      _selectedImage = null;
-      _extractedText = null;
-      _medications.clear();
     });
 
     try {
@@ -54,7 +61,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         return;
       }
 
-      await _processImage(image);
+      await _addAndProcessImage(image);
     } on PlatformException catch (e) {
       debugPrint('Camera permission error: $e');
       if (e.code == 'camera_access_denied' || 
@@ -76,11 +83,14 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   }
 
   Future<void> _handleGalleryPick() async {
+    // Check if we've reached the maximum number of images
+    if (_selectedImages.length >= _maxImages) {
+      _showErrorSnackBar('Máximo $_maxImages imágenes permitidas. Elimina una imagen para agregar otra.');
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
-      _selectedImage = null;
-      _extractedText = null;
-      _medications.clear();
     });
 
     try {
@@ -91,7 +101,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         return;
       }
 
-      await _processImage(image);
+      await _addAndProcessImage(image);
     } on PlatformException catch (e) {
       debugPrint('Storage permission error: $e');
       if (e.code == 'photo_access_denied' || 
@@ -113,64 +123,175 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     }
   }
 
-  Future<void> _processImage(File image) async {
+  Future<void> _addAndProcessImage(File image) async {
+    // Add image to list
     setState(() {
-      _selectedImage = image;
+      _selectedImages.add(image);
       _isProcessing = true;
     });
 
     try {
-      // Extract text from image
-      final text = await _ocrService.extractTextFromFile(image);
+      // Extract text from ALL images and combine
+      await _processAllImages();
+    } catch (e) {
+      debugPrint('Error adding and processing image: $e');
+      _showErrorSnackBar('Error al procesar imagen: ${e.toString()}');
+      // Remove the image that caused the error
+      setState(() {
+        if (_selectedImages.isNotEmpty) {
+          _selectedImages.removeLast();
+        }
+      });
+    } finally {
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+    
+    // Clear extracted data if all images are removed
+    if (_selectedImages.isEmpty) {
+      setState(() {
+        _extractedText = null;
+        _medicoController.clear();
+        _diagnosticoController.clear();
+        _medications.clear();
+      });
+    } else {
+      // Reprocess remaining images
+      _processAllImages();
+    }
+  }
+
+  Future<void> _processAllImages() async {
+    if (_selectedImages.isEmpty) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      // Extract text from all images and combine intelligently
+      final StringBuffer combinedText = StringBuffer();
+      final List<Map<String, dynamic>> allParsedData = [];
       
-      if (text.isEmpty) {
-        _showErrorSnackBar('No se pudo extraer texto de la imagen');
+      for (int i = 0; i < _selectedImages.length; i++) {
+        final image = _selectedImages[i];
+        debugPrint('📄 Processing image ${i + 1}/${_selectedImages.length}...');
+        
+        final text = await _ocrService.extractTextFromFile(image);
+        
+        if (text.isNotEmpty) {
+          // Add text to combined buffer
+          if (combinedText.isNotEmpty) {
+            combinedText.writeln('\n--- Imagen ${i + 1} ---\n');
+          }
+          combinedText.writeln(text);
+          
+          // Parse each image individually to extract structured data
+          final parsedData = await _ocrService.parsePrescriptionText(text);
+          allParsedData.add(parsedData);
+          debugPrint('Image ${i + 1} parsed: ${parsedData.keys}');
+        }
+      }
+      
+      final extractedText = combinedText.toString().trim();
+      
+      if (extractedText.isEmpty) {
+        _showErrorSnackBar('No se pudo extraer texto de las imágenes');
         return;
       }
 
-      setState(() => _extractedText = text);
+      setState(() => _extractedText = extractedText);
 
-      // Parse prescription data with improved algorithm
-      final parsedData = await _ocrService.parsePrescriptionText(text);
+      // Merge data from all images intelligently
+      String? bestDoctor;
+      String? bestDiagnosis;
+      DateTime? bestDate;
+      final List<Map<String, dynamic>> allMedications = [];
+      int totalConfidence = 0;
       
-      // Get confidence score
-      final confidence = parsedData['_confidence'] as int? ?? 0;
-      
-      // Populate controllers with parsed data
-      _medicoController.text = parsedData['doctor'] ?? '';
-      _diagnosticoController.text = parsedData['diagnosis'] ?? '';
-      
-      if (parsedData['date'] != null) {
-        _selectedDate = parsedData['date'] as DateTime;
-      }
-
-      // Parse medications
-      // Parse date if found
-      if (parsedData['date'] != null && parsedData['date'] is DateTime) {
-        _selectedDate = parsedData['date'] as DateTime;
-      }
-
-      // Parse medications
-      if (parsedData['medications'] != null && parsedData['medications'] is List) {
-        final medsList = parsedData['medications'] as List;
-        setState(() {
-          _medications.clear();
-          for (var med in medsList) {
-            _medications.add({
-              'nombre': med['name'] ?? 'Medicamento',
-              'dosisMg': (med['dosage'] ?? 500.0),
-              'frecuenciaHoras': med['frequency'] ?? 8,
-              'duracionDias': med['duration'] ?? 7,
-              'observaciones': med['notes'] ?? '',
-              'controller_nombre': TextEditingController(text: med['name'] ?? 'Medicamento'),
-              'controller_dosis': TextEditingController(text: (med['dosage'] ?? 500.0).toString()),
-              'controller_frecuencia': TextEditingController(text: (med['frequency'] ?? 8).toString()),
-              'controller_duracion': TextEditingController(text: (med['duration'] ?? 7).toString()),
-              'controller_observaciones': TextEditingController(text: med['notes'] ?? ''),
-            });
+      // Extract best values from all images
+      for (final data in allParsedData) {
+        // Get doctor name (prefer longest/most complete)
+        if (data['doctor'] != null && data['doctor'].toString().isNotEmpty) {
+          if (bestDoctor == null || data['doctor'].toString().length > bestDoctor.length) {
+            bestDoctor = data['doctor'].toString();
           }
-        });
+        }
+        
+        // Get diagnosis (prefer longest/most complete)
+        if (data['diagnosis'] != null && data['diagnosis'].toString().isNotEmpty) {
+          if (bestDiagnosis == null || data['diagnosis'].toString().length > bestDiagnosis.length) {
+            bestDiagnosis = data['diagnosis'].toString();
+          }
+        }
+        
+        // Get date (prefer the first valid date found)
+        if (data['date'] != null && data['date'] is DateTime) {
+          bestDate ??= data['date'] as DateTime;
+        }
+        
+        // Collect all medications from all images (no duplicates)
+        if (data['medications'] != null && data['medications'] is List) {
+          final medsList = data['medications'] as List;
+          for (var med in medsList) {
+            // Check if medication already exists (by name)
+            final medName = med['name']?.toString().toLowerCase() ?? '';
+            final exists = allMedications.any((existing) => 
+              existing['name']?.toString().toLowerCase() == medName
+            );
+            
+            if (!exists && medName.isNotEmpty) {
+              allMedications.add(med);
+            }
+          }
+        }
+        
+        // Sum up confidence scores
+        totalConfidence += (data['_confidence'] as int? ?? 0);
       }
+      
+      // Calculate average confidence
+      final confidence = allParsedData.isEmpty ? 0 : (totalConfidence / allParsedData.length).round();
+      
+      // Update UI with merged data
+      _medicoController.text = bestDoctor ?? '';
+      _diagnosticoController.text = bestDiagnosis ?? '';
+      
+      if (bestDate != null) {
+        _selectedDate = bestDate;
+      }
+
+      // Update medications list with all found medications
+      setState(() {
+        // Dispose old controllers
+        for (var med in _medications) {
+          med['controller_nombre']?.dispose();
+          med['controller_dosis']?.dispose();
+          med['controller_frecuencia']?.dispose();
+          med['controller_duracion']?.dispose();
+          med['controller_observaciones']?.dispose();
+        }
+        
+        _medications.clear();
+        
+        for (var med in allMedications) {
+          _medications.add({
+            'nombre': med['name'] ?? 'Medicamento',
+            'dosisMg': (med['dosage'] ?? 500.0),
+            'frecuenciaHoras': med['frequency'] ?? 8,
+            'duracionDias': med['duration'] ?? 7,
+            'observaciones': med['notes'] ?? '',
+            'controller_nombre': TextEditingController(text: med['name'] ?? 'Medicamento'),
+            'controller_dosis': TextEditingController(text: (med['dosage'] ?? 500.0).toString()),
+            'controller_frecuencia': TextEditingController(text: (med['frequency'] ?? 8).toString()),
+            'controller_duracion': TextEditingController(text: (med['duration'] ?? 7).toString()),
+            'controller_observaciones': TextEditingController(text: med['notes'] ?? ''),
+          });
+        }
+      });
 
       // If no medications found, add one empty medication
       if (_medications.isEmpty) {
@@ -178,17 +299,30 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       }
 
       // Show success with confidence score
+      final medicationInfo = allMedications.isEmpty 
+          ? ''
+          : ' - ${allMedications.length} medicamento(s) encontrado(s)';
+      
       if (confidence >= 70) {
-        _showSuccessSnackBar('Texto extraído exitosamente (Confianza: $confidence%)');
+        _showSuccessSnackBar('Texto extraído exitosamente (Confianza: $confidence%)$medicationInfo');
       } else if (confidence >= 40) {
-        _showInfoSnackBar('Texto extraído con confianza media ($confidence%). Por favor revisa los datos.');
+        _showInfoSnackBar('Texto extraído con confianza media ($confidence%)$medicationInfo. Por favor revisa los datos.');
       } else {
-        _showErrorSnackBar('Confianza baja ($confidence%). Por favor revisa y corrige los datos manualmente.');
+        _showErrorSnackBar('Confianza baja ($confidence%)$medicationInfo. Por favor revisa y corrige los datos manualmente.');
       }
       
       // Show improved confirmation dialog to review extracted data
       await Future.delayed(const Duration(milliseconds: 500));
-      _showExtractedDataReview(confidence: confidence, parsedData: parsedData);
+      _showExtractedDataReview(
+        confidence: confidence, 
+        parsedData: {
+          'doctor': bestDoctor,
+          'diagnosis': bestDiagnosis,
+          'date': bestDate,
+          'medications': allMedications,
+          '_confidence': confidence,
+        },
+      );
     } catch (e) {
       debugPrint('OCR processing error: $e');
       _showErrorSnackBar('Error al procesar imagen: ${e.toString()}');
@@ -378,32 +512,128 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   }
 
   Future<void> _handleUpload() async {
-    // Validate required fields
-    if (_medicoController.text.trim().isEmpty) {
-      _showErrorSnackBar('El nombre del médico es requerido');
+    // ========== COMPREHENSIVE VALIDATION ==========
+    
+    // 1. Validate doctor name
+    final medicoText = _medicoController.text.trim();
+    if (medicoText.isEmpty) {
+      _showValidationErrorDialog('El nombre del médico es obligatorio.\n\nPor favor ingresa el nombre completo del médico.');
+      return;
+    }
+    
+    if (medicoText.length < 5) {
+      _showValidationErrorDialog('El nombre del médico es demasiado corto.\n\nIngresa el nombre completo (ejemplo: "Dr. Juan Pérez").');
+      return;
+    }
+    
+    if (!_isValidDoctorName(medicoText)) {
+      _showValidationErrorDialog(
+        'El nombre del médico no parece válido.\n\n'
+        'Debe contener al menos un nombre y apellido.\n\n'
+        'Valor actual: "$medicoText"'
+      );
       return;
     }
 
-    if (_diagnosticoController.text.trim().isEmpty) {
-      _showErrorSnackBar('El diagnóstico es requerido');
+    // 2. Validate diagnosis
+    final diagnosticoText = _diagnosticoController.text.trim();
+    if (diagnosticoText.isEmpty) {
+      _showValidationErrorDialog('El diagnóstico es obligatorio.\n\nPor favor ingresa el diagnóstico del paciente.');
+      return;
+    }
+    
+    if (diagnosticoText.length < 3) {
+      _showValidationErrorDialog('El diagnóstico es demasiado corto.\n\nIngresa una descripción más detallada.');
       return;
     }
 
+    // 3. Validate medications exist
     if (_medications.isEmpty) {
-      _showErrorSnackBar('Debe agregar al menos un medicamento');
+      _showValidationErrorDialog(
+        'Debes agregar al menos un medicamento.\n\n'
+        'Usa el botón "+ Agregar Medicamento" para añadir medicamentos a la prescripción.'
+      );
       return;
     }
 
+    // 4. Validate each medication in detail
+    List<String> errors = [];
+    for (int i = 0; i < _medications.length; i++) {
+      final med = _medications[i];
+      final medNum = i + 1;
+      
+      // Get values from controllers
+      final nombre = (med['controller_nombre'] as TextEditingController).text.trim();
+      final dosisText = (med['controller_dosis'] as TextEditingController).text.trim();
+      final frecuenciaText = (med['controller_frecuencia'] as TextEditingController).text.trim();
+      final duracionText = (med['controller_duracion'] as TextEditingController).text.trim();
+      
+      // Validate medication name (MOST IMPORTANT - CANNOT BE EMPTY OR GIBBERISH)
+      if (nombre.isEmpty) {
+        errors.add('❌ Medicamento #$medNum: El nombre es obligatorio');
+      } else if (nombre.length < 3) {
+        errors.add('❌ Medicamento #$medNum: El nombre "$nombre" es demasiado corto');
+      } else if (!_isValidMedicationName(nombre)) {
+        errors.add('❌ Medicamento #$medNum: El nombre "$nombre" no parece válido');
+      }
+      
+      // Validate dosage is a valid number
+      final dosis = double.tryParse(dosisText);
+      if (dosisText.isEmpty || dosis == null) {
+        errors.add('❌ Medicamento #$medNum: La dosis debe ser un número');
+      } else if (dosis <= 0) {
+        errors.add('❌ Medicamento #$medNum: La dosis debe ser mayor a 0');
+      } else if (dosis > 10000) {
+        errors.add('⚠️ Medicamento #$medNum: La dosis parece muy alta (${dosis}mg). Verifica si es correcto.');
+      }
+      
+      // Validate frequency is a valid number
+      final frecuencia = int.tryParse(frecuenciaText);
+      if (frecuenciaText.isEmpty || frecuencia == null) {
+        errors.add('❌ Medicamento #$medNum: La frecuencia debe ser un número');
+      } else if (frecuencia <= 0) {
+        errors.add('❌ Medicamento #$medNum: La frecuencia debe ser mayor a 0');
+      } else if (frecuencia < 1) {
+        errors.add('❌ Medicamento #$medNum: La frecuencia debe ser al menos 1 hora');
+      } else if (frecuencia > 168) {
+        errors.add('⚠️ Medicamento #$medNum: La frecuencia parece muy alta (cada ${frecuencia} horas)');
+      }
+      
+      // Validate duration is a valid number
+      final duracion = int.tryParse(duracionText);
+      if (duracionText.isEmpty || duracion == null) {
+        errors.add('❌ Medicamento #$medNum: La duración debe ser un número');
+      } else if (duracion <= 0) {
+        errors.add('❌ Medicamento #$medNum: La duración debe ser mayor a 0');
+      } else if (duracion > 365) {
+        errors.add('⚠️ Medicamento #$medNum: La duración parece muy larga ($duracion días)');
+      }
+    }
+    
+    // Show all validation errors if any
+    if (errors.isNotEmpty) {
+      _showValidationErrorDialog(
+        'Se encontraron los siguientes errores:\n\n${errors.join('\n')}\n\n'
+        'Por favor corrige estos errores antes de guardar.'
+      );
+      return;
+    }
+
+    // ========== CONFIRMATION DIALOG ==========
+    
     final confirmed = await _showConfirmDialog(
       title: 'Confirmar Carga',
       message: '¿Deseas guardar esta prescripción en tu cuenta?\n\n'
-          'Médico: ${_medicoController.text}\n'
+          'Médico: $medicoText\n'
+          'Diagnóstico: $diagnosticoText\n'
           'Medicamentos: ${_medications.length}',
       confirmText: 'Guardar',
     );
 
     if (confirmed != true) return;
 
+    // ========== SAVE TO FIRESTORE ==========
+    
     setState(() => _isUploading = true);
 
     try {
@@ -418,22 +648,22 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       final prescription = Prescripcion(
         id: prescriptionId,
         fechaCreacion: _selectedDate,
-        diagnostico: _diagnosticoController.text.trim(),
-        medico: _medicoController.text.trim(),
+        diagnostico: diagnosticoText,
+        medico: medicoText,
         activa: true,
       );
 
-      // Create medications
+      // Create medications (already validated, safe to parse)
       final medications = <Map<String, dynamic>>[];
       for (int i = 0; i < _medications.length; i++) {
         final med = _medications[i];
         final medicationId = 'med_${prescriptionId}_$i';
         
-        // Get values from controllers
+        // Get values from controllers (now guaranteed to be valid)
         final nombre = (med['controller_nombre'] as TextEditingController).text.trim();
-        final dosis = double.tryParse((med['controller_dosis'] as TextEditingController).text) ?? 500.0;
-        final frecuencia = int.tryParse((med['controller_frecuencia'] as TextEditingController).text) ?? 8;
-        final duracion = int.tryParse((med['controller_duracion'] as TextEditingController).text) ?? 7;
+        final dosis = double.parse((med['controller_dosis'] as TextEditingController).text.trim());
+        final frecuencia = int.parse((med['controller_frecuencia'] as TextEditingController).text.trim());
+        final duracion = int.parse((med['controller_duracion'] as TextEditingController).text.trim());
         final observaciones = (med['controller_observaciones'] as TextEditingController).text.trim();
 
         final fechaInicio = DateTime.now();
@@ -446,8 +676,8 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           'dosisMg': dosis,
           'frecuenciaHoras': frecuencia,
           'duracionDias': duracion,
-          'fechaInicio': fechaInicio.toIso8601String(),
-          'fechaFin': fechaFin.toIso8601String(),
+          'fechaInicio': Timestamp.fromDate(fechaInicio),
+          'fechaFin': Timestamp.fromDate(fechaFin),
           'observaciones': observaciones.isNotEmpty ? observaciones : null,
           'activo': true,
           'userId': userId,
@@ -476,7 +706,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
 
       // Clear form after successful upload
       setState(() {
-        _selectedImage = null;
+        _selectedImages.clear();
         _extractedText = null;
         _medicoController.clear();
         _diagnosticoController.clear();
@@ -540,6 +770,128 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         ],
       ),
     );
+  }
+
+  void _showValidationErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 12),
+            Expanded(child: Text('Error de Validación')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Por favor corrige los errores para poder guardar la prescripción.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Validation helper methods
+  
+  /// Validates that doctor name is reasonable (at least 2 words, contains letters, not just numbers/symbols)
+  bool _isValidDoctorName(String name) {
+    if (name.isEmpty) return false;
+    
+    // Remove common titles
+    final cleanName = name.replaceAll(RegExp(r'\b(Dr|Dra|Doctor|Doctora)\.?\s*', caseSensitive: false), '').trim();
+    
+    // Must have at least 2 characters after removing titles
+    if (cleanName.length < 2) return false;
+    
+    // Split into words
+    final words = cleanName.split(RegExp(r'\s+'));
+    
+    // Must have at least 1 word (preferably 2 for full name)
+    if (words.isEmpty) return false;
+    
+    // At least one word must be longer than 2 characters
+    final hasValidWord = words.any((word) => word.length >= 2);
+    if (!hasValidWord) return false;
+    
+    // Must contain letters (not just numbers/symbols)
+    if (!RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]').hasMatch(cleanName)) return false;
+    
+    // Should not be mostly numbers (gibberish detection)
+    final letterCount = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]').allMatches(cleanName).length;
+    final numberCount = RegExp(r'\d').allMatches(cleanName).length;
+    if (numberCount > letterCount) return false;
+    
+    return true;
+  }
+  
+  /// Validates that medication name is reasonable (not empty, not gibberish, contains letters)
+  bool _isValidMedicationName(String name) {
+    if (name.isEmpty) return false;
+    
+    // Must be at least 3 characters
+    if (name.length < 3) return false;
+    
+    // Must contain letters (not just numbers/symbols)
+    if (!RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]').hasMatch(name)) return false;
+    
+    // Should not be common placeholder text
+    final lowerName = name.toLowerCase();
+    if (lowerName == 'medicamento' || 
+        lowerName == 'medicina' ||
+        lowerName == 'test' ||
+        lowerName == 'ejemplo' ||
+        lowerName == 'asdf' ||
+        lowerName == 'xxx' ||
+        lowerName == 'n/a' ||
+        lowerName == 'none' ||
+        lowerName == 'null') {
+      return false;
+    }
+    
+    // Should not be mostly numbers (gibberish detection)
+    final letterCount = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]').allMatches(name).length;
+    final numberCount = RegExp(r'\d').allMatches(name).length;
+    if (letterCount < 2) return false; // Must have at least 2 letters
+    if (numberCount > letterCount * 2) return false; // Too many numbers vs letters
+    
+    // Should not be all the same character repeated
+    if (RegExp(r'^(.)\1+$').hasMatch(name)) return false;
+    
+    return true;
   }
 
   void _showPermissionDeniedDialog(String title, String message) {
@@ -706,34 +1058,97 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
 
             const SizedBox(height: 24),
 
-            // Action Buttons
-            Text(
-              'Seleccionar Imagen',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+            // Multi-Image Info Card
+            if (_selectedImages.isNotEmpty) ...[
+              Card(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.collections, color: AppTheme.primaryColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedImages.length < _maxImages
+                              ? 'Puedes agregar ${_maxImages - _selectedImages.length} imagen(es) más'
+                              : 'Máximo de imágenes alcanzado',
+                          style: TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${_selectedImages.length}/$_maxImages',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 16),
+            ],
 
-            Row(
-              children: [
-                Expanded(
-                  child: _buildImageSourceButton(
-                    icon: Icons.camera_alt,
-                    label: 'Cámara',
-                    onPressed: _isProcessing ? null : _handleCameraCapture,
+            // Action Buttons - Show only if we haven't reached max images
+            if (_selectedImages.length < _maxImages) ...[
+              Text(
+                _selectedImages.isEmpty ? 'Seleccionar Imagen' : 'Agregar Más Imágenes',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildImageSourceButton(
+                      icon: Icons.camera_alt,
+                      label: 'Cámara',
+                      onPressed: _isProcessing ? null : _handleCameraCapture,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildImageSourceButton(
+                      icon: Icons.photo_library,
+                      label: 'Galería',
+                      onPressed: _isProcessing ? null : _handleGalleryPick,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            
+            // Show message when max images reached
+            if (_selectedImages.length >= _maxImages) ...[
+              Card(
+                color: Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Máximo $_maxImages imágenes alcanzado. Elimina una imagen para agregar otra.',
+                          style: TextStyle(
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildImageSourceButton(
-                    icon: Icons.photo_library,
-                    label: 'Galería',
-                    onPressed: _isProcessing ? null : _handleGalleryPick,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
 
             if (_isProcessing) ...[
               const SizedBox(height: 24),
@@ -754,26 +1169,76 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               ),
             ],
 
-            // Image Preview
-            if (_selectedImage != null && !_isProcessing) ...[
+            // Image Preview (Multiple Images)
+            if (_selectedImages.isNotEmpty && !_isProcessing) ...[
               const SizedBox(height: 24),
-              Text(
-                'Imagen Seleccionada',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Imágenes Seleccionadas',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${_selectedImages.length}/$_maxImages',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
-              Card(
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Image.file(
-                  _selectedImage!,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        right: index < _selectedImages.length - 1 ? 12.0 : 0,
+                      ),
+                      child: Stack(
+                        children: [
+                          Card(
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Image.file(
+                              _selectedImages[index],
+                              width: 150,
+                              height: 150,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Material(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(20),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => _removeImage(index),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(6.0),
+                                  child: Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -802,6 +1267,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                         controller: _medicoController,
                         decoration: const InputDecoration(
                           labelText: 'Nombre del Médico *',
+                          hintText: 'Por favor ingresa el nombre del médico',
                           prefixIcon: Icon(Icons.person),
                           border: OutlineInputBorder(),
                         ),
@@ -811,6 +1277,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                         controller: _diagnosticoController,
                         decoration: const InputDecoration(
                           labelText: 'Diagnóstico *',
+                          hintText: 'Por favor añade un diagnóstico',
                           prefixIcon: Icon(Icons.description),
                           border: OutlineInputBorder(),
                         ),
@@ -937,6 +1404,48 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           ],
         ),
       ),
+      // Floating Action Button to add more images (shows when scrolled down)
+      floatingActionButton: _selectedImages.isNotEmpty && 
+                            _selectedImages.length < _maxImages && 
+                            !_isProcessing
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                // Show options to add more images
+                final choice = await showDialog<String>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Agregar Imagen'),
+                    content: const Text('¿Cómo deseas agregar la imagen?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancelar'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(context, 'camera'),
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Cámara'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(context, 'gallery'),
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text('Galería'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (choice == 'camera') {
+                  await _handleCameraCapture();
+                } else if (choice == 'gallery') {
+                  await _handleGalleryPick();
+                }
+              },
+              icon: const Icon(Icons.add_photo_alternate),
+              label: Text('Agregar (${_selectedImages.length}/$_maxImages)'),
+              backgroundColor: AppTheme.primaryColor,
+            )
+          : null,
     );
   }
 
@@ -1053,6 +1562,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               controller: med['controller_observaciones'] as TextEditingController,
               decoration: const InputDecoration(
                 labelText: 'Observaciones',
+                hintText: 'Notas adicionales (opcional)',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),

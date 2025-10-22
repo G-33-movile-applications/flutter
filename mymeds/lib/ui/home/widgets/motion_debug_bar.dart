@@ -15,6 +15,8 @@ class MotionDebugBar extends StatelessWidget {
     final manualState = motionProvider.manualState;
     final isDrivingConfirmed = motionProvider.isDriving;
     final magnitude = motionProvider.currentMagnitude;
+    final speed = motionProvider.currentSpeed;
+    final speedActive = motionProvider.isSpeedDetectionActive;
 
     final effectiveState = motionProvider.motionState;
 
@@ -77,6 +79,31 @@ class MotionDebugBar extends StatelessWidget {
                   'Mag: ${magnitude.toStringAsFixed(2)} m/s²',
                   style: const TextStyle(
                     fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    speedActive 
+                        ? '📍 GPS: ${(speed * 3.6).toStringAsFixed(1)} km/h'
+                        : '📍 GPS: Inactive',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: speedActive ? Colors.blue[700] : Colors.grey,
+                      fontWeight: speedActive ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                Text(
+                  speedActive ? 'Speed: ${speed.toStringAsFixed(2)} m/s' : '',
+                  style: const TextStyle(
+                    fontSize: 9,
                     fontFamily: 'monospace',
                   ),
                 ),

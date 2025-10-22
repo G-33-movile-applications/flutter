@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/motion_provider.dart';
+import '../widgets/driving_overlay.dart';
 
 /// Main upload page that provides navigation to different upload methods
 /// - PDF upload (traditional file upload)
@@ -11,24 +14,27 @@ class UploadPrescriptionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDriving = context.watch<MotionProvider>().isDriving;
 
-    return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          "Cargar Prescripción",
-          style: theme.appBarTheme.titleTextStyle,
-        ),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home_outlined),
-            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppTheme.scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: Text(
+              "Cargar Prescripción",
+              style: theme.appBarTheme.titleTextStyle,
+            ),
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.home_outlined),
+                onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
+          body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,14 +87,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               title: 'Cargar PDF',
               description: 'Selecciona un archivo PDF de tu prescripción',
               color: Colors.orange,
-              onTap: () {
-                // TODO: Implement PDF upload or keep existing implementation
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Funcionalidad PDF en desarrollo'),
-                  ),
-                );
-              },
+              onTap: () => Navigator.pushNamed(context, '/upload/pdf'),
             ),
 
             const SizedBox(height: 40),
@@ -145,6 +144,14 @@ class UploadPrescriptionPage extends StatelessWidget {
           ],
         ),
       ),
+        ),
+        
+        // Driving overlay
+        if (isDriving)
+          DrivingOverlay(
+            customMessage: "Por seguridad, no puedes cargar prescripciones mientras conduces.",
+          ),
+      ],
     );
   }
 

@@ -168,13 +168,13 @@
 
       try {
         final updatedUser = _user!.copyWith(
-          nombre: _nameController.text,
-          email: _emailController.text,
-          telefono: _phoneController.text,
-          direccion: _addressController.text,
-          city: _cityController.text,
-          department: _departmentController.text,
-          zipCode: _zipCodeController.text,
+          nombre: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          telefono: _phoneController.text.trim(),
+          direccion: _addressController.text.trim(),
+          city: _cityController.text.trim(),
+          department: _departmentController.text.trim(),
+          zipCode: _zipCodeController.text.trim(),
           preferencias: _user!.preferencias?.copyWith(
               modoEntregaPreferido: _modoEntregaPreferido,
               notificaciones: _aceptaNotificaciones,
@@ -183,11 +183,23 @@
 
         await _usuarioRepository.update(updatedUser);
 
+        // Update controllers with trimmed values
         setState(() {
           _user = updatedUser;
           _originalUser = updatedUser.copyWith();
+          
+          // Update controllers to show trimmed values
+          _nameController.text = updatedUser.nombre;
+          _emailController.text = updatedUser.email;
+          _phoneController.text = updatedUser.telefono;
+          _addressController.text = updatedUser.direccion;
+          _cityController.text = updatedUser.city;
+          _departmentController.text = updatedUser.department;
+          _zipCodeController.text = updatedUser.zipCode;
+          
           _editable = false; // Return to read-only after saving
           _updating = false;
+          _hasChanges = false;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(

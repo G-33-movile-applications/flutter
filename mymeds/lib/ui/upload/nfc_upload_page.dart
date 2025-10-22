@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import '../../models/prescripcion.dart';
 import '../../models/prescripcion_with_medications.dart';
@@ -27,6 +28,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   bool _isNfcEnabled = false;
   bool _isProcessing = false;
   bool _isUploading = false;
+  bool _hasJustRead = false; // Flag to prevent multiple reads
   
   PrescripcionWithMedications? _readPrescription;
   Prescripcion? _mockPrescription;
@@ -126,6 +128,13 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       return;
     }
 
+    // Prevent multiple reads if we just read a tag
+    if (_hasJustRead) {
+      _showInfoSnackBar('Ya se ha leído una prescripción. Aleja el tag y vuelve a acercarlo para leer de nuevo.');
+      return;
+    }
+
+    // Clear any previous results before starting new action
     setState(() {
       _isProcessing = true;
       _readPrescription = null;
@@ -178,9 +187,17 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           prescripcion: prescripcion,
           medicamentos: medicamentos,
         );
+        _hasJustRead = true; // Set flag to prevent re-reading
       });
 
       _showSuccessSnackBar('Prescripción leída exitosamente');
+      
+      // Reset the flag after 3 seconds to allow reading again
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() => _hasJustRead = false);
+        }
+      });
     } on PlatformException catch (e) {
       debugPrint('NFC platform error: $e');
       if (e.code == 'NFCUserCanceled' || e.code == 'userCanceled') {
@@ -215,6 +232,12 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       _showNfcDisabledDialog();
       return;
     }
+
+    // Clear any previous results before starting new action
+    setState(() {
+      _readPrescription = null;
+      _mockPrescription = null;
+    });
 
     // Cancel any previous NFC session
     await _nfcService.cancelSession();
@@ -286,27 +309,60 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       final jsonString = PrescriptionAdapter.toNdefJson(selected.prescripcion);
       
       // Parse to Map to add medications
-      final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
+      Map<String, dynamic> jsonData;
+      try {
+        jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
+      } catch (e) {
+        _showErrorSnackBar('Error al procesar prescripción: formato JSON inválido');
+        return;
+      }
       
-      // Add medications to JSON
-      jsonData['medicamentos'] = selected.medicamentos.map((med) => {
-        'id': med.id,
-        'medicamentoRef': med.medicamentoRef,
-        'nombre': med.nombre,
-        'dosisMg': med.dosisMg,
-        'frecuenciaHoras': med.frecuenciaHoras,
-        'duracionDias': med.duracionDias,
-        'fechaInicio': med.fechaInicio.toIso8601String(),
-        'fechaFin': med.fechaFin.toIso8601String(),
-        'observaciones': med.observaciones,
-        'activo': med.activo,
-      }).toList();
+      // Add medications to JSON (convert all DateTime to ISO strings for NFC compatibility)
+      try {
+        jsonData['medicamentos'] = selected.medicamentos.map((med) {
+          // Ensure all fields are JSON-serializable
+          return {
+            'id': med.id,
+            'medicamentoRef': med.medicamentoRef,
+            'nombre': med.nombre,
+            'dosisMg': med.dosisMg.toDouble(),
+            'frecuenciaHoras': med.frecuenciaHoras,
+            'duracionDias': med.duracionDias,
+            'fechaInicio': med.fechaInicio.toIso8601String(),
+            'fechaFin': med.fechaFin.toIso8601String(),
+            'observaciones': med.observaciones ?? '',
+            'activo': med.activo,
+          };
+        }).toList();
+      } catch (e) {
+        _showErrorSnackBar('Error al procesar medicamentos: ${e.toString()}');
+        return;
+      }
 
-      // Convert back to JSON string
-      final completeJsonString = jsonEncode(jsonData);
+      // Convert back to JSON string and validate
+      String completeJsonString;
+      try {
+        completeJsonString = jsonEncode(jsonData);
+      } catch (e) {
+        _showErrorSnackBar('Error al generar JSON: ${e.toString()}');
+        return;
+      }
+
+      // Check payload size (NFC tags have limited capacity, typically 888 bytes for NTAG216)
+      final payloadSize = utf8.encode(completeJsonString).length;
+      if (payloadSize > 800) {
+        _showErrorSnackBar('Datos muy grandes ($payloadSize bytes). Intenta con menos medicamentos.');
+        return;
+      }
 
       _showInfoSnackBar('Acerca tu dispositivo al tag NFC...');
-      await _nfcService.writeNdefJson(completeJsonString);
+      
+      try {
+        await _nfcService.writeNdefJson(completeJsonString);
+      } catch (e) {
+        // Re-throw to be caught by outer catch
+        rethrow;
+      }
 
       if (!mounted) return;
       _showSuccessSnackBar('Prescripción escrita en NFC exitosamente');
@@ -466,7 +522,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                     ),
                   ),
                   title: Text(
-                    'Dr. ${prescription.medico}',
+                    prescription.medico,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Column(
@@ -505,6 +561,12 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       _showNfcDisabledDialog();
       return;
     }
+
+    // Clear any previous results before starting new action
+    setState(() {
+      _readPrescription = null;
+      _mockPrescription = null;
+    });
 
     final confirmed = await _showConfirmDialog(
       title: 'Limpiar Tag NFC',
@@ -585,8 +647,8 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           'dosisMg': med.dosisMg,
           'frecuenciaHoras': med.frecuenciaHoras,
           'duracionDias': med.duracionDias,
-          'fechaInicio': med.fechaInicio.toIso8601String(),
-          'fechaFin': med.fechaFin.toIso8601String(),
+          'fechaInicio': Timestamp.fromDate(med.fechaInicio), // Convert to Timestamp
+          'fechaFin': Timestamp.fromDate(med.fechaFin), // Convert to Timestamp
           'observaciones': med.observaciones,
           'activo': med.activo,
           'userId': userId,
@@ -985,7 +1047,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _buildHelpItem('1. Asegúrate de que NFC esté activado'),
+                    _buildHelpItem('1. Asegúrate de que NFC esté activado 1'),
                     _buildHelpItem('2. Mantén el teléfono cerca del tag NFC'),
                     _buildHelpItem('3. Espera la confirmación'),
                     _buildHelpItem('4. No muevas el teléfono hasta que termine'),

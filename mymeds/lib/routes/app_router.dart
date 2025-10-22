@@ -7,6 +7,7 @@ import '../ui/map/map_screen.dart';
 import '../ui/upload/upload_prescription.dart';
 import '../ui/upload/nfc_upload_page.dart';
 import '../ui/upload/ocr_upload_page.dart';
+import '../ui/upload/pdf_upload_page.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
 import '../models/punto_fisico.dart';
@@ -19,6 +20,7 @@ class AppRouter {
   static const String upload = '/upload';
   static const String uploadNfc = '/upload/nfc';
   static const String uploadOcr = '/upload/ocr';
+  static const String uploadPdf = '/upload/pdf';
   static const String profile = '/profile';
   static const String delivery = '/delivery';
   static const String forgotPassword = '/forgot-password';
@@ -62,6 +64,11 @@ class AppRouter {
       case uploadOcr:
         return MaterialPageRoute(
           builder: (_) => const OcrUploadPage(),
+          settings: settings,
+        );
+      case uploadPdf:
+        return MaterialPageRoute(
+          builder: (_) => const PdfUploadPage(),
           settings: settings,
         );
       case profile:
