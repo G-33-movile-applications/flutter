@@ -119,12 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('HOME'),
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () {
-            // TODO: implement drawer/navigation menu
-          },
-        ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
@@ -136,12 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context) => const DeliveryAnalyticsScreen(),
                 ),
               );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: implement notifications
             },
           ),
           IconButton(

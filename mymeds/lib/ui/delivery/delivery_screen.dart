@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
 import '../../services/user_session.dart';
 import '../../facade/app_repository_facade.dart';
+import '../../services/location_service.dart';
+import '../../models/user_model.dart';
+import '../../utils/address_validator.dart';
+
+/// Enum to represent different address selection types
+enum AddressType {
+  home('Dirección de casa', Icons.home),
+  current('Ubicación actual', Icons.my_location),
+  other('Otra dirección', Icons.location_on);
+
+  const AddressType(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
 
 class DeliveryScreen extends StatefulWidget {
   final PuntoFisico? pharmacy;
@@ -19,18 +34,32 @@ class DeliveryScreen extends StatefulWidget {
 
 class _DeliveryScreenState extends State<DeliveryScreen> {
   final AppRepositoryFacade _facade = AppRepositoryFacade();
+  final LocationService _locationService = LocationService();
+  
   List<Prescripcion> _prescripciones = [];
   Prescripcion? _selectedPrescripcion;
   bool _isPickup = true; // true for pickup, false for delivery
   bool _isLoading = true;
   bool _isCreatingPedido = false;
   String? _errorMessage;
+  bool _hasInitializedDeliveryMode = false; // Track if we've set initial delivery mode
+  bool _hasPrescriptions = false; // Track if user has any prescriptions
+  
+  // Address-related state variables
   final TextEditingController _addressController = TextEditingController();
+  AddressType _selectedAddressType = AddressType.home;
+  UserModel? _currentUser;
+  String? _homeAddress;
+  String? _currentLocationAddress;
+  bool _isLoadingCurrentLocation = false;
+  bool _isLoadingHomeAddress = false;
+  String? _addressValidationError;
 
   @override
   void initState() {
     super.initState();
     _loadUserPrescripciones();
+    _loadUserData();
   }
 
   @override
@@ -50,11 +79,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         
         setState(() {
           _prescripciones = prescripciones;
+          _hasPrescriptions = prescripciones.isNotEmpty;
           _isLoading = false;
         });
       } else {
         setState(() {
           _errorMessage = 'Usuario no autenticado o ID de usuario vacío';
+          _hasPrescriptions = false;
           _isLoading = false;
         });
       }
@@ -62,21 +93,622 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       print('❌ Error loading prescriptions: $e'); // Debug log
       setState(() {
         _errorMessage = 'Error cargando prescripciones: $e';
+        _hasPrescriptions = false;
         _isLoading = false;
       });
     }
   }
 
-  String _getRecommendation() {
-    final hour = DateTime.now().hour;
-    if (8 < hour && hour < 18) {
-      return "Recomendación: Recoger en farmacia";
-    } else {
-      return "Recomendación: Entrega a domicilio";
+  /// Load user data and initialize address information
+  Future<void> _loadUserData() async {
+    try {
+      _currentUser = UserSession().currentUser.value;
+      if (_currentUser != null) {
+        await _loadHomeAddress();
+        _initializeDeliveryModeFromPreferences();
+      }
+    } catch (e) {
+      print('❌ Error loading user data: $e');
     }
   }
 
+  /// Initialize delivery mode based on user preferences
+  void _initializeDeliveryModeFromPreferences() {
+    if (_hasInitializedDeliveryMode || _currentUser?.preferencias == null) {
+      return;
+    }
+
+    final preferredMode = _currentUser!.preferencias!.modoEntregaPreferido;
+    final shouldUseDelivery = preferredMode == 'domicilio';
+    
+    setState(() {
+      _isPickup = !shouldUseDelivery;
+      _hasInitializedDeliveryMode = true;
+    });
+
+    // If switching to delivery mode and we have home address, populate it
+    if (shouldUseDelivery && _homeAddress != null && _selectedAddressType == AddressType.home) {
+      _addressController.text = _homeAddress!;
+      _logAddressSelection('home', _homeAddress!);
+    }
+
+    print('🔧 Initialized delivery mode from user preference: $preferredMode (isPickup: $_isPickup)');
+  }
+
+  /// Load the user's home address from their profile
+  Future<void> _loadHomeAddress() async {
+    if (_currentUser == null) return;
+
+    setState(() {
+      _isLoadingHomeAddress = true;
+    });
+
+    try {
+      // Get complete home address from user model
+      final address = _currentUser!.direccion;
+      final city = _currentUser!.city;
+      final department = _currentUser!.department;
+      
+      // Build complete address string
+      List<String> addressParts = [];
+      if (address.isNotEmpty) addressParts.add(address);
+      if (city.isNotEmpty) addressParts.add(city);
+      if (department.isNotEmpty) addressParts.add(department);
+      
+      _homeAddress = addressParts.isNotEmpty ? addressParts.join(', ') : null;
+      
+      // Clean the address to remove duplicates
+      if (_homeAddress != null) {
+        _homeAddress = AddressValidator.cleanAddress(_homeAddress!);
+      }
+      
+      // If home address is available and delivery is selected, auto-fill it
+      if (_homeAddress != null && !_isPickup && _selectedAddressType == AddressType.home) {
+        _addressController.text = _homeAddress!;
+        _logAddressSelection('home', _homeAddress!);
+      }
+      
+      print('🏠 Home address loaded: $_homeAddress');
+    } catch (e) {
+      print('❌ Error loading home address: $e');
+      _homeAddress = null;
+    } finally {
+      setState(() {
+        _isLoadingHomeAddress = false;
+      });
+    }
+  }
+
+  /// Load the user's current location and convert to address
+  /// Uses the same location method as MapScreen for accuracy
+  Future<void> _loadCurrentLocationAddress() async {
+    setState(() {
+      _isLoadingCurrentLocation = true;
+      _addressValidationError = null; // Clear any previous errors
+    });
+
+    try {
+      // Get current position using the same method as MapScreen
+      final position = await _locationService.getCurrentPosition();
+      if (position == null) {
+        throw Exception('No se pudo obtener la ubicación actual');
+      }
+
+      print('📍 Current position: ${position.latitude}, ${position.longitude}');
+
+      // Convert coordinates to address
+      final address = await _locationService.getAddressFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      
+      if (address == null) {
+        throw Exception('No se pudo convertir las coordenadas a dirección');
+      }
+
+      _currentLocationAddress = address;
+      
+      // Clean the address to remove duplicates and format properly
+      if (_currentLocationAddress != null) {
+        _currentLocationAddress = AddressValidator.cleanAddress(_currentLocationAddress!);
+      }
+      
+      // If current location is available and selected, auto-fill it
+      if (_currentLocationAddress != null && 
+          !_isPickup && 
+          _selectedAddressType == AddressType.current) {
+        _addressController.text = _currentLocationAddress!;
+        _logAddressSelection('current', _currentLocationAddress!);
+      }
+      
+      print('📍 Current location address loaded: $_currentLocationAddress');
+    } catch (e) {
+      print('❌ Error loading current location address: $e');
+      _currentLocationAddress = null;
+      
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error obteniendo ubicación: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingCurrentLocation = false;
+        });
+      }
+    }
+  }
+
+  /// Handle address type selection changes
+  void _onAddressTypeChanged(AddressType? newType) {
+    if (newType == null) return;
+
+    setState(() {
+      _selectedAddressType = newType;
+      _addressValidationError = null; // Clear validation error when switching types
+    });
+
+    switch (newType) {
+      case AddressType.home:
+        if (_homeAddress != null) {
+          _addressController.text = _homeAddress!;
+          _logAddressSelection('home', _homeAddress!);
+        } else {
+          _loadHomeAddress();
+        }
+        break;
+      case AddressType.current:
+        if (_currentLocationAddress != null) {
+          _addressController.text = _currentLocationAddress!;
+          _logAddressSelection('current', _currentLocationAddress!);
+        } else {
+          _loadCurrentLocationAddress();
+        }
+        break;
+      case AddressType.other:
+        _addressController.clear();
+        break;
+    }
+  }
+
+  /// Log address selection for analytics
+  void _logAddressSelection(String type, String address) {
+    print('📊 Address selection analytics: Type=$type, Address=${address.length > 50 ? '${address.substring(0, 50)}...' : address}');
+    // TODO: In production, send this to your analytics service
+    // AnalyticsService.logEvent('address_selected', {
+    //   'type': type,
+    //   'address_length': address.length,
+    //   'pharmacy_id': widget.pharmacy?.id,
+    // });
+  }
+
+  /// Load address suggestions when delivery option is selected
+  Future<void> _loadAddressSuggestions() async {
+    // Load home address if not already loaded
+    if (_homeAddress == null && _currentUser != null) {
+      await _loadHomeAddress();
+    }
+    
+    // Load current location if not already loaded and user prefers current location
+    if (_currentLocationAddress == null && _selectedAddressType == AddressType.current) {
+      await _loadCurrentLocationAddress();
+    }
+  }
+
+  /// Validates the current address in the text field
+  void _validateCurrentAddress() {
+    final address = _addressController.text.trim();
+    final validationResult = AddressValidator.validateAddress(address);
+    
+    setState(() {
+      _addressValidationError = validationResult;
+    });
+  }
+
+  /// Handles address input changes and validates in real-time
+  void _onAddressChanged(String value) {
+    // Validate address for manual input or edited auto-filled addresses
+    if (_selectedAddressType == AddressType.other || 
+        (_selectedAddressType != AddressType.other && value.trim() != _getAddressDataForType(_selectedAddressType)?.trim())) {
+      _validateCurrentAddress();
+      _logAddressSelection('manual_edit', value);
+    } else {
+      // Clear validation error for pre-filled addresses
+      setState(() {
+        _addressValidationError = null;
+      });
+    }
+  }
+
+  /// Get address data for a specific address type
+  String? _getAddressDataForType(AddressType type) {
+    switch (type) {
+      case AddressType.home:
+        return _homeAddress;
+      case AddressType.current:
+        return _currentLocationAddress;
+      case AddressType.other:
+        return null;
+    }
+  }
+
+  /// Get loading state for a specific address type
+  bool _getLoadingStateForType(AddressType type) {
+    switch (type) {
+      case AddressType.home:
+        return _isLoadingHomeAddress;
+      case AddressType.current:
+        return _isLoadingCurrentLocation;
+      case AddressType.other:
+        return false;
+    }
+  }
+
+  /// Get helper text based on the selected address type
+  String _getHelperTextForAddressType() {
+    // If there's a validation error, don't show the helper text as it's already shown as errorText
+    if (_addressValidationError != null) {
+      return '';
+    }
+
+    switch (_selectedAddressType) {
+      case AddressType.home:
+      case AddressType.current:
+      case AddressType.other:
+        return 'Asegúrate de incluir todos los detalles necesarios para la entrega';
+    }
+  }
+
+  /// Handle delivery mode changes and auto-populate address if needed
+  void _onDeliveryModeChanged(bool isPickup) {
+    setState(() {
+      _isPickup = isPickup;
+      _addressValidationError = null; // Clear validation error when switching modes
+    });
+
+    // If switching to delivery mode and we have home address selected, populate it immediately
+    if (!isPickup && _selectedAddressType == AddressType.home && _homeAddress != null) {
+      _addressController.text = _homeAddress!;
+      _logAddressSelection('home', _homeAddress!);
+    }
+    // If switching to delivery mode and current location is selected, load it
+    else if (!isPickup && _selectedAddressType == AddressType.current) {
+      _loadCurrentLocationAddress();
+    }
+    // Clear address field when switching to pickup mode
+    else if (isPickup) {
+      _addressController.clear();
+    }
+
+    // Load address suggestions for delivery mode
+    if (!isPickup) {
+      _loadAddressSuggestions();
+    }
+  }
+
+  /// Check if the current user has any prescriptions available
+  /// This method validates prescription availability for delivery creation
+  Future<bool> userHasPrescriptions() async {
+    try {
+      final userId = UserSession().currentUser.value?.uid;
+      if (userId == null || userId.isEmpty) {
+        print('❌ [Prescription Check] User not authenticated');
+        return false;
+      }
+
+      final prescripciones = await _facade.getUserPrescripciones(userId);
+      final hasValidPrescriptions = prescripciones.isNotEmpty && 
+                                   prescripciones.any((p) => p.activa);
+      
+      print('🔍 [Prescription Check] User $userId has ${prescripciones.length} prescriptions, ${hasValidPrescriptions ? 'valid' : 'none valid'} for delivery');
+      return hasValidPrescriptions;
+    } catch (e) {
+      print('❌ [Prescription Check] Error checking prescriptions: $e');
+      return false;
+    }
+  }
+
+  /// Widget displayed when user has no prescriptions
+  /// Shows informative message and redirect button to upload screen
+  Widget _buildNoPrescriptionsWidget() {
+    final theme = AppTheme.lightTheme;
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.medical_services_outlined,
+                size: 50,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Title
+            Text(
+              'No Prescriptions Available',
+              style: GoogleFonts.poetsenOne(
+                textStyle: theme.textTheme.headlineSmall,
+                color: theme.colorScheme.primary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            
+            // Message
+            Text(
+              'You cannot create a delivery because you have no prescriptions uploaded or associated with your account.',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            
+            // Upload button
+            ElevatedButton.icon(
+              onPressed: () async {
+                // Navigate to upload prescription screen
+                final result = await Navigator.pushNamed(context, '/upload');
+                
+                // If user returns from upload screen, refresh prescriptions
+                if (result != null || mounted) {
+                  print('🔄 Returning from upload screen, refreshing prescriptions...');
+                  setState(() {
+                    _isLoading = true;
+                  });
+                  await _loadUserPrescripciones();
+                }
+              },
+              icon: const Icon(Icons.upload_file),
+              label: const Text('Upload Prescription'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            
+            // Secondary action - refresh
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () async {
+                setState(() {
+                  _isLoading = true;
+                });
+                await _loadUserPrescripciones();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Widget containing the main delivery form
+  /// Displayed when user has valid prescriptions
+  Widget _buildDeliveryForm() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pharmacy info card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Farmacia Seleccionada',
+                    style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.pharmacy!.nombre,
+                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    widget.pharmacy!.direccion,
+                    style: AppTheme.lightTheme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Prescription selection
+          Text(
+            'Selecciona una prescripción:',
+            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<Prescripcion>(
+            value: _selectedPrescripcion,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Selecciona una prescripción',
+            ),
+            items: _prescripciones.map((prescripcion) {
+              return DropdownMenuItem(
+                value: prescripcion,
+                child: Text(
+                  '${prescripcion.medico} - ${prescripcion.diagnostico}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedPrescripcion = value;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Delivery mode selection
+          Text(
+            'Método de entrega:',
+            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Pickup option
+          RadioListTile<bool>(
+            title: const Text('Recoger en farmacia'),
+            subtitle: const Text('Recoge tu pedido directamente en la farmacia'),
+            value: true,
+            groupValue: _isPickup,
+            onChanged: (value) => _onDeliveryModeChanged(value ?? true),
+          ),
+          
+          // Delivery option
+          RadioListTile<bool>(
+            title: const Text('Entrega a domicilio'),
+            subtitle: const Text('Recibe tu pedido en tu dirección'),
+            value: false,
+            groupValue: _isPickup,
+            onChanged: (value) => _onDeliveryModeChanged(value ?? false),
+          ),
+
+          // Address input for delivery
+          if (!_isPickup) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Dirección de entrega:',
+              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Address type selection
+            DropdownButtonFormField<AddressType>(
+              value: _selectedAddressType,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Tipo de dirección',
+              ),
+              items: AddressType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Row(
+                    children: [
+                      Icon(type.icon, size: 20),
+                      const SizedBox(width: 8),
+                      Text(type.label),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: _onAddressTypeChanged,
+            ),
+            const SizedBox(height: 12),
+            
+            // Address input field
+            TextFormField(
+              controller: _addressController,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                labelText: 'Dirección',
+                hintText: 'Ingresa tu dirección completa',
+                errorText: _addressValidationError,
+                helperText: _getHelperTextForAddressType(),
+                suffixIcon: _getLoadingStateForType(_selectedAddressType)
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+              ),
+              onChanged: _onAddressChanged,
+              maxLines: 2,
+            ),
+          ],
+
+          const SizedBox(height: 32),
+
+          // Create order button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: (_selectedPrescripcion != null && !_isCreatingPedido)
+                  ? _createPedido
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.lightTheme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isCreatingPedido
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Creando pedido...'),
+                      ],
+                    )
+                  : Text(
+                      _isPickup ? 'Crear pedido (Recoger)' : 'Crear pedido (Domicilio)',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _createPedido() async {
+    // Get user ID first for use in error handling
+    final userId = UserSession().currentUser.value?.uid;
+    
     // Validation - ensure prescription is selected
     if (_selectedPrescripcion == null || widget.pharmacy == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -100,10 +732,47 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
 
     // Validation - ensure delivery address for home delivery
-    if (!_isPickup && _addressController.text.trim().isEmpty) {
+    if (!_isPickup) {
+      final address = _addressController.text.trim();
+      if (address.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor ingresa la dirección de entrega'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Validate address format
+      final addressValidationError = AddressValidator.validateAddress(address);
+      if (addressValidationError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Dirección inválida: $addressValidationError'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    // Additional validation to ensure all required fields for Firestore
+    final deliveryAddress = _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim();
+    if (deliveryAddress.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor ingresa la dirección de entrega'),
+          content: Text('Error: Dirección de entrega vacía'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (widget.pharmacy!.id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: ID de farmacia vacío'),
           backgroundColor: Colors.red,
         ),
       );
@@ -118,7 +787,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     if (fechaEntrega.isBefore(fechaDespacho)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('La fecha de entrega debe ser posterior a la fecha de despacho'),
+          content: Text('Error: Fecha de entrega debe ser posterior a fecha de despacho'),
           backgroundColor: Colors.red,
         ),
       );
@@ -130,7 +799,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     });
 
     try {
-      final userId = UserSession().currentUser.value?.uid;
       if (userId == null) {
         throw Exception('Usuario no autenticado');
       }
@@ -140,20 +808,29 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         throw Exception('La farmacia seleccionada no tiene un ID válido');
       }
 
+      // Generate a unique pedido ID with prefix using UUID
+      const uuid = Uuid();
+      final pedidoId = 'ped_${uuid.v4().replaceAll('-', '').substring(0, 16)}';
+      
       // Create pedido with reference to existing prescription - NO PRESCRIPTION CREATION
       final pedido = Pedido(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: pedidoId,
         prescripcionId: _selectedPrescripcion!.id,
         puntoFisicoId: widget.pharmacy!.id,
         tipoEntrega: _isPickup ? 'recogida' : 'domicilio',
         direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
-        estado: 'pendiente',
+        estado: 'en_proceso', // Set as required: "en_proceso" for confirmed orders
         fechaPedido: fechaDespacho,
         fechaEntrega: fechaEntrega,
       );
 
+      print('🔄 Creating pedido with ID: $pedidoId for user: $userId');
+      print('📦 Pedido details: tipoEntrega=${pedido.tipoEntrega}, estado=${pedido.estado}, prescripcionId=${pedido.prescripcionId}');
+
       // Create only the pedido - no prescription creation
       await _facade.createPedido(pedido, userId: userId);
+      
+      print('✅ Pedido successfully saved to Firestore: usuarios/$userId/pedidos/$pedidoId');
 
       if (mounted) {
         // Show success message
@@ -175,11 +852,15 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         }
       }
     } catch (e) {
+      print('❌ Error creating pedido: $e');
+      print('🔍 Error context: userId=$userId, prescripcionId=${_selectedPrescripcion?.id}, pharmacyId=${widget.pharmacy?.id}');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error creando pedido: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -265,246 +946,34 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+              ? Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Pharmacy info card
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.pharmacy!.nombre,
-                                style: theme.textTheme.headlineSmall,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                widget.pharmacy!.direccion,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 16),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      widget.pharmacy!.direccion,
-                                      style: theme.textTheme.bodySmall,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Recommendation
                       Text(
-                        _getRecommendation(),
-                        style: GoogleFonts.poetsenOne(
-                          fontSize: 18,
-                          color: theme.colorScheme.primary,
+                        _errorMessage!,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.red,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-
-                      // Delivery/Pickup selection
-                      Text(
-                        'Tipo de entrega:',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      ListTile(
-                        title: const Text('Recoger en farmacia'),
-                        leading: Radio<bool>(
-                          value: true,
-                          groupValue: _isPickup,
-                          onChanged: (value) {
-                            setState(() {
-                              _isPickup = value!;
-                            });
-                          },
-                        ),
-                        onTap: () {
+                      ElevatedButton(
+                        onPressed: () async {
                           setState(() {
-                            _isPickup = true;
+                            _isLoading = true;
+                            _errorMessage = null;
                           });
+                          await _loadUserPrescripciones();
                         },
-                      ),
-                      ListTile(
-                        title: const Text('Entrega a domicilio'),
-                        leading: Radio<bool>(
-                          value: false,
-                          groupValue: _isPickup,
-                          onChanged: (value) {
-                            setState(() {
-                              _isPickup = value!;
-                            });
-                          },
-                        ),
-                        onTap: () {
-                          setState(() {
-                            _isPickup = false;
-                          });
-                        },
-                      ),
-
-                      // Address field for delivery
-                      if (!_isPickup) ...[
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _addressController,
-                          decoration: InputDecoration(
-                            labelText: 'Dirección de entrega',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            prefixIcon: const Icon(Icons.home),
-                          ),
-                          maxLines: 2,
-                        ),
-                      ],
-
-                      const SizedBox(height: 20),
-
-                      // Prescription selection
-                      Text(
-                        'Seleccionar prescripción:',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: "Prescripción",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        initialValue: _selectedPrescripcion == null 
-                            ? null 
-                            : (_selectedPrescripcion!.id.isEmpty 
-                                ? 'prescripcion_${_prescripciones.indexOf(_selectedPrescripcion!)}' 
-                                : _selectedPrescripcion!.id),
-                        items: _prescripciones.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final prescripcion = entry.value;
-                          final itemValue = prescripcion.id.isEmpty ? 'prescripcion_$index' : prescripcion.id;
-                          return DropdownMenuItem<String>(
-                            value: itemValue,
-                            child: Text(
-                              '${prescripcion.recetadoPor} - ${prescripcion.fechaEmision.day}/${prescripcion.fechaEmision.month}/${prescripcion.fechaEmision.year}',
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (selectedId) {
-                          setState(() {
-                            if (selectedId != null) {
-                              if (selectedId.startsWith('prescripcion_')) {
-                                final index = int.parse(selectedId.split('_')[1]);
-                                _selectedPrescripcion = _prescripciones[index];
-                              } else {
-                                _selectedPrescripcion = _prescripciones
-                                    .firstWhere((p) => p.id == selectedId);
-                              }
-                            }
-                          });
-                        },
-                      ),
-
-                      // Show selected prescription info
-                      if (_selectedPrescripcion != null) ...[
-                        const SizedBox(height: 16),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Prescripción seleccionada:',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.medical_services, size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text('Diagnóstico: ${_selectedPrescripcion!.diagnostico}'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.person, size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text('Médico: ${_selectedPrescripcion!.medico}'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today, size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text('Fecha: ${_selectedPrescripcion!.fechaCreacion.day}/${_selectedPrescripcion!.fechaCreacion.month}/${_selectedPrescripcion!.fechaCreacion.year}'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 30),
-
-                      // Create order button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          onPressed: _isCreatingPedido ? null : _createPedido,
-                          child: _isCreatingPedido
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : Text(
-                                  _isPickup ? "CONFIRMAR RECOGIDA" : "CONFIRMAR ENTREGA",
-                                  style: GoogleFonts.poetsenOne(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                        ),
+                        child: const Text('Reintentar'),
                       ),
                     ],
                   ),
-                ),
+                )
+              : !_hasPrescriptions
+                  ? _buildNoPrescriptionsWidget() // Show no prescriptions message
+                  : _buildDeliveryForm(), // Show normal delivery form
     );
   }
 }
