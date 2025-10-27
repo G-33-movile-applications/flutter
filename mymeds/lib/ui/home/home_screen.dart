@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
 import '../analytics/delivery_analytics_screen.dart';
+import '../prescriptions/prescriptions_list_widget.dart';
 import 'package:provider/provider.dart';
 import '../../providers/motion_provider.dart';
 
@@ -15,12 +16,15 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   bool _dialogOpen = false; // Guard to prevent duplicate dialogs
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    
     // Add listener to MotionProvider for confirmation needs
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final motionProvider = context.read<MotionProvider>();
@@ -31,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     // Remove listener to prevent memory leaks
     final motionProvider = context.read<MotionProvider>();
     motionProvider.removeListener(_checkDrivingConfirmation);
@@ -122,8 +127,15 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'Mis estadísticas',
+            onPressed: () {
+              Navigator.pushNamed(context, '/stats');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Ver estadísticas',
+            tooltip: 'Ver análisis de entregas',
             onPressed: () {
               Navigator.push(
                 context, 
@@ -144,64 +156,31 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.home),
+              text: 'Inicio',
+            ),
+            Tab(
+              icon: Icon(Icons.medication),
+              text: 'Prescripciones',
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      // Greeting section
-                      _buildGreetingSection(theme),
-                      const SizedBox(height: 24),
-                      // Feature cards
-                      FeatureCard(
-                        overline: 'FUNCIONALIDAD',
-                        title: 'Ver mapa de farmacias',
-                        description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
-                        icon: Icons.map_rounded,
-                        buttonText: 'Abrir mapa',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/map');
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      FeatureCard(
-                        overline: 'FUNCIONALIDAD',
-                        title: 'Sube tu prescripción',
-                        description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
-                        icon: Icons.upload_file_rounded,
-                        buttonText: 'Subir',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/upload');
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      FeatureCard(
-                        overline: 'CUENTA',
-                        title: 'Ver tu perfil',
-                        description: 'Datos del usuario, preferencias y accesibilidad.',
-                        icon: Icons.person_rounded,
-                        buttonText: 'Ver perfil',
-                        onPressed: () {
-                          Navigator.pushNamed(
-                          context,
-                          '/profile',
-                          arguments: UserSession().currentUser.value?.uid,
-                        );
-                        },
-                      ),
-                      
-                      // Bottom spacing for better scroll experience
-                      const SizedBox(height: 24),
-                    ]),
-                  ),
-                ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildHomeTab(theme),
+                _buildPrescriptionsTab(),
               ],
             ),
           ),
@@ -209,6 +188,90 @@ class _HomeScreenState extends State<HomeScreen> {
           const MotionDebugBar(),
         ],
       ),
+    );
+  }
+
+  Widget _buildHomeTab(ThemeData theme) {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Greeting section
+              _buildGreetingSection(theme),
+              const SizedBox(height: 24),
+              // Feature cards
+              FeatureCard(
+                overline: 'FUNCIONALIDAD',
+                title: 'Ver mapa de farmacias',
+                description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
+                icon: Icons.map_rounded,
+                buttonText: 'Abrir mapa',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/map');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              FeatureCard(
+                overline: 'FUNCIONALIDAD',
+                title: 'Sube tu prescripción',
+                description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
+                icon: Icons.upload_file_rounded,
+                buttonText: 'Subir',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/upload');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              FeatureCard(
+                overline: 'CUENTA',
+                title: 'Ver tu perfil',
+                description: 'Datos del usuario, preferencias y accesibilidad.',
+                icon: Icons.person_rounded,
+                buttonText: 'Ver perfil',
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    '/profile',
+                    arguments: UserSession().currentUser.value?.uid,
+                  );
+                },
+              ),
+              
+              // Bottom spacing for better scroll experience
+              const SizedBox(height: 24),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrescriptionsTab() {
+    return PrescriptionsListWidget(
+      onPrescriptionTap: (prescripcion) async {
+        // Navigate to map screen to select pharmacy
+        final selectedPharmacy = await Navigator.pushNamed(
+          context,
+          '/map-select',
+          arguments: prescripcion,
+        );
+        
+        // If pharmacy was selected, navigate to delivery screen
+        if (selectedPharmacy != null && context.mounted) {
+          Navigator.pushNamed(
+            context,
+            '/delivery',
+            arguments: {
+              'pharmacy': selectedPharmacy,
+              'prescripcion': prescripcion,
+            },
+          );
+        }
+      },
     );
   }
 

@@ -25,8 +25,9 @@ enum AddressType {
 
 class DeliveryScreen extends StatefulWidget {
   final PuntoFisico? pharmacy;
+  final Prescripcion? prescripcion; // Optional: pre-selected prescription
   
-  const DeliveryScreen({super.key, this.pharmacy});
+  const DeliveryScreen({super.key, this.pharmacy, this.prescripcion});
 
   @override
   State<DeliveryScreen> createState() => _DeliveryScreenState();
@@ -38,6 +39,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   
   List<Prescripcion> _prescripciones = [];
   Prescripcion? _selectedPrescripcion;
+  PuntoFisico? _selectedPharmacy; // Store pharmacy (from widget or selected later)
   bool _isPickup = true; // true for pickup, false for delivery
   bool _isLoading = true;
   bool _isCreatingPedido = false;
@@ -58,6 +60,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedPharmacy = widget.pharmacy; // Initialize with passed pharmacy
+    _selectedPrescripcion = widget.prescripcion; // Initialize with passed prescription
     _loadUserPrescripciones();
     _loadUserData();
   }
@@ -532,13 +536,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.pharmacy!.nombre,
+                    _selectedPharmacy!.nombre,
                     style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    widget.pharmacy!.direccion,
+                    _selectedPharmacy!.direccion,
                     style: AppTheme.lightTheme.textTheme.bodyMedium,
                   ),
                 ],
@@ -710,10 +714,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     final userId = UserSession().currentUser.value?.uid;
     
     // Validation - ensure prescription is selected
-    if (_selectedPrescripcion == null || widget.pharmacy == null) {
+    if (_selectedPrescripcion == null || _selectedPharmacy == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona una prescripción'),
+        SnackBar(
+          content: Text(_selectedPrescripcion == null 
+              ? 'Selecciona una prescripción' 
+              : 'Selecciona una farmacia'),
           backgroundColor: Colors.red,
         ),
       );
@@ -758,7 +764,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
 
     // Additional validation to ensure all required fields for Firestore
-    final deliveryAddress = _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim();
+    final deliveryAddress = _isPickup ? _selectedPharmacy!.direccion : _addressController.text.trim();
     if (deliveryAddress.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -769,7 +775,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       return;
     }
 
-    if (widget.pharmacy!.id.isEmpty) {
+    if (_selectedPharmacy!.id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Error: ID de farmacia vacío'),
@@ -804,7 +810,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       }
 
       // Validation - ensure pharmacy ID is not empty
-      if (widget.pharmacy!.id.isEmpty) {
+      if (_selectedPharmacy!.id.isEmpty) {
         throw Exception('La farmacia seleccionada no tiene un ID válido');
       }
 
@@ -816,9 +822,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       final pedido = Pedido(
         id: pedidoId,
         prescripcionId: _selectedPrescripcion!.id,
-        puntoFisicoId: widget.pharmacy!.id,
+        puntoFisicoId: _selectedPharmacy!.id,
         tipoEntrega: _isPickup ? 'recogida' : 'domicilio',
-        direccionEntrega: _isPickup ? widget.pharmacy!.direccion : _addressController.text.trim(),
+        direccionEntrega: _isPickup ? _selectedPharmacy!.direccion : _addressController.text.trim(),
         estado: 'en_proceso', // Set as required: "en_proceso" for confirmed orders
         fechaPedido: fechaDespacho,
         fechaEntrega: fechaEntrega,
@@ -853,7 +859,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       }
     } catch (e) {
       print('❌ Error creating pedido: $e');
-      print('🔍 Error context: userId=$userId, prescripcionId=${_selectedPrescripcion?.id}, pharmacyId=${widget.pharmacy?.id}');
+      print('🔍 Error context: userId=$userId, prescripcionId=${_selectedPrescripcion?.id}, pharmacyId=${_selectedPharmacy?.id}');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -874,10 +880,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   }
 
   Future<void> _openGoogleMapsDirections() async {
-    if (widget.pharmacy == null) return;
+    if (_selectedPharmacy == null) return;
     
-    final lat = widget.pharmacy!.latitud;
-    final lng = widget.pharmacy!.longitud;
+    final lat = _selectedPharmacy!.latitud;
+    final lng = _selectedPharmacy!.longitud;
     
     // Google Maps directions URL
     final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng';
@@ -912,7 +918,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   Widget build(BuildContext context) {
     final theme = AppTheme.lightTheme;
 
-    if (widget.pharmacy == null) {
+    if (_selectedPharmacy == null) {
       return Scaffold(
         appBar: AppBar(
           title: Text(
@@ -934,7 +940,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "DELIVERY - ${widget.pharmacy!.nombre}",
+          "DELIVERY - ${_selectedPharmacy!.nombre}",
           style: GoogleFonts.poetsenOne(
             textStyle: theme.textTheme.headlineMedium,
             color: Colors.white,
