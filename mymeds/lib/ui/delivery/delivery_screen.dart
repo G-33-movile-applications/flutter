@@ -882,6 +882,16 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       
       print('✅ Pedido successfully saved to Firestore: usuarios/$userId/pedidos/$pedidoId');
 
+      // Auto-deactivate the prescription after successful order creation
+      try {
+        final updatedPrescription = _selectedPrescripcion!.copyWith(activa: false);
+        await _facade.updatePrescripcion(updatedPrescription, userId: userId);
+        print('✅ Prescription ${_selectedPrescripcion!.id} deactivated after order creation');
+      } catch (e) {
+        print('⚠️ Warning: Could not deactivate prescription: $e');
+        // Don't throw - order was created successfully, this is just a warning
+      }
+
       if (mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
