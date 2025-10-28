@@ -559,26 +559,70 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<Prescripcion>(
-            value: _selectedPrescripcion,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Selecciona una prescripción',
-            ),
-            items: _prescripciones.map((prescripcion) {
-              return DropdownMenuItem(
-                value: prescripcion,
-                child: Text(
-                  '${prescripcion.medico} - ${prescripcion.diagnostico}',
-                  overflow: TextOverflow.ellipsis,
+          // Show prescription lock indicator if preselected
+          if (widget.prescripcion != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.primaryColor.withOpacity(0.3),
                 ),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedPrescripcion = value;
-              });
-            },
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lock,
+                    size: 16,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Prescripción preseleccionada',
+                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: DropdownButtonFormField<Prescripcion>(
+              value: _selectedPrescripcion,
+              isExpanded: true, // Fix overflow issue
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: 'Selecciona una prescripción',
+                filled: widget.prescripcion != null,
+                fillColor: widget.prescripcion != null 
+                    ? Colors.grey.withOpacity(0.1) 
+                    : null,
+              ),
+              items: _prescripciones.map((prescripcion) {
+                return DropdownMenuItem(
+                  value: prescripcion,
+                  child: Text(
+                    '${prescripcion.medico} - ${prescripcion.diagnostico}',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: widget.prescripcion != null 
+                          ? AppTheme.textSecondary.withOpacity(0.6)
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: widget.prescripcion != null ? null : (value) {
+                setState(() {
+                  _selectedPrescripcion = value;
+                });
+              },
+            ),
           ),
           const SizedBox(height: 24),
 

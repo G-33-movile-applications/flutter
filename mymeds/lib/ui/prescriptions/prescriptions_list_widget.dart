@@ -141,11 +141,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         }
       },
       backgroundColor: Colors.white,
-      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-      checkmarkColor: AppTheme.primaryColor,
+      selectedColor: AppTheme.primaryColor,
+      checkmarkColor: Colors.white,
+      side: BorderSide(
+        color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+        width: 1,
+      ),
       labelStyle: TextStyle(
-        color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.white : const Color(0xFF37474F), // Darker grey for better contrast
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
       ),
     );
   }
@@ -251,21 +255,16 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isActive
-              ? AppTheme.primaryColor.withValues(alpha: 0.3)
-              : Colors.grey.withValues(alpha: 0.2),
+              ? AppTheme.primaryColor.withOpacity(0.3)
+              : Colors.grey.withOpacity(0.2),
           width: 1,
         ),
       ),
-      child: InkWell(
-        onTap: widget.onPrescriptionTap != null && isActive
-            ? () => widget.onPrescriptionTap!(prescripcion)
-            : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               Row(
                 children: [
                   // Status badge
@@ -276,13 +275,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                     ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? Colors.green.withValues(alpha: 0.1)
-                          : Colors.grey.withValues(alpha: 0.1),
+                          ? const Color(0xFF1B5E20) // Dark green background for better contrast
+                          : const Color(0xFF424242), // Dark grey background for better contrast
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isActive
-                            ? Colors.green.withValues(alpha: 0.3)
-                            : Colors.grey.withValues(alpha: 0.3),
+                            ? const Color(0xFF2E7D32) // Medium green border
+                            : const Color(0xFF616161), // Medium grey border
                       ),
                     ),
                     child: Row(
@@ -291,15 +290,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                         Icon(
                           isActive ? Icons.check_circle : Icons.cancel,
                           size: 14,
-                          color: isActive ? Colors.green : Colors.grey,
+                          color: Colors.white, // White icon for contrast
                         ),
                         const SizedBox(width: 4),
                         Text(
                           isActive ? 'Activa' : 'Inactiva',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: isActive ? Colors.green : Colors.grey,
+                            color: Colors.white, // White text for contrast
                           ),
                         ),
                       ],
@@ -393,12 +392,24 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton.icon(
+                    ElevatedButton.icon(
                       onPressed: () => widget.onPrescriptionTap!(prescripcion),
                       icon: const Icon(Icons.local_pharmacy, size: 18),
                       label: const Text('Buscar Farmacia'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.primaryColor,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        minimumSize: const Size(140, 36),
+                        textStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -407,7 +418,6 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
             ],
           ),
         ),
-      ),
     );
   }
 

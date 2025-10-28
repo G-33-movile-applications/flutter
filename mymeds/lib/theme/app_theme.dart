@@ -5,7 +5,7 @@ class AppTheme {
   // Color palette
   static const Color primaryColor = Color(0xFF86AFEF);
   static const Color cardColor = Color(0xFF9FB3DF);
-  static const Color buttonBackgroundColor = Color(0xFFFFF1D5);
+  static const Color buttonBackgroundColor = Color(0xFFF2F4F7);
   static const Color buttonTextColor = Color(0xFF1F2937);
   static const Color scaffoldBackgroundColor = Color(0xFFF7FAFC);
   static const Color textPrimary = Color(0xFF0F172A);

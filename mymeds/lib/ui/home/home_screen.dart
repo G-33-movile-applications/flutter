@@ -33,15 +33,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    // Remove listener to prevent memory leaks
-    final motionProvider = context.read<MotionProvider>();
-    motionProvider.removeListener(_checkDrivingConfirmation);
-    super.dispose();
-  }
-
   void _checkDrivingConfirmation() {
     if (!mounted) return;
     
