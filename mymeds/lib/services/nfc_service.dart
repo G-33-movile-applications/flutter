@@ -1,13 +1,17 @@
 import 'dart:convert';
+import 'dart:io' show gzip;
+import 'dart:typed_data';
 import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
 import 'package:ndef/ndef.dart' as ndef;
 import 'package:flutter/foundation.dart';
 
 /// Service for reading and writing prescription data to NFC tags
 /// Uses NDEF records with custom MIME type for prescription JSON
+/// Includes compression and partial data upload for size-limited tags
 class NfcService {
   static const String mimeType = 'application/vnd.mymeds.prescription+json';
   static const String prescriptionIdentifier = 'MYMEDS_PRESCRIPTION';
+  static const int maxTagSize = 800; // bytes - safe limit for most NFC tags
 
   /// Check if NFC is available on this device
   Future<bool> isAvailable() async {
@@ -97,20 +101,75 @@ class NfcService {
               }
             }
             
+            // Check if data is compressed
+            String decompressedPayload = payload;
+            try {
+              final jsonTest = jsonDecode(payload) as Map<String, dynamic>;
+              if (jsonTest.containsKey('_compressed') && jsonTest['_compressed'] == true) {
+                debugPrint('🔄 Detected compressed data, attempting decompression...');
+                // Data was compressed, need to decompress
+                // The payload is actually the base64 encoded compressed data
+                // But in our write, we compressed the bytes directly, so try to decompress
+                try {
+                  final compressedBytes = Uint8List.fromList(utf8.encode(payload));
+                  final decompressedBytes = gzip.decode(compressedBytes);
+                  decompressedPayload = utf8.decode(decompressedBytes);
+                  debugPrint('✅ Successfully decompressed data');
+                } catch (e) {
+                  debugPrint('⚠️ Decompression failed, using original payload: $e');
+                  // Continue with original payload - it might not actually be compressed
+                }
+              }
+            } catch (e) {
+              // Not valid JSON yet, might need decompression first
+              debugPrint('Attempting to decompress non-JSON payload...');
+              try {
+                final compressedBytes = record.payload!;
+                final decompressedBytes = gzip.decode(compressedBytes);
+                decompressedPayload = utf8.decode(decompressedBytes);
+                debugPrint('✅ Successfully decompressed raw payload');
+              } catch (decompressError) {
+                debugPrint('Decompression not needed or failed: $decompressError');
+                // Use original payload
+              }
+            }
+            
             // Verify it's valid JSON
-            if (_isValidJson(payload)) {
+            if (_isValidJson(decompressedPayload)) {
               // Check if it's a prescription (contains our identifier or expected fields)
-              final jsonData = jsonDecode(payload) as Map<String, dynamic>;
+              final jsonData = jsonDecode(decompressedPayload) as Map<String, dynamic>;
+              
+              // Fill in missing medication fields with defaults
+              if (jsonData.containsKey('medicamentos') && jsonData['medicamentos'] is List) {
+                final meds = jsonData['medicamentos'] as List;
+                for (var med in meds) {
+                  if (med is Map<String, dynamic>) {
+                    // Set defaults for missing fields
+                    med.putIfAbsent('nombre', () => 'Medicamento sin nombre');
+                    med.putIfAbsent('dosis', () => 0);
+                    med.putIfAbsent('cantidad', () => 1);
+                    med.putIfAbsent('frecuencia', () => 8);
+                    med.putIfAbsent('duracion', () => 7);
+                    med.putIfAbsent('notas', () => '');
+                  }
+                }
+              }
+              
+              // Add warning if data was partial
+              if (jsonData.containsKey('_partial') && jsonData['_partial'] == true) {
+                debugPrint('⚠️ Warning: This is partial prescription data (reduced for NFC tag size)');
+              }
+              
               if (jsonData.containsKey('_type') && 
                   jsonData['_type'] == prescriptionIdentifier) {
                 debugPrint('Found prescription data with identifier on NFC tag');
-                return payload;
+                return jsonEncode(jsonData); // Return the cleaned/filled data
               }
               // Also accept if it has prescription-like fields
               if (jsonData.containsKey('diagnostico') || 
                   jsonData.containsKey('medico')) {
                 debugPrint('Found prescription-like data on NFC tag');
-                return payload;
+                return jsonEncode(jsonData); // Return the cleaned/filled data
               }
             }
           } catch (e) {
@@ -141,8 +200,9 @@ class NfcService {
   }
 
   /// Write prescription JSON to an NFC tag as NDEF record
-  /// Throws exception on write errors
-  Future<void> writeNdefJson(String jsonPayload, {bool overwrite = false}) async {
+  /// Returns a map with write result: {success: bool, warning: String?, medicationsWritten: int}
+  /// Throws exception on critical write errors
+  Future<Map<String, dynamic>> writeNdefJson(String jsonPayload, {bool overwrite = false}) async {
     NFCTag? tag;
     try {
       // Validate JSON before writing
@@ -167,12 +227,67 @@ class NfcService {
         throw Exception('Error al codificar JSON: $e');
       }
 
-      final payloadBytes = utf8.encode(enhancedPayload);
-      final payloadSize = payloadBytes.length;
+      Uint8List payloadBytes = Uint8List.fromList(utf8.encode(enhancedPayload));
+      var payloadSize = payloadBytes.length;
+      String? warning;
+      int originalMedicationCount = 0;
+      int writtenMedicationCount = 0;
+
+      // Try compression if too large
+      if (payloadSize > maxTagSize) {
+        debugPrint('⚠️ Payload too large ($payloadSize bytes), attempting compression...');
+        
+        try {
+          payloadBytes = Uint8List.fromList(gzip.encode(payloadBytes));
+          payloadSize = payloadBytes.length;
+          jsonData['_compressed'] = true;
+          debugPrint('✅ Compressed to $payloadSize bytes');
+          
+          if (payloadSize <= maxTagSize) {
+            warning = 'Datos comprimidos para caber en el tag NFC';
+          }
+        } catch (e) {
+          debugPrint('❌ Compression failed: $e');
+        }
+      }
+
+      // If still too large, reduce medication data
+      if (payloadSize > maxTagSize) {
+        debugPrint('⚠️ Still too large after compression, reducing medication data...');
+        
+        // Store original count
+        if (jsonData.containsKey('medicamentos') && jsonData['medicamentos'] is List) {
+          originalMedicationCount = (jsonData['medicamentos'] as List).length;
+        }
+        
+        // Try to fit essential data only
+        final reducedData = _reduceDataForNfc(jsonData);
+        enhancedPayload = jsonEncode(reducedData);
+        payloadBytes = utf8.encode(enhancedPayload);
+        payloadSize = payloadBytes.length;
+        
+        if (reducedData.containsKey('medicamentos') && reducedData['medicamentos'] is List) {
+          writtenMedicationCount = (reducedData['medicamentos'] as List).length;
+        }
+        
+        if (payloadSize > maxTagSize) {
+          throw Exception(
+            'Tag NFC muy pequeño. Necesitas $payloadSize bytes pero el límite es $maxTagSize bytes.\n\n'
+            'Sugerencias:\n'
+            '• Usa un tag NFC de mayor capacidad (NTAG216 o superior)\n'
+            '• Reduce el número de medicamentos en la prescripción\n'
+            '• Divide la prescripción en múltiples tags'
+          );
+        }
+        
+        warning = originalMedicationCount > 0
+            ? 'Tag NFC pequeño: solo se guardaron $writtenMedicationCount de $originalMedicationCount medicamentos (datos esenciales)'
+            : 'Algunos datos fueron reducidos para caber en el tag NFC';
+      }
 
       // Check size limits (most NFC tags support 888 bytes for NTAG216)
-      if (payloadSize > 800) {
-        throw Exception('Datos muy grandes ($payloadSize bytes). Máximo: 800 bytes');
+      if (payloadSize > maxTagSize) {
+        throw Exception('Datos muy grandes ($payloadSize bytes). Máximo: $maxTagSize bytes');
       }
 
       // Poll for NFC tag with longer timeout
@@ -212,6 +327,14 @@ class NfcService {
       // Finish session with success message
       await FlutterNfcKit.finish(iosAlertMessage: 'Prescription written successfully');
       
+      // Return write result
+      return {
+        'success': true,
+        'warning': warning,
+        'medicationsWritten': writtenMedicationCount > 0 ? writtenMedicationCount : originalMedicationCount,
+        'originalMedicationCount': originalMedicationCount,
+      };
+      
     } catch (e) {
       debugPrint('NFC write error: $e');
       debugPrint('Error type: ${e.runtimeType}');
@@ -238,6 +361,52 @@ class NfcService {
     }
   }
 
+  /// Reduce prescription data to fit in NFC tag by keeping only essential fields
+  Map<String, dynamic> _reduceDataForNfc(Map<String, dynamic> data) {
+    final reduced = <String, dynamic>{};
+    
+    // Keep type identifier
+    if (data.containsKey('_type')) {
+      reduced['_type'] = data['_type'];
+    }
+    if (data.containsKey('_compressed')) {
+      reduced['_compressed'] = data['_compressed'];
+    }
+    
+    // Keep essential prescription fields
+    if (data.containsKey('id')) reduced['id'] = data['id'];
+    if (data.containsKey('fechaEmision')) reduced['fechaEmision'] = data['fechaEmision'];
+    if (data.containsKey('fechaVencimiento')) reduced['fechaVencimiento'] = data['fechaVencimiento'];
+    if (data.containsKey('activa')) reduced['activa'] = data['activa'];
+    
+    // Reduce medication list to essential fields
+    if (data.containsKey('medicamentos') && data['medicamentos'] is List) {
+      final medications = data['medicamentos'] as List;
+      final reducedMeds = <Map<String, dynamic>>[];
+      
+      for (var med in medications) {
+        if (med is Map<String, dynamic>) {
+          // Only keep the most essential fields per medication
+          final reducedMed = <String, dynamic>{};
+          if (med.containsKey('nombre')) reducedMed['nombre'] = med['nombre'];
+          if (med.containsKey('dosis')) reducedMed['dosis'] = med['dosis'];
+          if (med.containsKey('cantidad')) reducedMed['cantidad'] = med['cantidad'];
+          
+          reducedMeds.add(reducedMed);
+        }
+        
+        // Limit to first 10 medications to ensure fit
+        if (reducedMeds.length >= 10) {
+          break;
+        }
+      }
+      
+      reduced['medicamentos'] = reducedMeds;
+      reduced['_partial'] = true; // Mark as partial data
+    }
+    
+    return reduced;
+  }
   /// Delete/format the NFC tag by writing empty NDEF
   Future<void> clearTag() async {
     NFCTag? tag;

@@ -159,6 +159,21 @@ class AppRepositoryFacade {
     return await _prescripcionRepository.findByRecetadoPor(doctor);
   }
 
+  /// Update prescription (e.g., to deactivate after order creation)
+  Future<void> updatePrescripcion(Prescripcion prescripcion, {required String userId}) async {
+    try {
+      // Update in the user's prescriptions subcollection
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(prescripcion.id)
+          .update(prescripcion.toMap());
+    } catch (e) {
+      throw Exception('Error updating prescription: $e');
+    }
+  }
+
   // ==================== MEDICATION OPERATIONS ====================
 
   /// Get medications available at physical points (pharmacies)

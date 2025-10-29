@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
+import '../../models/prescripcion.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
 import 'package:provider/provider.dart'; 
@@ -14,7 +15,9 @@ import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final Prescripcion? prescripcion; // Optional: if user is selecting pharmacy for a prescription
+  
+  const MapScreen({super.key, this.prescripcion});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -173,6 +176,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showPharmacyDetails(PuntoFisico pharmacy, double distance) {
+    final isSelectionMode = widget.prescripcion != null;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -182,8 +187,15 @@ class _MapScreenState extends State<MapScreen> {
         distance: distance,
         onDelivery: () => _goToDelivery(pharmacy),
         onViewInventory: () => _viewInventory(pharmacy),
+        onSelect: isSelectionMode ? () => _selectPharmacy(pharmacy) : null,
       ),
     );
+  }
+
+  void _selectPharmacy(PuntoFisico pharmacy) {
+    // Return the selected pharmacy to the previous screen
+    Navigator.pop(context); // Close bottom sheet
+    Navigator.pop(context, pharmacy); // Return pharmacy to home screen
   }
 
   void _goToDelivery(PuntoFisico pharmacy) {

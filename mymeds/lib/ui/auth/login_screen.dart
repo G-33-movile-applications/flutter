@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
 									labelText: 'Correo electrónico',
 									hintText: 'ejemplo1@mail.com',
 									filled: true,
-									fillColor: const Color(0xFFFFF1D5),
+									fillColor: const Color(0xFFF2F4F7),
 									border: OutlineInputBorder(
 										borderRadius: BorderRadius.circular(16),
 									),
@@ -133,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
 									labelText: 'Contraseña',
 									hintText: 'Tu contraseña',
 									filled: true,
-									fillColor: const Color(0xFFFFF1D5),
+									fillColor: const Color(0xFFF2F4F7),
 									border: OutlineInputBorder(
 										borderRadius: BorderRadius.circular(16),
 									),
