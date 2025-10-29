@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../models/delivery_stats.dart';
 import '../../services/analytics_service.dart';
-import '../../services/user_session.dart';
 
 class DeliveryAnalyticsScreen extends StatefulWidget {
   const DeliveryAnalyticsScreen({super.key});
@@ -27,23 +26,12 @@ class _DeliveryAnalyticsScreenState extends State<DeliveryAnalyticsScreen> {
 
   Future<void> _loadStats() async {
     try {
-      final currentUser = UserSession().currentUser.value;
-      
-      if (currentUser == null) {
-        setState(() {
-          _error = 'No hay una sesión activa';
-          _isLoading = false;
-        });
-        return;
-      }
-
       setState(() {
         _isLoading = true;
         _error = null;
       });
 
       final stats = await _analyticsService.getDeliveryStats(
-        userId: currentUser.uid,
         startDate: _startDate,
         endDate: _endDate,
       );

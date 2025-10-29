@@ -14,25 +14,25 @@ class PedidoRepository {
       final fechaEntrega = data['fechaEntrega'];
       
       if (fechaDespacho == null || fechaEntrega == null) {
-        
+        print('Warning: Missing required date fields');
         return false;
       }
       
       if (fechaDespacho is! Timestamp || fechaEntrega is! Timestamp) {
-        
+        print('Warning: Invalid date field types');
         return false;
       }
 
       // Check for other required fields
       final entregaEnTienda = data['entregaEnTienda'];
       if (entregaEnTienda == null) {
-        
+        print('Warning: Missing entregaEnTienda field');
         return false;
       }
 
       return true;
     } catch (e) {
-      
+      print('Warning: Error validating pedido data: $e');
       return false;
     }
   }
@@ -62,25 +62,19 @@ class PedidoRepository {
     }
   }
 
-  // Read all pedidos for a specific user
-  Future<List<Pedido>> readAll({String? userId}) async {
+  // Read all pedidos
+  Future<List<Pedido>> readAll() async {
     try {
-      Query query = _firestore.collection(_collection);
-      
-      if (userId != null) {
-        query = query.where('usuarioId', isEqualTo: userId);
-      }
-      
-      final querySnapshot = await query.get();
+      final querySnapshot = await _firestore.collection(_collection).get();
       List<Pedido> pedidos = [];
       
       for (var doc in querySnapshot.docs) {
         try {
-          final pedidoData = doc.data() as Map<String, dynamic>;
+          final pedidoData = doc.data();
           
           // Skip invalid data
           if (!_isValidPedidoData(pedidoData)) {
-            
+            print('Warning: Invalid pedido data in document ${doc.id}');
             continue;
           }
 
@@ -89,7 +83,7 @@ class PedidoRepository {
           // Note: Prescriptions are now managed separately
           pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
         } catch (e) {
-          
+          print('Warning: Error processing pedido ${doc.id}: $e');
           // Continue processing other pedidos
           continue;
         }
