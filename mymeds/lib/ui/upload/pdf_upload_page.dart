@@ -24,6 +24,14 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
 
   /// Selección de archivo PDF
   Future<void> _selectFile() async {
+    if (selectedFiles.length >= 3) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Solo puedes subir un máximo de 3 prescripciones.")),
+      );
+      return;
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
@@ -142,12 +150,23 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Archivos seleccionados:",
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                "Archivos seleccionados:",
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                "(${selectedFiles.length}/3)",
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 10),
                           ...selectedFiles.map(
