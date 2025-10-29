@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme/app_theme.dart';
 import '../../models/delivery_stats.dart';
 import '../../services/analytics_service.dart';
@@ -31,7 +32,18 @@ class _DeliveryAnalyticsScreenState extends State<DeliveryAnalyticsScreen> {
         _error = null;
       });
 
+      // Obtener el ID del usuario actual
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        setState(() {
+          _error = 'No hay usuario autenticado';
+          _isLoading = false;
+        });
+        return;
+      }
+
       final stats = await _analyticsService.getDeliveryStats(
+        userId: currentUser.uid,
         startDate: _startDate,
         endDate: _endDate,
       );

@@ -62,7 +62,31 @@ class PedidoRepository {
     }
   }
 
-  // Read all pedidos
+  // Read all pedidos for a specific user
+  Future<List<Pedido>> readAllByUser(String userId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_collection)
+          .where('usuarioId', isEqualTo: userId) // Cambiado de 'userId' a 'usuarioId' para coincidir con el modelo
+          .get();
+      List<Pedido> pedidos = [];
+      
+      for (var doc in querySnapshot.docs) {
+        final pedidoData = doc.data();
+        if (!_isValidPedidoData(pedidoData)) {
+          print('Warning: Invalid pedido data in document ${doc.id}');
+          continue;
+        }
+        pedidos.add(Pedido.fromMap(pedidoData, documentId: doc.id));
+      }
+      return pedidos;
+    } catch (e) {
+      throw Exception('Error reading pedidos for user: $e');
+    }
+  }
+
+  // Read all pedidos (admin only - should be removed or protected)
+  @deprecated
   Future<List<Pedido>> readAll() async {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
