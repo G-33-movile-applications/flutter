@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'dart:io';
-import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/motion_provider.dart';
+import '../../repositories/pdf_repository.dart';
 import '../widgets/driving_overlay.dart';
 import 'widget/upload_prescription_widget.dart';
 
@@ -18,82 +17,113 @@ class PdfUploadPage extends StatefulWidget {
 
 class _PdfUploadPageState extends State<PdfUploadPage> {
   bool isUploading = false;
-  String? selectedFileName;
-  Map<String, dynamic>? pdfAsJson;
-  List<String> selectedFiles = [];
+  final List<File> selectedFiles = [];
+  final List<String> processedTexts = [];
+  final PdfRepository _pdfRepository = PdfRepository(userId: 'user123'); // TODO: Usar ID real del usuario
 
   /// Selección de archivo PDF
   Future<void> _selectFile() async {
+    // Verificar si ya hay 5 archivos seleccionados
+    if (selectedFiles.length >= 5) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No puedes seleccionar más de 5 prescripciones a la vez"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      allowMultiple: true,
+      withData: true,
     );
 
     if (result != null && result.files.isNotEmpty) {
-      final filePath = result.files.single.path!;
-      final fileName = result.files.single.name;
+      // Calcular cuántos archivos podemos agregar
+      final remainingSlots = 5 - selectedFiles.length;
+      final filesToAdd = result.files.take(remainingSlots).toList();
+
       setState(() {
-        selectedFileName = fileName;
-        selectedFiles.add(fileName);
+        for (final file in filesToAdd) {
+          if (file.path != null) {
+            selectedFiles.add(File(file.path!));
+          }
+        }
       });
 
-      // Convertir PDF a JSON
-      await _convertPdfToJson(filePath);
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Archivo seleccionado: $selectedFileName")),
-      );
+      
+      if (result.files.length > remainingSlots) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Se seleccionaron ${filesToAdd.length} archivo(s). No se pueden agregar más de 5 prescripciones."),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("${filesToAdd.length} archivo(s) seleccionado(s)"),
+          ),
+        );
+      }
     }
   }
 
-  /// Conversión PDF a JSON
-  Future<void> _convertPdfToJson(String filePath) async {
-    final fileBytes = File(filePath).readAsBytesSync();
-    final PdfDocument document = PdfDocument(inputBytes: fileBytes);
-
-    Map<String, dynamic> jsonData = {};
-
-    for (int i = 0; i < document.pages.count; i++) {
-      String pageText = PdfTextExtractor(document).extractText(startPageIndex: i);
-      jsonData["page_${i + 1}"] = pageText;
-    }
-
-    document.dispose();
-
-    setState(() {
-      pdfAsJson = jsonData;
-    });
-
-    debugPrint("PDF en JSON: ${jsonEncode(jsonData)}");
-  }
-
-  void _startUpload() {
+  /// Procesar y subir PDFs
+  Future<void> _startUpload() async {
     if (selectedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Por favor, selecciona al menos un archivo.")),
+        const SnackBar(content: Text("Por favor, selecciona al menos un archivo")),
       );
       return;
     }
 
     setState(() {
       isUploading = true;
+      processedTexts.clear();
     });
 
-  // Simulación de "subida"
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      // Procesar PDFs y guardar medicamentos
+      final medications = await _pdfRepository.processPrescriptionPdfs(selectedFiles);
+
       if (!mounted) return;
 
       setState(() {
         isUploading = false;
+        selectedFiles.clear();
       });
 
+      // Mostrar resultado
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Se subieron ${selectedFiles.length} archivo(s) correctamente."),
+          content: Text("Se procesaron ${medications.length} medicamento(s) correctamente"),
+          backgroundColor: Colors.green,
         ),
       );
-    });
+
+      // Navegar a la lista de medicamentos
+      Navigator.pushReplacementNamed(context, '/medications');
+
+    } catch (e) {
+      setState(() {
+        isUploading = false;
+      });
+
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error procesando PDFs: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -153,7 +183,18 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                           ...selectedFiles.map(
                             (file) => ListTile(
                               leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                              title: Text(file, style: theme.textTheme.bodyMedium),
+                              title: Text(
+                                file.path.split(Platform.pathSeparator).last,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  setState(() {
+                                    selectedFiles.remove(file);
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ],
@@ -161,8 +202,7 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
 
                     const SizedBox(height: 20),
 
-      // Preview de JSON (del último archivo)
-                    if (pdfAsJson != null)
+                    if (processedTexts.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -170,15 +210,20 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
+                              color: Colors.black.withOpacity(0.05),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: Text(
-                          const JsonEncoder.withIndent("  ").convert(pdfAsJson),
-                          style: const TextStyle(fontSize: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: processedTexts
+                              .map((text) => Text(
+                                    text,
+                                    style: const TextStyle(fontSize: 12),
+                                  ))
+                              .toList(),
                         ),
                       ),
                   ],
