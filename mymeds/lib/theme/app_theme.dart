@@ -27,7 +27,7 @@ class AppTheme {
         seedColor: primaryColor,
         brightness: Brightness.light,
         primary: primaryColor,
-        surface: cardColor,
+        surface: Colors.white, // Changed from cardColor to white for text fields
       ),
       
       // AppBar theme

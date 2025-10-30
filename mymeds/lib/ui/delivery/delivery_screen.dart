@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
-import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
@@ -421,315 +420,347 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   /// Widget displayed when user has no prescriptions
   /// Shows informative message and redirect button to upload screen
   Widget _buildNoPrescriptionsWidget() {
-    final theme = AppTheme.lightTheme;
-    
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Icon
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Icon(
-                Icons.medical_services_outlined,
-                size: 50,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Title
-            Text(
-              'No hay prescripciones disponibles',
-              style: GoogleFonts.poetsenOne(
-                textStyle: theme.textTheme.headlineSmall,
-                color: theme.colorScheme.primary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            
-            // Message
-            Text(
-              'No puedes crear un pedido porque no tienes ninguna prescripción subida o associada a tu cuenta.',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            
-            // Upload button
-            ElevatedButton.icon(
-              onPressed: () {
-                // Navigate to upload prescription screen
-                Navigator.pushNamed(context, '/upload');
-              },
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Subir Prescripción'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icon
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: Icon(
+                    Icons.medical_services_outlined,
+                    size: 50,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 24),
+                
+                // Title
+                Text(
+                  'No hay prescripciones disponibles',
+                  style: GoogleFonts.poetsenOne(
+                    textStyle: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Message
+                Text(
+                  'No puedes crear un pedido porque no tienes ninguna prescripción subida o associada a tu cuenta.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                
+                // Upload button
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to upload prescription screen
+                    Navigator.pushNamed(context, '/upload');
+                  },
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Subir Prescripción'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   /// Widget containing the main delivery form
   /// Displayed when user has valid prescriptions
   Widget _buildDeliveryForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Pharmacy info card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Farmacia Seleccionada',
-                    style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _selectedPharmacy!.nombre,
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    _selectedPharmacy!.direccion,
-                    style: AppTheme.lightTheme.textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Prescription selection
-          Text(
-            'Selecciona una prescripción:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Show prescription lock indicator if preselected
-          if (widget.prescripcion != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.lock,
-                    size: 16,
-                    color: AppTheme.primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Prescripción preseleccionada',
-                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          SizedBox(
-            width: double.infinity,
-            child: DropdownButtonFormField<Prescripcion>(
-              value: _selectedPrescripcion,
-              isExpanded: true, // Fix overflow issue
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                hintText: 'Selecciona una prescripción',
-                filled: widget.prescripcion != null,
-                fillColor: widget.prescripcion != null 
-                    ? Colors.grey.withOpacity(0.1) 
-                    : null,
-              ),
-              items: _prescripciones.map((prescripcion) {
-                return DropdownMenuItem(
-                  value: prescripcion,
-                  child: Text(
-                    '${prescripcion.medico} - ${prescripcion.diagnostico}',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: widget.prescripcion != null 
-                          ? AppTheme.textSecondary.withOpacity(0.6)
-                          : AppTheme.textSecondary,
-                    ),
-                  ),
-                );
-              }).toList(),
-              onChanged: widget.prescripcion != null ? null : (value) {
-                setState(() {
-                  _selectedPrescripcion = value;
-                });
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Delivery mode selection
-          Text(
-            'Método de entrega:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          
-          // Pickup option
-          RadioListTile<bool>(
-            title: const Text('Recoger en farmacia'),
-            subtitle: const Text('Recoge tu pedido directamente en la farmacia'),
-            value: true,
-            groupValue: _isPickup,
-            onChanged: (value) => _onDeliveryModeChanged(value ?? true),
-          ),
-          
-          // Delivery option
-          RadioListTile<bool>(
-            title: const Text('Entrega a domicilio'),
-            subtitle: const Text('Recibe tu pedido en tu dirección'),
-            value: false,
-            groupValue: _isPickup,
-            onChanged: (value) => _onDeliveryModeChanged(value ?? false),
-          ),
-
-          // Address input for delivery
-          if (!_isPickup) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Dirección de entrega:',
-              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            // Address type selection
-            DropdownButtonFormField<AddressType>(
-              value: _selectedAddressType,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Tipo de dirección',
-              ),
-              items: AddressType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Row(
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Pharmacy info card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(type.icon, size: 20),
-                      const SizedBox(width: 8),
-                      Text(type.label),
+                      Text(
+                        'Farmacia Seleccionada',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedPharmacy!.nombre,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        _selectedPharmacy!.direccion,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
                     ],
                   ),
-                );
-              }).toList(),
-              onChanged: _onAddressTypeChanged,
-            ),
-            const SizedBox(height: 12),
-            
-            // Address input field
-            TextFormField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: 'Dirección',
-                hintText: 'Ingresa tu dirección completa',
-                errorText: _addressValidationError,
-                helperText: _getHelperTextForAddressType(),
-                suffixIcon: _getLoadingStateForType(_selectedAddressType)
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : null,
-              ),
-              onChanged: _onAddressChanged,
-              maxLines: 2,
-            ),
-          ],
-
-          const SizedBox(height: 32),
-
-          // Create order button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: (_selectedPrescripcion != null && !_isCreatingPedido)
-                  ? _createPedido
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.lightTheme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: _isCreatingPedido
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              const SizedBox(height: 16),
+
+              // Prescription selection
+              Text(
+                'Selecciona una prescripción:',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Show prescription lock indicator if preselected
+              if (widget.prescripcion != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Prescripción preseleccionada',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: DropdownButtonFormField<Prescripcion>(
+                  value: _selectedPrescripcion,
+                  isExpanded: true, // Fix overflow issue
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: 'Selecciona una prescripción',
+                    filled: widget.prescripcion != null,
+                    fillColor: widget.prescripcion != null 
+                        ? Colors.grey.withOpacity(0.1) 
+                        : null,
+                  ),
+                  items: _prescripciones.map((prescripcion) {
+                    return DropdownMenuItem(
+                      value: prescripcion,
+                      child: Text(
+                        '${prescripcion.medico} - ${prescripcion.diagnostico}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: widget.prescripcion != null ? null : (value) {
+                    setState(() {
+                      _selectedPrescripcion = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Delivery mode selection
+              Text(
+                'Método de entrega:',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Pickup option
+              RadioListTile<bool>(
+                title: Text(
+                  'Recoger en farmacia',
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                ),
+                subtitle: Text(
+                  'Recoge tu pedido directamente en la farmacia',
+                  style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                ),
+                value: true,
+                groupValue: _isPickup,
+                onChanged: (value) => _onDeliveryModeChanged(value ?? true),
+              ),
+              
+              // Delivery option
+              RadioListTile<bool>(
+                title: Text(
+                  'Entrega a domicilio',
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                ),
+                subtitle: Text(
+                  'Recibe tu pedido en tu dirección',
+                  style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                ),
+                value: false,
+                groupValue: _isPickup,
+                onChanged: (value) => _onDeliveryModeChanged(value ?? false),
+              ),
+
+              // Address input for delivery
+              if (!_isPickup) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Dirección de entrega:',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Address type selection
+                DropdownButtonFormField<AddressType>(
+                  value: _selectedAddressType,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Tipo de dirección',
+                  ),
+                  items: AddressType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Row(
+                        children: [
+                          Icon(type.icon, size: 20),
+                          const SizedBox(width: 8),
+                          Text(type.label),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: _onAddressTypeChanged,
+                ),
+                const SizedBox(height: 12),
+                
+                // Address input field
+                TextFormField(
+                  controller: _addressController,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: 'Dirección',
+                    hintText: 'Ingresa tu dirección completa',
+                    errorText: _addressValidationError,
+                    helperText: _getHelperTextForAddressType(),
+                    suffixIcon: _getLoadingStateForType(_selectedAddressType)
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                  onChanged: _onAddressChanged,
+                  maxLines: 2,
+                ),
+              ],
+
+              const SizedBox(height: 32),
+
+              // Create order button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_selectedPrescripcion != null && !_isCreatingPedido)
+                      ? _createPedido
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isCreatingPedido
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Creando pedido...',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          _isPickup ? 'Crear pedido (Recoger)' : 'Crear pedido (Domicilio)',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                        SizedBox(width: 12),
-                        Text('Creando pedido...'),
-                      ],
-                    )
-                  : Text(
-                      _isPickup ? 'Crear pedido (Recoger)' : 'Crear pedido (Domicilio)',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
-  }
-
-  Future<void> _createPedido() async {
+  }  Future<void> _createPedido() async {
     // Get user ID first for use in error handling
     final userId = UserSession().currentUser.value?.uid;
     
@@ -946,7 +977,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightTheme;
+    final theme = Theme.of(context);
 
     if (_selectedPharmacy == null) {
       return Scaffold(
@@ -954,8 +985,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           title: Text(
             "DELIVERY",
             style: GoogleFonts.poetsenOne(
-              textStyle: theme.textTheme.headlineMedium,
-              color: Colors.white,
+              textStyle: theme.textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+              ),
             ),
           ),
           centerTitle: true,
@@ -972,8 +1004,9 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         title: Text(
           "DELIVERY - ${_selectedPharmacy!.nombre}",
           style: GoogleFonts.poetsenOne(
-            textStyle: theme.textTheme.headlineMedium,
-            color: Colors.white,
+            textStyle: theme.textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+            ),
           ),
         ),
         centerTitle: true,
@@ -989,7 +1022,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                       Text(
                         _errorMessage!,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.red,
+                          color: theme.colorScheme.error,
                         ),
                         textAlign: TextAlign.center,
                       ),

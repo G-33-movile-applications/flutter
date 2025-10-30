@@ -168,8 +168,16 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
 
                     const SizedBox(height: 20),
 
-      // Preview de JSON (del último archivo)
-                    if (pdfAsJson != null)
+                    // Preview de JSON (del último archivo)
+                    if (pdfAsJson != null) ...[
+                      Text(
+                        "Vista previa del JSON:",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -191,6 +199,7 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
