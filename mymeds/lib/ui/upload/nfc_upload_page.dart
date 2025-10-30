@@ -351,21 +351,26 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       // Check payload size (NFC tags have limited capacity, typically 888 bytes for NTAG216)
       final payloadSize = utf8.encode(completeJsonString).length;
       if (payloadSize > 800) {
-        _showErrorSnackBar('Datos muy grandes ($payloadSize bytes). Intenta con menos medicamentos.');
-        return;
+        _showInfoSnackBar('Datos muy grandes ($payloadSize bytes). Se intentará comprimir...');
       }
 
       _showInfoSnackBar('Acerca tu dispositivo al tag NFC...');
       
       try {
-        await _nfcService.writeNdefJson(completeJsonString);
+        final writeResult = await _nfcService.writeNdefJson(completeJsonString);
+        
+        if (!mounted) return;
+        
+        // Show appropriate message based on result
+        if (writeResult['warning'] != null) {
+          _showInfoSnackBar('NFC: ${writeResult['warning']}');
+        } else {
+          _showSuccessSnackBar('Prescripción escrita en NFC exitosamente');
+        }
       } catch (e) {
         // Re-throw to be caught by outer catch
         rethrow;
       }
-
-      if (!mounted) return;
-      _showSuccessSnackBar('Prescripción escrita en NFC exitosamente');
     } on PlatformException catch (e) {
       debugPrint('NFC write platform error: $e');
       if (e.code == 'NFCUserCanceled' || e.code == 'userCanceled') {
@@ -406,10 +411,16 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       final jsonData = PrescriptionAdapter.toNdefJson(prescription);
 
       _showInfoSnackBar('Acerca tu dispositivo al tag NFC...');
-      await _nfcService.writeNdefJson(jsonData);
+      final writeResult = await _nfcService.writeNdefJson(jsonData);
 
       if (!mounted) return;
-      _showSuccessSnackBar('Prescripción de prueba escrita en NFC');
+      
+      // Show appropriate message based on result
+      if (writeResult['warning'] != null) {
+        _showInfoSnackBar('NFC: ${writeResult['warning']}');
+      } else {
+        _showSuccessSnackBar('Prescripción de prueba escrita en NFC');
+      }
     } on PlatformException catch (e) {
       debugPrint('NFC write platform error: $e');
       if (e.code == 'NFCUserCanceled' || e.code == 'userCanceled') {
@@ -719,10 +730,20 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           children: [
             const Icon(Icons.check_circle, color: Colors.green),
             const SizedBox(width: 12),
-            Text(title),
+            Expanded(
+              child: Text(
+                title,
+                overflow: TextOverflow.visible,
+              ),
+            ),
           ],
         ),
-        content: Text(message),
+        content: SingleChildScrollView(
+          child: Text(
+            message,
+            overflow: TextOverflow.visible,
+          ),
+        ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),

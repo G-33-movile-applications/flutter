@@ -331,7 +331,30 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     }
   }
 
-  void _addEmptyMedication() {
+  /// Add medication with smart limits and warnings
+  Future<void> _addEmptyMedication() async {
+    // Hard limit: 50 medicines maximum
+    if (_medications.length >= 50) {
+      _showValidationErrorDialog(
+        'Has alcanzado el límite máximo de 50 medicamentos por prescripción. '
+        'Si necesitas agregar más, crea una nueva prescripción.',
+      );
+      return;
+    }
+    
+    // Warning at 20 medicines: ask for confirmation
+    if (_medications.length >= 20) {
+      final confirmed = await _showConfirmDialog(
+        title: 'Muchos medicamentos',
+        message: 'Ya tienes ${_medications.length} medicamentos en esta prescripción. '
+            '¿Estás seguro de que deseas agregar otro?\n\n'
+            'Consejo: Considera dividir prescripciones muy largas para facilitar su gestión.',
+        confirmText: 'Sí, agregar',
+      );
+      
+      if (confirmed != true) return;
+    }
+    
     setState(() {
       _medications.add({
         'nombre': 'Medicamento',

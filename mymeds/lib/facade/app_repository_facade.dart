@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 import '../models/pedido.dart';
 import '../models/prescripcion.dart';
 import '../models/medicamento.dart';
+import '../models/medicamento_global.dart';
 import '../models/punto_fisico.dart';
 import '../repositories/usuario_repository.dart';
 import '../repositories/pedido_repository.dart';
@@ -76,32 +77,14 @@ class AppRepositoryFacade {
   // ==================== PEDIDO OPERATIONS ====================
 
   /// Create a complete pedido with prescription and medications
+  @Deprecated('Use createPedido with existing prescripcionId instead - medications are now in subcollections')
   Future<void> createUserWithPedidoAndPrescripcion({
     required UserModel usuario,
     required Pedido pedido,
     required Prescripcion prescripcion,
     required List<Medicamento> medicamentos,
   }) async {
-    try {
-      // 1. Create user if doesn't exist
-      final existingUser = await _usuarioRepository.read(usuario.uid);
-      if (existingUser == null) {
-        await _usuarioRepository.create(usuario);
-      }
-
-      // 2. Create pedido
-      await _pedidoRepository.create(pedido);
-
-      // 3. Create prescription
-      await _prescripcionRepository.create(prescripcion);
-
-      // 4. Create medications
-      for (final medicamento in medicamentos) {
-        await _medicamentoRepository.create(medicamento);
-      }
-    } catch (e) {
-      throw Exception('Error creating user with pedido and prescription: $e');
-    }
+    throw Exception('DEPRECATED: Use createPedido with existing prescripcionId instead - medications are now in subcollections');
   }
 
   /// Get all pedidos for a user with complete information
@@ -137,26 +120,32 @@ class AppRepositoryFacade {
   // ==================== PRESCRIPTION OPERATIONS ====================
 
   /// Create prescription with medications
+  @Deprecated('Medications are now in subcollections - use prescription creation only')
   Future<void> createPrescripcionWithMedicamentos({
     required Prescripcion prescripcion,
     required List<Medicamento> medicamentos,
   }) async {
-    try {
-      // Create prescription
-      await _prescripcionRepository.create(prescripcion);
-
-      // Create medications
-      for (final medicamento in medicamentos) {
-        await _medicamentoRepository.create(medicamento);
-      }
-    } catch (e) {
-      throw Exception('Error creating prescription with medications: $e');
-    }
+    throw Exception('DEPRECATED: Medications are now in subcollections - use prescription creation only');
   }
 
   /// Get prescription by doctor
   Future<List<Prescripcion>> getPrescripcionesByDoctor(String doctor) async {
     return await _prescripcionRepository.findByRecetadoPor(doctor);
+  }
+
+  /// Update prescription (e.g., to deactivate after order creation)
+  Future<void> updatePrescripcion(Prescripcion prescripcion, {required String userId}) async {
+    try {
+      // Update in the user's prescriptions subcollection
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(prescripcion.id)
+          .update(prescripcion.toMap());
+    } catch (e) {
+      throw Exception('Error updating prescription: $e');
+    }
   }
 
   // ==================== MEDICATION OPERATIONS ====================
@@ -170,6 +159,8 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
   List<Map<String, dynamic>> medicamentosConDetalles = [];
 
   if (puntoFisicoId != null) {
+    print('🔍 [Facade] Fetching inventory for punto fisico: $puntoFisicoId');
+    
     // 🔹 Fetch inventory from subcollection approach (as seeded)
     try {
       final inventorySnapshot = await FirebaseFirestore.instance
@@ -178,32 +169,83 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
           .collection('inventario')
           .get();
 
+      print('🔍 [Facade] Found ${inventorySnapshot.docs.length} items in inventory subcollection');
+
       for (final doc in inventorySnapshot.docs) {
         final inventoryData = doc.data();
         
+        print('🔍 [Facade] Processing inventory item:');
+        print('   - doc.id (medicamentoId): ${doc.id}');
+        print('   - inventoryData: $inventoryData');
+        
         // Only include items with stock
         final stock = inventoryData['stock'] ?? 0;
-        if (stock <= 0) continue;
+        if (stock <= 0) {
+          print('   ⏩ Skipping - no stock (stock: $stock)');
+          continue;
+        }
 
-        // Apply filters if provided
+        // The document ID in the inventory subcollection IS the medication ID from the global collection
+        // Try to fetch full details from global medicamentos collection
+        String medDescripcion = 'Medicamento disponible en farmacia';
+        String medTipo = 'medicamento';
+        
+        try {
+          print('   🔍 Fetching medication details from global collection with id: ${doc.id}');
+          final medicamento = await _medicamentoRepository.read(doc.id);
+          
+          if (medicamento != null) {
+            print('   ✅ Found medication in global collection:');
+            print('      - nombre: ${medicamento.nombre}');
+            print('      - descripcion: ${medicamento.descripcion}');
+            print('      - presentacion: ${medicamento.presentacion}');
+            
+            medDescripcion = medicamento.descripcion.isNotEmpty 
+                ? medicamento.descripcion 
+                : 'Sin descripción disponible';
+            medTipo = medicamento.presentacion.isNotEmpty
+                ? medicamento.presentacion
+                : 'medicamento';
+          } else {
+            print('   ❌ Medication NOT found in global collection with id: ${doc.id}');
+          }
+        } catch (e) {
+          print('   ❌ Error fetching medication details for ${doc.id}: $e');
+        }
+
+        // Apply filters if provided (after fetching full data)
         if (esRestringido != null) {
-          // For now, skip filtering by esRestringido since it's not in inventory data
+          // MedicamentoGlobal doesn't have esRestringido field, skip this filter
+          print('   ⏩ Skipping - esRestringido filter applied');
+          continue;
         }
-        if (tipo != null) {
-          // For now, skip filtering by tipo since it's not in inventory data  
+        if (tipo != null && medTipo.toLowerCase() != tipo.toLowerCase()) {
+          // Filter by type/presentacion if specified
+          print('   ⏩ Skipping - tipo filter mismatch (expected: $tipo, got: $medTipo)');
+          continue;
         }
 
-        medicamentosConDetalles.add({
+        final medicamentoMap = {
           'id': doc.id,
           'nombre': inventoryData['nombre'] ?? 'Sin nombre',
-          'descripcion': 'Medicamento disponible en farmacia', // Default description
-          'tipo': 'medicamento', // Default type
+          'descripcion': medDescripcion,
+          'tipo': medTipo,
           'cantidad': stock,
           'precio': (inventoryData['precioUnidad'] ?? 0) / 100.0, // Convert cents to currency
-        });
+        };
+        
+        print('   ✅ Adding medication to list:');
+        print('      - id: ${medicamentoMap['id']}');
+        print('      - nombre: ${medicamentoMap['nombre']}');
+        print('      - descripcion: ${medicamentoMap['descripcion']}');
+        print('      - tipo: ${medicamentoMap['tipo']}');
+        
+        medicamentosConDetalles.add(medicamentoMap);
       }
+      
+      print('🔍 [Facade] Total medications with details: ${medicamentosConDetalles.length}');
     } catch (e) {
-      print('Error fetching inventory for punto fisico $puntoFisicoId: $e');
+      print('❌ [Facade] Error fetching inventory for punto fisico $puntoFisicoId: $e');
     }
   } else {
     // 🔹 Fetch from all pharmacies - this is more complex with subcollections
@@ -227,13 +269,25 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
   }
 
   /// Get restricted medications
+  @Deprecated('MedicamentoGlobal model does not have esRestringido field')
   Future<List<Medicamento>> getRestrictedMedicamentos() async {
-    return await _medicamentoRepository.findByEsRestringido(true);
+    throw Exception('DEPRECATED: MedicamentoGlobal model does not have esRestringido field');
   }
 
-  /// Get medications by type
+  /// Get medications by type (deprecated - use getMedicamentosByPresentacion)
+  @Deprecated('Use getMedicamentosByPresentacion instead - MedicamentoGlobal uses presentacion field')
   Future<List<Medicamento>> getMedicamentosByTipo(String tipo) async {
-    return await _medicamentoRepository.findByTipo(tipo);
+    throw Exception('DEPRECATED: Use getMedicamentosByPresentacion instead');
+  }
+
+  /// Get medications by presentacion
+  Future<List<MedicamentoGlobal>> getMedicamentosByPresentacion(String presentacion) async {
+    return await _medicamentoRepository.findByPresentacion(presentacion);
+  }
+
+  /// Get medication by ID from the global medicamentos collection
+  Future<MedicamentoGlobal?> getMedicamentoById(String id) async {
+    return await _medicamentoRepository.read(id);
   }
 
   // ==================== PHARMACY OPERATIONS ====================
@@ -275,7 +329,7 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
     
     // Get medicamentos available at this pharmacy via many-to-many relationship
     final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoFisicoId);
-    List<Medicamento> medications = [];
+    List<MedicamentoGlobal> medications = [];
     for (String medId in medicamentoIds) {
       final med = await _medicamentoRepository.read(medId);
       if (med != null) {
@@ -287,7 +341,6 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
       'pharmacy': pharmacy,
       'medications': medications,
       'totalMedications': medications.length,
-      'restrictedMedications': medications.where((m) => m.esRestringido).length,
     };
   }
 
@@ -369,8 +422,8 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
       results.add({
         'medicamento': medicamento,
         'availability': availability,
-        'isRestricted': medicamento.esRestringido,
-        'type': medicamento.toMap()['tipo'],
+        'presentacion': medicamento.presentacion,
+        'laboratorio': medicamento.laboratorio,
       });
     }
 
@@ -428,9 +481,19 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
     return await _prescripcionRepository.findByUserId(userId);
   }
 
+  /// Get only active prescriptions for a user
+  Future<List<Prescripcion>> getActiveUserPrescripciones(String userId) async {
+    return await _prescripcionRepository.findActiveByUserId(userId);
+  }
+
   /// Stream version of getUserPrescripciones
   Stream<List<Prescripcion>> streamUserPrescripciones(String userId) {
     return _prescripcionRepository.streamByUserId(userId);
+  }
+
+  /// Stream only active prescriptions for a user (for real-time updates)
+  Stream<List<Prescripcion>> streamActiveUserPrescripciones(String userId) {
+    return _prescripcionRepository.streamActiveByUserId(userId);
   }
 
   /// UML: Pedido (1) —— (1) Prescripcion
@@ -455,10 +518,10 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
   }
 
   /// UML: Medicamento (0..*) —— (*) PuntoFisico (now many-to-many)
-  Future<List<Medicamento>> getPuntoInventory(String puntoId) async {
+  Future<List<MedicamentoGlobal>> getPuntoInventory(String puntoId) async {
     // Get medicamento IDs available at this punto fisico
     final medicamentoIds = await _medicamentoPuntoFisicoRepository.getMedicamentosAtPuntoFisico(puntoId);
-    List<Medicamento> medicamentos = [];
+    List<MedicamentoGlobal> medicamentos = [];
     
     for (String medId in medicamentoIds) {
       final med = await _medicamentoRepository.read(medId);
@@ -471,8 +534,9 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
   }
 
   /// Get medicamentos by type (UML generalization)
+  @Deprecated('Use getMedicamentosByPresentacion instead - MedicamentoGlobal uses presentacion field')
   Future<List<Medicamento>> getMedicamentosByTipoUML(String tipo) async {
-    return await _medicamentoRepository.findByTipo(tipo);
+    throw Exception('DEPRECATED: Use getMedicamentosByPresentacion instead - MedicamentoGlobal uses presentacion field');
   }
 
   /// Helper: Get distinct puntos fisicos for a user (via prescripciones → medicamentos → MedicamentoPuntoFisico)
