@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
 
@@ -44,14 +43,14 @@ class UploadPrescriptionPage extends StatelessWidget {
               'Selecciona un Método',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: theme.colorScheme.onBackground,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Elige cómo deseas cargar tu prescripción médica',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: theme.colorScheme.onBackground.withOpacity(0.8),
               ),
             ),
             const SizedBox(height: 32),
@@ -62,7 +61,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               icon: Icons.nfc,
               title: 'Cargar por NFC',
               description: 'Lee o escribe prescripciones usando tags NFC',
-              color: AppTheme.primaryColor,
+              color: theme.colorScheme.primary,
               onTap: () => Navigator.pushNamed(context, '/upload/nfc'),
             ),
 
@@ -163,8 +162,10 @@ class UploadPrescriptionPage extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 4,
+      color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
@@ -179,13 +180,13 @@ class UploadPrescriptionPage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   icon,
                   size: 40,
-                  color: color,
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 20),
@@ -197,10 +198,10 @@ class UploadPrescriptionPage extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -208,7 +209,7 @@ class UploadPrescriptionPage extends StatelessWidget {
                       description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade600,
+                        color: theme.colorScheme.onSurface.withOpacity(0.8),
                       ),
                     ),
                   ],
@@ -218,7 +219,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.grey.shade400,
+                color: theme.colorScheme.onSurface.withOpacity(0.4),
                 size: 20,
               ),
             ],

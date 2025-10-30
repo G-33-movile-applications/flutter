@@ -377,7 +377,7 @@
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9EC6F3),
+                        backgroundColor: theme.colorScheme.primary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -385,13 +385,15 @@
                       ),
                       onPressed: _isLoading ? null : _register,
                       child: _isLoading
-                          ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ? CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.colorScheme.onPrimary,
+                              ),
                             )
                           : Text(
                               'REGISTRAR',
                               style: GoogleFonts.poetsenOne(
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                                 fontSize: 18,
                               ),
                             ),
@@ -402,7 +404,10 @@
                   Text(
                     "Al registrarte aceptas nuestros términos de servicio y políticas de privacidad.",
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.balsamiqSans(fontSize: 12, color: Colors.black54),
+                    style: GoogleFonts.balsamiqSans(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -416,7 +421,7 @@
                             "términos y condiciones",
                             style: GoogleFonts.balsamiqSans(
                               decoration: TextDecoration.underline,
-                              color: Colors.blue,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ),
@@ -427,7 +432,12 @@
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
-                    title: Text("Acepto recibir notificaciones", style: GoogleFonts.balsamiqSans()),
+                    title: Text(
+                      "Acepto recibir notificaciones",
+                      style: GoogleFonts.balsamiqSans(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     value: _aceptaNotificaciones,
                     onChanged: (val) => setState(() => _aceptaNotificaciones = val!),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -450,26 +460,44 @@
     String? hint,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       obscureText: isPassword && !(_showPassword),
       keyboardType: type,
-      style: GoogleFonts.balsamiqSans(),
+      style: GoogleFonts.balsamiqSans(
+        color: theme.textTheme.bodyLarge?.color,
+      ),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(
+          color: theme.colorScheme.primary,
+        ),
         hintText: hint,
+        hintStyle: TextStyle(
+          color: theme.colorScheme.onSurface.withOpacity(0.5),
+        ),
         filled: true,
-        fillColor: const Color(0xFFFFF1D5),
+        fillColor: theme.colorScheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
         ),
         // Show suffix icon only when requested and for password fields
         suffixIcon: (isPassword && showPasswordToggle)
             ? IconButton(
                 icon: Icon(
                   _showPassword ? Icons.visibility : Icons.visibility_off,
-                  // You can style the icon size if you want
+                  color: theme.iconTheme.color,
                 ),
                 onPressed: () => setState(() => _showPassword = !_showPassword),
               )
@@ -480,11 +508,22 @@
 
 
     InputDecoration _dropdownDecoration(String label) {
+      final theme = Theme.of(context);
       return InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(
+          color: theme.colorScheme.primary,
+        ),
         filled: true,
-        fillColor: const Color(0xFFFFF1D5),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        fillColor: theme.colorScheme.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.outline),
+        ),
       );
     }
   }

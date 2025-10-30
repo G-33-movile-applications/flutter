@@ -4,7 +4,6 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
 import 'widget/upload_prescription_widget.dart';
@@ -105,14 +104,14 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
         final isDriving = motionProvider.isDriving;
 
         return Scaffold(
-          backgroundColor: AppTheme.scaffoldBackgroundColor,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
             title: Text(
               "Medical_File_Upload",
               style: theme.appBarTheme.titleTextStyle,
             ),
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
             actions: [
               IconButton(
                 icon: const Icon(Icons.home_outlined),
@@ -146,14 +145,22 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                             "Archivos seleccionados:",
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 10),
                           ...selectedFiles.map(
                             (file) => ListTile(
-                              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                              title: Text(file, style: theme.textTheme.bodyMedium),
+                              leading: Icon(
+                                Icons.picture_as_pdf,
+                                color: theme.colorScheme.error,
+                              ),
+                              title: Text(
+                                file,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -166,11 +173,11 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: theme.colorScheme.surface,
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
+                              color: theme.colorScheme.shadow.withOpacity(0.05),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
