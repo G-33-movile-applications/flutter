@@ -90,7 +90,9 @@ class _LoginScreenState extends State<LoginScreen> {
 							TextFormField(
 								controller: _emailController,
 								keyboardType: TextInputType.emailAddress,
-								style: GoogleFonts.balsamiqSans(),
+								style: GoogleFonts.balsamiqSans(
+									color: theme.textTheme.bodyLarge?.color,
+								),
 								validator: (value) {
 									if (value == null || value.trim().isEmpty) {
 										return 'Ingresa tu correo electrónico';
@@ -104,7 +106,13 @@ class _LoginScreenState extends State<LoginScreen> {
 								},
 								decoration: InputDecoration(
 									labelText: 'Correo electrónico',
+									labelStyle: TextStyle(
+										color: theme.colorScheme.onSurface.withOpacity(0.7),
+									),
 									hintText: 'ejemplo1@mail.com',
+									hintStyle: TextStyle(
+										color: theme.colorScheme.onSurface.withOpacity(0.5),
+									),
 									filled: true,
 									fillColor: theme.colorScheme.surface,
 									border: OutlineInputBorder(
@@ -126,7 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
 							TextFormField(
 								controller: _passwordController,
 								obscureText: !_isPasswordVisible, // Use the state variable here
-								style: GoogleFonts.balsamiqSans(),
+								style: GoogleFonts.balsamiqSans(
+									color: theme.textTheme.bodyLarge?.color,
+								),
 								validator: (value) {
 									if (value == null || value.isEmpty) {
 										return 'Ingresa tu contraseña';
@@ -140,7 +150,13 @@ class _LoginScreenState extends State<LoginScreen> {
 								},
 								decoration: InputDecoration(
 									labelText: 'Contraseña',
+									labelStyle: TextStyle(
+										color: theme.colorScheme.onSurface.withOpacity(0.7),
+									),
 									hintText: 'Tu contraseña',
+									hintStyle: TextStyle(
+										color: theme.colorScheme.onSurface.withOpacity(0.5),
+									),
 									filled: true,
 									fillColor: theme.colorScheme.surface,
 									border: OutlineInputBorder(
@@ -168,6 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
 										},
 										child: Icon(
 											_isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+											color: theme.iconTheme.color,
 										),
 									),
 								),

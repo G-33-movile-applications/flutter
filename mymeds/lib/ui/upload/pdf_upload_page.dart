@@ -185,7 +185,10 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                         ),
                         child: Text(
                           const JsonEncoder.withIndent("  ").convert(pdfAsJson),
-                          style: const TextStyle(fontSize: 12),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ),
                   ],

@@ -105,14 +105,14 @@ class UploadPrescriptionPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700),
+                        Icon(Icons.info_outline, color: theme.colorScheme.primary),
                         const SizedBox(width: 12),
                         Text(
                           '¿Necesitas ayuda?',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: Colors.blue.shade700,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ],
@@ -219,7 +219,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,
-                color: theme.colorScheme.onSurface.withOpacity(0.4),
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
                 size: 20,
               ),
             ],
@@ -232,18 +232,26 @@ class UploadPrescriptionPage extends StatelessWidget {
   Widget _buildHelpItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle, size: 18, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check_circle, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -256,8 +256,11 @@
           labelStyle: TextStyle(
             fontSize: 14,
             color: isEnabled 
-                ? Theme.of(context).colorScheme.primary
+                ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
                 : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          ),
+          hintStyle: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
           ),
           filled: true,
           fillColor: isEnabled 
@@ -269,6 +272,20 @@
             borderSide: BorderSide(
               color: Theme.of(context).colorScheme.outline,
               width: 1,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 2,
             ),
           ),
           disabledBorder: OutlineInputBorder(

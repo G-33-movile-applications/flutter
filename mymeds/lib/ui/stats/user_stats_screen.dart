@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import '../../models/user_stats.dart';
 import '../../services/user_stats_service.dart';
 import '../../services/user_session.dart';
@@ -56,7 +55,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: const Text('Mis Estadísticas'),
         actions: [
@@ -136,26 +135,26 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.shopping_bag_outlined,
               size: 48,
-              color: Color(0xFF1565C0), // Darker blue for better contrast
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(height: 12),
             Text(
               '${_stats!.totalOrders}',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    color: const Color(0xFF1565C0), // Darker blue for better contrast
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Pedidos Totales',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF37474F), // Darker gray for better contrast
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -173,14 +172,14 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.local_shipping, color: Color(0xFF1565C0)), // Darker blue for better contrast
+                Icon(Icons.local_shipping, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Preferencia de Entrega',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF212121), // Dark gray for better contrast
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -192,7 +191,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                     'Domicilio',
                     _stats!.deliveryCount,
                     _stats!.deliveryPercentage,
-                    const Color(0xFF1565C0), // Darker blue for better contrast
+                    Theme.of(context).colorScheme.primary,
                     Icons.home,
                   ),
                 ),
@@ -202,7 +201,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                     'Recogida',
                     _stats!.pickupCount,
                     _stats!.pickupPercentage,
-                    const Color(0xFF2E7D32), // Darker green for better contrast
+                    Theme.of(context).colorScheme.secondary,
                     Icons.store,
                   ),
                 ),
@@ -214,8 +213,8 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: _stats!.preferredDeliveryMode == 'domicilio'
-                    ? const Color(0xFF1565C0).withOpacity(0.1) // Darker blue for better contrast
-                    : const Color(0xFF1565C0).withOpacity(0.1), // Darker green for better contrast
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                    : Theme.of(context).colorScheme.secondary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -225,16 +224,16 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                     Icons.star,
                     size: 16,
                     color: _stats!.preferredDeliveryMode == 'domicilio'
-                        ? const Color(0xFF1565C0) // Darker blue for better contrast
-                        : const Color(0xFF1565C0), // Darker green for better contrast
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.secondary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Modo preferido: ${_stats!.preferredDeliveryMode == "domicilio" ? "Domicilio" : "Recogida"}',
                     style: TextStyle(
                       color: _stats!.preferredDeliveryMode == 'domicilio'
-                          ? const Color(0xFF1565C0) // Darker blue for better contrast
-                          : const Color(0xFF1565C0), // Darker green for better contrast
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.secondary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -249,41 +248,36 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
 
   Widget _buildModeItem(
       String label, int count, double percentage, Color color, IconData icon) {
-    // Use darker colors for better contrast (WCAG AA compliant)
-    final Color darkColor = color == const Color(0xFF1565C0) 
-        ? const Color(0xFF1565C0) // Darker blue for domicilio
-        : const Color(0xFF2E7D32); // Darker green for recogida
-    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         children: [
-          Icon(icon, color: darkColor, size: 32),
+          Icon(icon, color: color, size: 32),
           const SizedBox(height: 8),
           Text(
             '$count',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: darkColor,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           Text(
             '${percentage.toStringAsFixed(1)}%',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF37474F), // Darker gray for better contrast
-                ),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
           ),
         ],
       ),
@@ -300,25 +294,25 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.medication, color: Color(0xFF1565C0)), // Darker blue for better contrast
+                Icon(Icons.medication, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Farmacias Más Frecuentes',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF212121), // Dark gray for better contrast
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             if (_topPharmacies.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Center(
                   child: Text(
                     'No hay datos de farmacias disponibles',
-                    style: TextStyle(color: Color(0xFF37474F)), // Darker gray for better contrast
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                   ),
                 ),
               )
@@ -329,19 +323,20 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                 final pharmacy = data['pharmacy'] as PuntoFisico;
                 final orderCount = data['orderCount'] as int;
                 final isTopPharmacy = index == 0;
+                final theme = Theme.of(context);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isTopPharmacy
-                        ? AppTheme.primaryColor.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.05),
+                        ? theme.colorScheme.primary.withOpacity(0.1)
+                        : theme.colorScheme.outline.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isTopPharmacy
-                          ? AppTheme.primaryColor.withOpacity(0.3)
-                          : Colors.grey.withOpacity(0.2),
+                          ? theme.colorScheme.primary.withOpacity(0.3)
+                          : theme.colorScheme.outline.withOpacity(0.2),
                     ),
                   ),
                   child: Row(
@@ -352,15 +347,17 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                         height: 32,
                         decoration: BoxDecoration(
                           color: isTopPharmacy
-                              ? AppTheme.primaryColor
-                              : Colors.grey.shade400,
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
                             '${index + 1}',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isTopPharmacy
+                                  ? theme.colorScheme.onPrimary
+                                  : theme.colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -374,7 +371,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                           children: [
                             Text(
                               pharmacy.nombre,
-                              style: Theme.of(context)
+                              style: theme
                                   .textTheme
                                   .titleMedium
                                   ?.copyWith(
@@ -384,11 +381,11 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                             const SizedBox(height: 4),
                             Text(
                               pharmacy.direccion,
-                              style: Theme.of(context)
+                              style: theme
                                   .textTheme
                                   .bodySmall
                                   ?.copyWith(
-                                    color: const Color(0xFF37474F), // Darker gray for better contrast
+                                    color: theme.colorScheme.onSurface.withOpacity(0.7),
                                   ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -405,14 +402,16 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isTopPharmacy
-                              ? AppTheme.primaryColor
-                              : Colors.grey.shade300,
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '$orderCount pedidos',
                           style: TextStyle(
-                            color: isTopPharmacy ? Colors.white : const Color(0xFF212121), // Darker color for better contrast
+                            color: isTopPharmacy
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),

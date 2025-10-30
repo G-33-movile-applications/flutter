@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/prescripcion_with_medications.dart';
 import '../../../models/medicamento_prescripcion.dart';
-import '../../../theme/app_theme.dart';
 
 /// Reusable widget to display prescription details with medications
 /// 
@@ -43,9 +42,9 @@ class PrescriptionPreviewWidget extends StatelessWidget {
             // Header
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.medical_services,
-                  color: AppTheme.primaryColor,
+                  color: theme.colorScheme.primary,
                   size: 28,
                 ),
                 const SizedBox(width: 12),
@@ -54,7 +53,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                     'Prescripción Médica',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -62,14 +61,14 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: theme.colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green),
+                      border: Border.all(color: theme.colorScheme.primary),
                     ),
-                    child: const Text(
+                    child: Text(
                       'ACTIVA',
                       style: TextStyle(
-                        color: Colors.green,
+                        color: theme.colorScheme.onPrimaryContainer,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -79,14 +78,14 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: theme.colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: theme.colorScheme.error),
                     ),
-                    child: const Text(
+                    child: Text(
                       'INACTIVA',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: theme.colorScheme.onErrorContainer,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -127,9 +126,9 @@ class PrescriptionPreviewWidget extends StatelessWidget {
             // Medications section
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.medication,
-                  color: AppTheme.primaryColor,
+                  color: theme.colorScheme.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -137,20 +136,20 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                   'Medicamentos',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: theme.colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${prescription.medicationCount}',
-                    style: const TextStyle(
-                      color: AppTheme.primaryColor,
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -165,18 +164,18 @@ class PrescriptionPreviewWidget extends StatelessWidget {
               ...prescription.medicamentos.map((med) => _buildMedicationCard(med, theme))
             else
               Card(
-                color: Colors.grey.shade100,
+                color: theme.colorScheme.surfaceContainerHighest,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.grey.shade600),
+                      Icon(Icons.info_outline, color: theme.colorScheme.onSurface.withOpacity(0.6)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'No hay medicamentos en esta prescripción',
                           style: TextStyle(
-                            color: Colors.grey.shade700,
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -211,19 +210,19 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: isLoading ? null : onUpload,
                         icon: isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: theme.colorScheme.onPrimary,
                                 ),
                               )
                             : const Icon(Icons.cloud_upload),
                         label: Text(isLoading ? 'Subiendo...' : 'Subir'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -250,7 +249,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: AppTheme.primaryColor),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -259,7 +258,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -267,7 +266,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
               Text(
                 value,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: theme.colorScheme.onSurface,
                 ),
                 maxLines: maxLines,
                 overflow: TextOverflow.ellipsis,
@@ -287,7 +286,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: theme.colorScheme.outline),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -301,7 +300,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                     med.nombre,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -309,14 +308,14 @@ class PrescriptionPreviewWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: theme.colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red),
+                      border: Border.all(color: theme.colorScheme.error),
                     ),
-                    child: const Text(
+                    child: Text(
                       'INACTIVO',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: theme.colorScheme.onErrorContainer,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -350,7 +349,7 @@ class PrescriptionPreviewWidget extends StatelessWidget {
               Text(
                 'Observaciones: ${med.observaciones}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
+                  color: theme.colorScheme.onSurface.withOpacity(0.7),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -369,14 +368,14 @@ class PrescriptionPreviewWidget extends StatelessWidget {
           Text(
             '$label: ',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
           Text(
             value,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppTheme.textPrimary,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ],

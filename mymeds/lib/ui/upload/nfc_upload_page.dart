@@ -898,8 +898,8 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                       Icons.nfc,
                       size: 64,
                       color: _isNfcAvailable && _isNfcEnabled
-                          ? AppTheme.primaryColor
-                          : Colors.grey,
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.3),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -908,9 +908,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                           : 'NFC No Disponible',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: _isNfcAvailable && _isNfcEnabled
-                            ? AppTheme.textPrimary
-                            : Colors.grey,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -922,7 +920,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                           : 'Este dispositivo no soporta NFC',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -1062,7 +1060,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                           'Cómo usar NFC',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1147,18 +1145,26 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   Widget _buildHelpItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle, size: 16, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -470,24 +470,32 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               _buildFieldStatus('Medicamentos', '${(parsedData['medications'] as List?)?.length ?? 0} encontrados'),
               
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Puedes editar todos los campos en el formulario de abajo.',
-                        style: TextStyle(fontSize: 12),
-                      ),
+              Builder(
+                builder: (context) {
+                  final theme = Theme.of(context);
+                  return Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Puedes editar todos los campos en el formulario de abajo.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -512,24 +520,29 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(
-            detected ? Icons.check_circle : Icons.cancel,
-            size: 16,
-            color: detected ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$label: ${detected ? (value is DateTime ? 'Detectado' : value.toString()) : 'No detectado'}',
-              style: TextStyle(
-                fontSize: 13,
-                color: detected ? Colors.black87 : Colors.red.shade700,
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return Row(
+            children: [
+              Icon(
+                detected ? Icons.check_circle : Icons.cancel,
+                size: 16,
+                color: detected ? Colors.green : Colors.red,
               ),
-            ),
-          ),
-        ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$label: ${detected ? (value is DateTime ? 'Detectado' : value.toString()) : 'No detectado'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: detected ? theme.colorScheme.onSurface : Colors.red.shade700,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -934,24 +947,32 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           children: [
             Text(message),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Los permisos son necesarios para el correcto funcionamiento de la app.',
-                      style: TextStyle(fontSize: 12),
-                    ),
+            Builder(
+              builder: (context) {
+                final theme = Theme.of(context);
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: theme.colorScheme.secondary, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Los permisos son necesarios para el correcto funcionamiento de la app.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface.withOpacity(0.8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -1063,7 +1084,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       'Captura tu Prescripción',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1071,7 +1092,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       'Toma una foto o selecciona una imagen de tu galería para extraer automáticamente los datos de la prescripción',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -1084,12 +1105,12 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             // Multi-Image Info Card
             if (_selectedImages.isNotEmpty) ...[
               Card(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      Icon(Icons.collections, color: AppTheme.primaryColor),
+                      Icon(Icons.collections, color: theme.colorScheme.primary),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1097,7 +1118,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                               ? 'Puedes agregar ${_maxImages - _selectedImages.length} imagen(es) más'
                               : 'Máximo de imágenes alcanzado',
                           style: TextStyle(
-                            color: AppTheme.primaryColor,
+                            color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1105,7 +1126,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       Text(
                         '${_selectedImages.length}/$_maxImages',
                         style: TextStyle(
-                          color: AppTheme.primaryColor,
+                          color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -1123,6 +1144,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                 _selectedImages.isEmpty ? 'Seleccionar Imagen' : 'Agregar Más Imágenes',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1151,18 +1173,18 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             // Show message when max images reached
             if (_selectedImages.length >= _maxImages) ...[
               Card(
-                color: Colors.orange.shade50,
+                color: theme.colorScheme.secondary.withOpacity(0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700),
+                      Icon(Icons.info_outline, color: theme.colorScheme.secondary),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Máximo $_maxImages imágenes alcanzado. Elimina una imagen para agregar otra.',
                           style: TextStyle(
-                            color: Colors.orange.shade900,
+                            color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1202,6 +1224,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                     'Imágenes Seleccionadas',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   Text(
@@ -1273,6 +1296,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                 'Datos de la Prescripción',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1341,6 +1365,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                     'Medicamentos',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   ElevatedButton.icon(
@@ -1396,7 +1421,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
 
             // Help Section
             Card(
-              color: Colors.blue.shade50,
+              color: theme.colorScheme.primaryContainer,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1404,13 +1429,13 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.tips_and_updates, color: Colors.blue.shade700),
+                        Icon(Icons.tips_and_updates, color: theme.colorScheme.onPrimaryContainer),
                         const SizedBox(width: 12),
                         Text(
                           'Consejos para mejores resultados',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: theme.colorScheme.onPrimaryContainer,
                           ),
                         ),
                       ],
@@ -1600,18 +1625,26 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   Widget _buildHelpItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle, size: 16, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check_circle, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
