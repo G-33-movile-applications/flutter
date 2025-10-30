@@ -105,7 +105,9 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
             child: ListTile(
               title: Text(
                 med['nombre'] ?? 'Medicamento sin nombre',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

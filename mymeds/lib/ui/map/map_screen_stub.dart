@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 
 class MapScreenStub extends StatelessWidget {
   const MapScreenStub({super.key});
@@ -7,48 +6,44 @@ class MapScreenStub extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('MAPA DE FARMACIAS'),
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.local_pharmacy_rounded,
               size: 64,
-              color: AppTheme.primaryColor,
+              color: Theme.of(context).colorScheme.primary,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'Mapa de Farmacias',
-              style: TextStyle(
-                fontSize: 24,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Próximamente: Encuentra farmacias cercanas',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppTheme.textSecondary,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 16),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
                 '• Buscar farmacias por ubicación\n'
                 '• Ver horarios de atención\n'
                 '• Consultar stock de medicamentos\n'
                 '• Obtener direcciones',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textSecondary,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ),
