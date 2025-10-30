@@ -10,6 +10,15 @@ class AppTheme {
   static const Color scaffoldBackgroundColor = Color(0xFFF7FAFC);
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF1F2937);
+  
+  // Enhanced pharmacy colors for better contrast
+  static const Color pharmacyPrimaryBlue = Color(0xFF1565C0);
+  static const Color pharmacySuccessGreen = Color(0xFF2E7D32);
+  static const Color pharmacyWarningOrange = Color(0xFFE65100);
+  static const Color pharmacyErrorRed = Color(0xFFC62828);
+  static const Color pharmacyTextDark = Color(0xFF0F172A);
+  static const Color pharmacyTextMedium = Color(0xFF475569);
+  static const Color pharmacyBackgroundLight = Color(0xFFF8FAFC);
 
   static ThemeData get lightTheme {
     return ThemeData(

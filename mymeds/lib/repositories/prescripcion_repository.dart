@@ -168,6 +168,30 @@ class PrescripcionRepository {
     }
   }
 
+  // Get only active prescriptions for a user
+  Future<List<Prescripcion>> findActiveByUserId(String userId) async {
+    try {
+      if (userId.isEmpty) {
+        throw ArgumentError('User ID cannot be empty');
+      }
+      
+      final querySnapshot = await _firestore
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .where('activa', isEqualTo: true)
+          .get();
+      
+      return querySnapshot.docs
+          .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+          .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+          .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
+          .toList();
+    } catch (e) {
+      throw Exception('Error finding active prescripciones by user ID: $e');
+    }
+  }
+
   // Stream version of findByUserId for reactive UIs
   // Updated to work with subcollection approach: usuarios/{userId}/prescripciones
   Stream<List<Prescripcion>> streamByUserId(String userId) {
@@ -179,6 +203,25 @@ class PrescripcionRepository {
         .collection('usuarios')
         .doc(userId)
         .collection('prescripciones')
+        .snapshots()
+        .map((querySnapshot) => querySnapshot.docs
+            .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs
+            .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
+            .where((prescripcion) => prescripcion.id.isNotEmpty) // Filter out prescriptions with empty IDs
+            .toList());
+  }
+
+  // Stream only active prescriptions for a user (for real-time updates)
+  Stream<List<Prescripcion>> streamActiveByUserId(String userId) {
+    if (userId.isEmpty) {
+      return Stream.error(ArgumentError('User ID cannot be empty'));
+    }
+    
+    return _firestore
+        .collection('usuarios')
+        .doc(userId)
+        .collection('prescripciones')
+        .where('activa', isEqualTo: true)
         .snapshots()
         .map((querySnapshot) => querySnapshot.docs
             .where((doc) => doc.id.isNotEmpty) // Filter out documents with empty IDs

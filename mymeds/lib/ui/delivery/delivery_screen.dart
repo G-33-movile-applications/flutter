@@ -72,14 +72,16 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     super.dispose();
   }
 
+  /// Load active prescriptions for the user
   Future<void> _loadUserPrescripciones() async {
     try {
       final userId = UserSession().currentUser.value?.uid;
-      print('🔍 Loading prescriptions for user: $userId'); // Debug log
+      print('🔍 Loading active prescriptions for user: $userId');
       
       if (userId != null && userId.isNotEmpty) {
-        final prescripciones = await _facade.getUserPrescripciones(userId);
-        print('✅ Loaded ${prescripciones.length} prescriptions'); // Debug log
+        // Fetch only active prescriptions
+        final prescripciones = await _facade.getActiveUserPrescripciones(userId);
+        print('✅ Loaded ${prescripciones.length} active prescriptions');
         
         setState(() {
           _prescripciones = prescripciones;
@@ -94,7 +96,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         });
       }
     } catch (e) {
-      print('❌ Error loading prescriptions: $e'); // Debug log
+      print('❌ Error loading prescriptions: $e');
       setState(() {
         _errorMessage = 'Error cargando prescripciones: $e';
         _hasPrescriptions = false;
@@ -395,7 +397,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
-  /// Check if the current user has any prescriptions available
+  /// Check if the current user has any active prescriptions available
   /// This method validates prescription availability for delivery creation
   Future<bool> userHasPrescriptions() async {
     try {
@@ -405,11 +407,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         return false;
       }
 
-      final prescripciones = await _facade.getUserPrescripciones(userId);
-      final hasValidPrescriptions = prescripciones.isNotEmpty && 
-                                   prescripciones.any((p) => p.activa);
+      final prescripciones = await _facade.getActiveUserPrescripciones(userId);
+      final hasValidPrescriptions = prescripciones.isNotEmpty;
       
-      print('🔍 [Prescription Check] User $userId has ${prescripciones.length} prescriptions, ${hasValidPrescriptions ? 'valid' : 'none valid'} for delivery');
+      print('🔍 [Prescription Check] User $userId has ${prescripciones.length} active prescriptions');
       return hasValidPrescriptions;
     } catch (e) {
       print('❌ [Prescription Check] Error checking prescriptions: $e');
@@ -446,7 +447,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             
             // Title
             Text(
-              'No Prescriptions Available',
+              'No hay prescripciones disponibles',
               style: GoogleFonts.poetsenOne(
                 textStyle: theme.textTheme.headlineSmall,
                 color: theme.colorScheme.primary,
@@ -457,7 +458,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             
             // Message
             Text(
-              'You cannot create a delivery because you have no prescriptions uploaded or associated with your account.',
+              'No puedes crear un pedido porque no tienes ninguna prescripción subida o associada a tu cuenta.',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
@@ -467,21 +468,12 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             
             // Upload button
             ElevatedButton.icon(
-              onPressed: () async {
+              onPressed: () {
                 // Navigate to upload prescription screen
-                final result = await Navigator.pushNamed(context, '/upload');
-                
-                // If user returns from upload screen, refresh prescriptions
-                if (result != null || mounted) {
-                  print('🔄 Returning from upload screen, refreshing prescriptions...');
-                  setState(() {
-                    _isLoading = true;
-                  });
-                  await _loadUserPrescripciones();
-                }
+                Navigator.pushNamed(context, '/upload');
               },
               icon: const Icon(Icons.upload_file),
-              label: const Text('Upload Prescription'),
+              label: const Text('Subir Prescripción'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
@@ -489,22 +481,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-            ),
-            
-            // Secondary action - refresh
-            const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: () async {
-                setState(() {
-                  _isLoading = true;
-                });
-                await _loadUserPrescripciones();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
-              style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.primary,
               ),
             ),
           ],
@@ -882,16 +858,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       
       print('✅ Pedido successfully saved to Firestore: usuarios/$userId/pedidos/$pedidoId');
 
-      // Auto-deactivate the prescription after successful order creation
-      try {
-        final updatedPrescription = _selectedPrescripcion!.copyWith(activa: false);
-        await _facade.updatePrescripcion(updatedPrescription, userId: userId);
-        print('✅ Prescription ${_selectedPrescripcion!.id} deactivated after order creation');
-      } catch (e) {
-        print('⚠️ Warning: Could not deactivate prescription: $e');
-        // Don't throw - order was created successfully, this is just a warning
-      }
-
       if (mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -906,10 +872,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           await _openGoogleMapsDirections();
         }
 
-        // Navigate back to map - use mounted check before navigation
+        // Navigate away BEFORE deactivating prescription to avoid UI rebuild issues
         if (mounted) {
           Navigator.popUntil(context, (route) => route.settings.name == '/map' || route.isFirst);
         }
+      }
+
+      // Auto-deactivate the prescription AFTER navigation to avoid dropdown assertion error
+      try {
+        final updatedPrescription = _selectedPrescripcion!.copyWith(activa: false);
+        await _facade.updatePrescripcion(updatedPrescription, userId: userId);
+        print('✅ Prescription ${_selectedPrescripcion!.id} deactivated after order creation');
+      } catch (e) {
+        print('⚠️ Warning: Could not deactivate prescription: $e');
+        // Don't throw - order was created successfully, this is just a warning
       }
     } catch (e) {
       print('❌ Error creating pedido: $e');

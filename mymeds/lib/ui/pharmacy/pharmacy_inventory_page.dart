@@ -145,7 +145,6 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
   }
 
   Widget _buildMedicineCard(BuildContext context, Map<String, dynamic> med) {
-    final theme = Theme.of(context);
     final nombre = med['nombre'] ?? 'Medicamento sin nombre';
     final descripcion = med['descripcion'] ?? 'Sin descripción';
     final cantidad = med['cantidad'] ?? 0;
@@ -159,12 +158,15 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
     );
 
     return Card(
-      elevation: 2,
+      elevation: 3,
       margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // Future: Navigate to medicine details
           _showMedicineDetails(context, med);
         },
         child: Padding(
@@ -176,17 +178,21 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Medicine icon
+                  // Medicine icon with improved contrast
                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      color: const Color(0xFF1565C0).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF1565C0).withOpacity(0.2),
+                        width: 1,
+                      ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.medication,
-                      color: theme.colorScheme.primary,
+                      color: Color(0xFF1565C0),
                       size: 28,
                     ),
                   ),
@@ -198,15 +204,16 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                       children: [
                         Text(
                           nombre,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: const Color(0xFF0F172A), // High contrast
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            height: 1.2,
+                            height: 1.3,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         _buildTypeBadge(context, tipo),
                       ],
                     ),
@@ -217,7 +224,7 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
               ),
 
               const SizedBox(height: 16),
-              const Divider(height: 1),
+              Divider(height: 1, color: Colors.grey.shade300),
               const SizedBox(height: 16),
 
               // Medicine details grid
@@ -227,44 +234,49 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                   label: 'Cantidad',
                   value: cantidad.toString(),
                   color: cantidad > 10
-                      ? Colors.green
+                      ? const Color(0xFF2E7D32)
                       : cantidad > 0
-                      ? Colors.orange
-                      : Colors.red,
+                      ? const Color(0xFFE65100)
+                      : const Color(0xFFC62828),
                 ),
                 _DetailItem(
                   icon: Icons.attach_money,
                   label: 'Precio',
                   value: currencyFormat.format(precio),
-                  color: theme.colorScheme.primary,
+                  color: const Color(0xFF1565C0),
                 ),
               ]),
 
               const SizedBox(height: 12),
 
-              // Description
+              // Description with improved contrast
               if (descripcion.isNotEmpty && descripcion != 'Sin descripción')
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surface.withOpacity(0.3),
+                    color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.info_outline,
                         size: 18,
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        color: Color(0xFF475569),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           descripcion,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF1F2937), // Good contrast
-                            height: 1.4,
+                          style: const TextStyle(
+                            color: Color(0xFF475569),
+                            fontSize: 13,
+                            height: 1.5,
                           ),
                         ),
                       ),
@@ -279,63 +291,80 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
   }
 
   Widget _buildTypeBadge(BuildContext context, String tipo) {
-    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondary.withOpacity(0.15),
+        color: const Color(0xFF1565C0).withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: const Color(0xFF1565C0).withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Text(
         tipo.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+        style: const TextStyle(
+          color: Color(0xFF1565C0),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
         ),
       ),
     );
   }
 
   Widget _buildStockIndicator(BuildContext context, int cantidad) {
-    final theme = Theme.of(context);
     final bool inStock = cantidad > 0;
     final bool lowStock = cantidad > 0 && cantidad <= 10;
 
+    // Define colors with high contrast
+    final Color backgroundColor;
+    final Color textColor;
+    final String label;
+
+    if (!inStock) {
+      backgroundColor = const Color(0xFFC62828);
+      textColor = Colors.white;
+      label = 'Agotado';
+    } else if (lowStock) {
+      backgroundColor = const Color(0xFFE65100);
+      textColor = Colors.white;
+      label = 'Poco stock';
+    } else {
+      backgroundColor = const Color(0xFF2E7D32);
+      textColor = Colors.white;
+      label = 'Disponible';
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: inStock
-            ? (lowStock
-                  ? Colors.orange.withOpacity(0.15)
-                  : Colors.green.withOpacity(0.15))
-            : Colors.red.withOpacity(0.15),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: inStock
-              ? (lowStock ? Colors.orange : Colors.green)
-              : Colors.red,
-          width: 1.5,
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: backgroundColor.withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             inStock ? Icons.check_circle : Icons.cancel,
-            size: 16,
-            color: inStock
-                ? (lowStock ? Colors.orange.shade700 : Colors.green.shade700)
-                : Colors.red.shade700,
+            size: 14,
+            color: textColor,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 5),
           Text(
-            inStock ? (lowStock ? 'Poco stock' : 'Disponible') : 'Agotado',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: inStock
-                  ? (lowStock ? Colors.orange.shade700 : Colors.green.shade700)
-                  : Colors.red.shade700,
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 11,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -357,32 +386,38 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
   }
 
   Widget _buildDetailItem(BuildContext context, _DetailItem item) {
-    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: item.color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: item.color.withOpacity(0.3), width: 1),
+        border: Border.all(
+          color: item.color.withOpacity(0.4),
+          width: 1.5,
+        ),
       ),
       child: Column(
         children: [
-          Icon(item.icon, color: item.color, size: 24),
-          const SizedBox(height: 6),
+          Icon(item.icon, color: item.color, size: 26),
+          const SizedBox(height: 8),
           Text(
             item.label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            style: const TextStyle(
+              color: Color(0xFF475569),
               fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             item.value,
-            style: theme.textTheme.titleSmall?.copyWith(
+            style: TextStyle(
               color: item.color,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.2,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -393,13 +428,73 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
     );
   }
 
-  void _showMedicineDetails(BuildContext context, Map<String, dynamic> med) {
-    final theme = Theme.of(context);
+  Future<void> _showMedicineDetails(BuildContext context, Map<String, dynamic> med) async {
+    // Get basic info from inventory
     final nombre = med['nombre'] ?? 'Medicamento sin nombre';
-    final descripcion = med['descripcion'] ?? 'Sin descripción disponible';
     final cantidad = med['cantidad'] ?? 0;
     final precio = med['precio'] ?? 0.0;
-    final tipo = med['tipo'] ?? 'medicamento';
+    final medicamentoId = med['id'] as String?;
+
+    print('🔍 [PharmacyInventory] Opening details for medication:');
+    print('   - nombre: $nombre');
+    print('   - medicamentoId from inventory: $medicamentoId');
+    print('   - cantidad: $cantidad');
+    print('   - precio: $precio');
+
+    // Show loading dialog while fetching full details
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    String descripcion = 'Sin descripción disponible';
+    String presentacion = 'Medicamento';
+    String? laboratorio;
+    String? principioActivo;
+
+    // Try to fetch full medication details from global collection
+    if (medicamentoId != null && medicamentoId.isNotEmpty) {
+      try {
+        print('🔍 [PharmacyInventory] Fetching full medication details from global collection...');
+        final medicamento = await _facade.getMedicamentoById(medicamentoId);
+        
+        if (medicamento != null) {
+          print('✅ [PharmacyInventory] Medication found in global collection:');
+          print('   - id: ${medicamento.id}');
+          print('   - nombre: ${medicamento.nombre}');
+          print('   - descripcion: ${medicamento.descripcion}');
+          print('   - presentacion: ${medicamento.presentacion}');
+          print('   - laboratorio: ${medicamento.laboratorio}');
+          print('   - principioActivo: ${medicamento.principioActivo}');
+          
+          descripcion = medicamento.descripcion.isNotEmpty 
+              ? medicamento.descripcion 
+              : 'Sin descripción disponible';
+          presentacion = medicamento.presentacion.isNotEmpty
+              ? medicamento.presentacion
+              : 'Medicamento';
+          laboratorio = medicamento.laboratorio;
+          principioActivo = medicamento.principioActivo;
+        } else {
+          print('❌ [PharmacyInventory] Medication NOT FOUND in global collection with id: $medicamentoId');
+        }
+      } catch (e) {
+        print('❌ [PharmacyInventory] Error fetching medication details: $e');
+        // Continue with basic info from inventory
+      }
+    } else {
+      print('⚠️ [PharmacyInventory] No medicamentoId available to fetch details');
+    }
+
+    // Close loading dialog
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
+    if (!context.mounted) return;
 
     final currencyFormat = NumberFormat.currency(
       symbol: '\$',
@@ -411,9 +506,9 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -437,25 +532,29 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 20),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withOpacity(0.3),
+                        color: Colors.grey.shade400,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
 
-                  // Header
+                  // Header with improved contrast
                   Row(
                     children: [
                       Container(
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: const Color(0xFF1565C0).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF1565C0).withOpacity(0.2),
+                            width: 1,
+                          ),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.medication,
-                          color: theme.colorScheme.primary,
+                          color: Color(0xFF1565C0),
                           size: 32,
                         ),
                       ),
@@ -466,12 +565,14 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                           children: [
                             Text(
                               nombre,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: const Color(0xFF0F172A),
+                              style: const TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            _buildTypeBadge(context, tipo),
+                            const SizedBox(height: 6),
+                            _buildTypeBadge(context, presentacion),
                           ],
                         ),
                       ),
@@ -479,15 +580,20 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                   ),
 
                   const SizedBox(height: 24),
-                  const Divider(),
+                  Divider(height: 1, color: Colors.grey.shade300),
                   const SizedBox(height: 24),
 
-                  // Details
+                  // Details with improved contrast
                   _buildModalDetailRow(
                     context,
                     Icons.inventory_2,
                     'Cantidad disponible',
                     cantidad.toString(),
+                    cantidad > 10
+                        ? const Color(0xFF2E7D32)
+                        : cantidad > 0
+                        ? const Color(0xFFE65100)
+                        : const Color(0xFFC62828),
                   ),
                   const SizedBox(height: 16),
                   _buildModalDetailRow(
@@ -495,41 +601,85 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                     Icons.attach_money,
                     'Precio unitario',
                     currencyFormat.format(precio),
+                    const Color(0xFF1565C0),
                   ),
                   const SizedBox(height: 24),
 
-                  // Description
-                  Text(
+                  // Description with improved contrast
+                  const Text(
                     'Descripción',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFF0F172A),
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surface.withOpacity(0.3),
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.grey.shade300,
+                        width: 1,
+                      ),
                     ),
                     child: Text(
                       descripcion,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF1F2937),
-                        height: 1.5,
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 14,
+                        height: 1.6,
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Close button
+                  // Additional medication information
+                  if (laboratorio != null && laboratorio.isNotEmpty) ...[
+                    _buildModalDetailRow(
+                      context,
+                      Icons.factory,
+                      'Laboratorio',
+                      laboratorio,
+                      const Color(0xFF1565C0),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (principioActivo != null && principioActivo.isNotEmpty) ...[
+                    _buildModalDetailRow(
+                      context,
+                      Icons.science,
+                      'Principio Activo',
+                      principioActivo,
+                      const Color(0xFF2E7D32),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Close button with improved styling
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cerrar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1565C0),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cerrar',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -546,18 +696,22 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
     IconData icon,
     String label,
     String value,
+    Color accentColor,
   ) {
-    final theme = Theme.of(context);
     return Row(
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+            color: accentColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: accentColor.withOpacity(0.3),
+              width: 1,
+            ),
           ),
-          child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+          child: Icon(icon, color: accentColor, size: 22),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -566,16 +720,20 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
             children: [
               Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: const Color(0xFF0F172A),
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],

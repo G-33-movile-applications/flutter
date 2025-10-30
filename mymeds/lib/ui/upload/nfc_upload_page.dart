@@ -730,10 +730,20 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           children: [
             const Icon(Icons.check_circle, color: Colors.green),
             const SizedBox(width: 12),
-            Text(title),
+            Expanded(
+              child: Text(
+                title,
+                overflow: TextOverflow.visible,
+              ),
+            ),
           ],
         ),
-        content: Text(message),
+        content: SingleChildScrollView(
+          child: Text(
+            message,
+            overflow: TextOverflow.visible,
+          ),
+        ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
