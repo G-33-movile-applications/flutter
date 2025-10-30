@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../models/prescripcion.dart';
 import '../repositories/prescripcion_repository.dart';
-import '../models/medicamento.dart';
 
 class PrescripcionService {
   final PrescripcionRepository _prescripcionRepository = PrescripcionRepository();
@@ -13,20 +12,16 @@ class PrescripcionService {
     try {
       final Map<String, dynamic> data = jsonDecode(jsonString);
 
-      // Crear lista de medicamentos si viene en el JSON
-      final List<Medicamento> medicamentos = (data['medicamentos'] as List<dynamic>?)
-              ?.map((med) => Medicamento.fromMap(med))
-              .toList() ??
-          [];
+      // Note: Medicamentos are now stored in subcollections, not processed here
 
       // Crear la prescripción a partir del JSON
       final prescripcion = Prescripcion(
         id: data['id'] ?? _uuid.v4(), // Si no trae id, generar uno
-        fechaEmision: DateTime.tryParse(data['fechaEmision'] ?? '') ?? DateTime.now(),
-        recetadoPor: data['recetadoPor'] ?? 'Desconocido',
-        userId: data['userId'] ?? '',
-        pedidoId: data['pedidoId'] ?? '',
-        medicamentos: medicamentos,
+        fechaCreacion: DateTime.tryParse(data['fechaEmision'] ?? data['fechaCreacion'] ?? '') ?? DateTime.now(),
+        medico: data['recetadoPor'] ?? data['medico'] ?? 'Desconocido',
+        diagnostico: data['diagnostico'] ?? 'Sin diagnóstico especificado',
+        activa: data['activa'] ?? true,
+        // Note: medicamentos are now stored in subcollections, not embedded
       );
 
       // Guardar en Firestore

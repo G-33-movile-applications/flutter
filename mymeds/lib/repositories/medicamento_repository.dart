@@ -1,13 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/medicamento.dart';
+import '../models/medicamento_global.dart';
 
 class MedicamentoRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _collection = 'medicamentos';
+  final String _collection = 'medicamentosGlobales';
 
 
   // Create a new medicamento - no longer requires foreign keys as they're managed via relationships
-  Future<void> create(Medicamento medicamento) async {
+  Future<void> create(MedicamentoGlobal medicamento) async {
     try {
       await _firestore.collection(_collection).doc(medicamento.id).set(medicamento.toMap());
     } catch (e) {
@@ -16,24 +16,34 @@ class MedicamentoRepository {
   }
 
   // Read a medicamento by ID
-  Future<Medicamento?> read(String id) async {
+  Future<MedicamentoGlobal?> read(String id) async {
     try {
+      print('🔍 [MedicamentoRepository] Reading medication from collection: $_collection with id: $id');
       final doc = await _firestore.collection(_collection).doc(id).get();
+      
+      print('🔍 [MedicamentoRepository] Document exists: ${doc.exists}');
+      
       if (doc.exists && doc.data() != null) {
-        return Medicamento.fromMap(doc.data()!);
+        print('✅ [MedicamentoRepository] Document data found: ${doc.data()}');
+        final medication = MedicamentoGlobal.fromMap(doc.data()!, documentId: doc.id);
+        print('✅ [MedicamentoRepository] Parsed medication: ${medication.nombre}');
+        return medication;
       }
+      
+      print('❌ [MedicamentoRepository] Document not found or has no data');
       return null;
     } catch (e) {
+      print('❌ [MedicamentoRepository] Error reading medicamento: $e');
       throw Exception('Error reading medicamento: $e');
     }
   }
 
   // Read all medicamentos
-  Future<List<Medicamento>> readAll() async {
+  Future<List<MedicamentoGlobal>> readAll() async {
     try {
       final querySnapshot = await _firestore.collection(_collection).get();
       return querySnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
+          .map((doc) => MedicamentoGlobal.fromMap(doc.data(), documentId: doc.id))
           .toList();
     } catch (e) {
       throw Exception('Error reading all medicamentos: $e');
@@ -41,7 +51,7 @@ class MedicamentoRepository {
   }
 
   // Update a medicamento
-  Future<void> update(Medicamento medicamento) async {
+  Future<void> update(MedicamentoGlobal medicamento) async {
     try {
       await _firestore.collection(_collection).doc(medicamento.id).update(medicamento.toMap());
     } catch (e) {
@@ -64,35 +74,31 @@ class MedicamentoRepository {
   // NOTE: Medicamento-PuntoFisico relationship is now many-to-many via MedicamentoPuntoFisico
   // Use MedicamentoPuntoFisicoRepository for these relationships
 
-  // Find medicamentos by restriction status
-  Future<List<Medicamento>> findByEsRestringido(bool esRestringido) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('esRestringido', isEqualTo: esRestringido)
-          .get();
-      
-      return querySnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
-          .toList();
-    } catch (e) {
-      throw Exception('Error finding medicamentos by restriction status: $e');
-    }
+  // Find medicamentos by restriction status (Note: MedicamentoGlobal doesn't have esRestringido field)
+  @Deprecated('MedicamentoGlobal model does not have esRestringido field')
+  Future<List<MedicamentoGlobal>> findByEsRestringido(bool esRestringido) async {
+    throw Exception('DEPRECATED: MedicamentoGlobal model does not have esRestringido field');
   }
 
-  // UML generalization: Find by tipo (Pastilla, Unguento, Inyectable, Jarabe)
-  Future<List<Medicamento>> findByTipo(String tipo) async {
+  // UML generalization: Find by tipo (Note: MedicamentoGlobal uses presentacion instead of tipo)
+  @Deprecated('Use findByPresentacion instead - MedicamentoGlobal uses presentacion field')
+  Future<List<MedicamentoGlobal>> findByTipo(String tipo) async {
+    throw Exception('DEPRECATED: Use findByPresentacion instead - MedicamentoGlobal uses presentacion field');
+  }
+
+  // Find medicamentos by presentacion
+  Future<List<MedicamentoGlobal>> findByPresentacion(String presentacion) async {
     try {
       final querySnapshot = await _firestore
           .collection(_collection)
-          .where('tipo', isEqualTo: tipo)
+          .where('presentacion', isEqualTo: presentacion)
           .get();
       
       return querySnapshot.docs
-          .map((doc) => Medicamento.fromMap(doc.data()))
+          .map((doc) => MedicamentoGlobal.fromMap(doc.data(), documentId: doc.id))
           .toList();
     } catch (e) {
-      throw Exception('Error finding medicamentos by tipo: $e');
+      throw Exception('Error finding medicamentos by presentacion: $e');
     }
   }
 
@@ -121,13 +127,13 @@ class MedicamentoRepository {
   }
 
   // Stream of medicamento changes
-  Stream<Medicamento?> streamMedicamento(String id) {
+  Stream<MedicamentoGlobal?> streamMedicamento(String id) {
     return _firestore
         .collection(_collection)
         .doc(id)
         .snapshots()
         .map((doc) => doc.exists && doc.data() != null 
-            ? Medicamento.fromMap(doc.data()!) 
+            ? MedicamentoGlobal.fromMap(doc.data()!, documentId: doc.id) 
             : null);
   }
 
@@ -143,7 +149,7 @@ class MedicamentoRepository {
   }
 
   @Deprecated('Use MedicamentoPuntoFisicoRepository for many-to-many relationships')
-  Future<List<Medicamento>> findByPuntoFisico(String puntoFisicoId) async {
+  Future<List<MedicamentoGlobal>> findByPuntoFisico(String puntoFisicoId) async {
     throw Exception('DEPRECATED: Use MedicamentoPuntoFisicoRepository.findByPuntoFisicoId() and then fetch individual medicamentos');
   }
 }

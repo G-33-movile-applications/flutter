@@ -1,0 +1,28 @@
+{
+  "name": "mymeds-firestore-seeder",
+  "version": "1.0.0",
+  "description": "Firestore seeding utilities for MyMeds Flutter app",
+  "type": "module",
+  "scripts": {
+    "generate": "node generate_mock_data.js",
+    "seed": "node seed_firestore.js",
+    "all": "npm run generate && npm run seed",
+    "test:geocoding": "node test_geocoding.js",
+    "preview": "node preview_changes.js",
+    "check:encoding": "node check_encoding.js",
+    "verify:consistency": "node verify_medication_consistency.js"
+  },
+  "keywords": [
+    "firestore",
+    "seeding",
+    "mock-data",
+    "flutter"
+  ],
+  "author": "MyMeds Team",
+  "license": "MIT",
+  "dependencies": {
+    "@faker-js/faker": "^8.0.0",
+    "dotenv": "^17.2.3",
+    "firebase-admin": "^13.5.0"
+  }
+}

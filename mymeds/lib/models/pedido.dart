@@ -1,105 +1,115 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'prescripcion.dart';
+import 'dart:convert';
 
 class Pedido {
-  final String identificadorPedido;
-  final DateTime fechaEntrega;
-  final DateTime fechaDespacho;
+  final String id;
+  final String prescripcionId;
+  final String puntoFisicoId;
+  final String tipoEntrega; // "domicilio" or "recogida"
   final String direccionEntrega;
-  final bool entregado;
-  final bool entregaEnTienda; // New field - pickup in store
-  final String usuarioId; // Foreign key to Usuario
-  final String puntoFisicoId; // Foreign key to PuntoFisico - new many-to-one relationship
-  final String prescripcionId; // Foreign key to Prescripcion
-  final Prescripcion? prescripcion; // Related prescription (for in-memory use)
+  final String estado; // "pendiente", "en_proceso", "entregado", "cancelado"
+  final DateTime fechaPedido;
+  final DateTime? fechaEntrega;
+  // Note: medicamentos are now stored as a subcollection, not embedded
 
   Pedido({
-    required this.identificadorPedido,
-    required this.fechaEntrega,
-    required this.fechaDespacho,
-    required this.direccionEntrega,
-    required this.entregado,
-    required this.entregaEnTienda,
-    required this.usuarioId,
-    required this.puntoFisicoId,
+    required this.id,
     required this.prescripcionId,
-    this.prescripcion,
+    required this.puntoFisicoId,
+    required this.tipoEntrega,
+    required this.direccionEntrega,
+    required this.estado,
+    required this.fechaPedido,
+    this.fechaEntrega,
   });
 
-  // Create Pedido from Firestore document
-  factory Pedido.fromMap(Map<String, dynamic> map, {Prescripcion? prescripcion}) {
-    // Safely convert timestamps
-    DateTime convertTimestamp(Timestamp? timestamp) {
-      return timestamp?.toDate() ?? DateTime.now();
-    }
+  // Getters for backward compatibility
+  String get identificadorPedido => id;
+  DateTime get fechaDespacho => fechaPedido; // Map fechaPedido to old fechaDespacho
+  bool get entregado => estado == 'entregado';
+  bool get entregaEnTienda => tipoEntrega == 'recogida';
+  
+  @Deprecated('Use id instead')
+  String get usuarioId => ''; // This information is now in the document path
 
+  // Create Pedido from Firestore document
+  factory Pedido.fromMap(Map<String, dynamic> map, {String? documentId}) {
     return Pedido(
-      identificadorPedido: map['identificadorPedido']?.toString() ?? '',
-      fechaEntrega: convertTimestamp(map['fechaEntrega'] as Timestamp?),
-      fechaDespacho: convertTimestamp(map['fechaDespacho'] as Timestamp?),
-      direccionEntrega: map['direccionEntrega']?.toString() ?? '',
-      entregado: map['entregado'] as bool? ?? false,
-      entregaEnTienda: map['entregaEnTienda'] as bool? ?? false,
-      usuarioId: map['usuarioId']?.toString() ?? '',
-      puntoFisicoId: map['puntoFisicoId']?.toString() ?? '',
-      prescripcionId: map['prescripcionId']?.toString() ?? '',
-      prescripcion: prescripcion,
+      id: documentId ?? map['id'] ?? '',
+      prescripcionId: map['prescripcionId'] ?? '',
+      puntoFisicoId: map['puntoFisicoId'] ?? '',
+      tipoEntrega: map['tipoEntrega'] ?? 
+                   (map['entregaEnTienda'] == true ? 'recogida' : 'domicilio'), // backward compatibility
+      direccionEntrega: map['direccionEntrega'] ?? '',
+      estado: map['estado'] ?? 
+              (map['entregado'] == true ? 'entregado' : 'pendiente'), // backward compatibility
+      fechaPedido: map['fechaPedido'] != null 
+          ? (map['fechaPedido'] as Timestamp).toDate()
+          : (map['fechaDespacho'] != null 
+              ? (map['fechaDespacho'] as Timestamp).toDate() // backward compatibility
+              : DateTime.now()),
+      fechaEntrega: map['fechaEntrega'] != null 
+          ? (map['fechaEntrega'] as Timestamp).toDate()
+          : null,
     );
   }
 
   // Convert Pedido to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
-      'identificadorPedido': identificadorPedido,
-      'fechaEntrega': Timestamp.fromDate(fechaEntrega),
-      'fechaDespacho': Timestamp.fromDate(fechaDespacho),
-      'direccionEntrega': direccionEntrega,
-      'entregado': entregado,
-      'entregaEnTienda': entregaEnTienda,
-      'usuarioId': usuarioId,
-      'puntoFisicoId': puntoFisicoId,
       'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
+      'tipoEntrega': tipoEntrega,
+      'direccionEntrega': direccionEntrega,
+      'estado': estado,
+      'fechaPedido': Timestamp.fromDate(fechaPedido),
+      if (fechaEntrega != null) 'fechaEntrega': Timestamp.fromDate(fechaEntrega!),
     };
   }
 
+  // Create from JSON string
+  factory Pedido.fromJson(String jsonStr) {
+    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    return Pedido.fromMap(map);
+  }
+
+  // Convert to JSON string
+  String toJson() => jsonEncode(toMap());
+
   // Create a copy with some fields updated
   Pedido copyWith({
-    String? identificadorPedido,
-    DateTime? fechaEntrega,
-    DateTime? fechaDespacho,
-    String? direccionEntrega,
-    bool? entregado,
-    bool? entregaEnTienda,
-    String? usuarioId,
-    String? puntoFisicoId,
+    String? id,
     String? prescripcionId,
-    Prescripcion? prescripcion,
+    String? puntoFisicoId,
+    String? tipoEntrega,
+    String? direccionEntrega,
+    String? estado,
+    DateTime? fechaPedido,
+    DateTime? fechaEntrega,
   }) {
     return Pedido(
-      identificadorPedido: identificadorPedido ?? this.identificadorPedido,
-      fechaEntrega: fechaEntrega ?? this.fechaEntrega,
-      fechaDespacho: fechaDespacho ?? this.fechaDespacho,
-      direccionEntrega: direccionEntrega ?? this.direccionEntrega,
-      entregado: entregado ?? this.entregado,
-      entregaEnTienda: entregaEnTienda ?? this.entregaEnTienda,
-      usuarioId: usuarioId ?? this.usuarioId,
-      puntoFisicoId: puntoFisicoId ?? this.puntoFisicoId,
+      id: id ?? this.id,
       prescripcionId: prescripcionId ?? this.prescripcionId,
-      prescripcion: prescripcion ?? this.prescripcion,
+      puntoFisicoId: puntoFisicoId ?? this.puntoFisicoId,
+      tipoEntrega: tipoEntrega ?? this.tipoEntrega,
+      direccionEntrega: direccionEntrega ?? this.direccionEntrega,
+      estado: estado ?? this.estado,
+      fechaPedido: fechaPedido ?? this.fechaPedido,
+      fechaEntrega: fechaEntrega ?? this.fechaEntrega,
     );
   }
 
   @override
   String toString() {
-    return 'Pedido(identificadorPedido: $identificadorPedido, entregado: $entregado)';
+    return 'Pedido(id: $id, estado: $estado, tipoEntrega: $tipoEntrega)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Pedido && other.identificadorPedido == identificadorPedido;
+    return other is Pedido && other.id == id;
   }
 
   @override
-  int get hashCode => identificadorPedido.hashCode;
+  int get hashCode => id.hashCode;
 }

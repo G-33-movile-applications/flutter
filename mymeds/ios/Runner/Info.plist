@@ -45,5 +45,23 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- NFC permissions -->
+	<key>NFCReaderUsageDescription</key>
+	<string>Esta aplicación necesita acceso a NFC para leer y escribir prescripciones médicas en tags NFC</string>
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>NDEF</string>
+	</array>
+	
+	<!-- Camera permissions for OCR -->
+	<key>NSCameraUsageDescription</key>
+	<string>Esta aplicación necesita acceso a la cámara para capturar fotos de prescripciones médicas y extraer la información</string>
+	
+	<!-- Photo library permissions -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Esta aplicación necesita acceso a tu galería de fotos para seleccionar imágenes de prescripciones médicas</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Esta aplicación necesita guardar fotos de prescripciones en tu galería</string>
 </dict>
 </plist>

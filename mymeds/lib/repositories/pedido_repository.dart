@@ -53,10 +53,8 @@ class PedidoRepository {
       if (doc.exists && doc.data() != null) {
         final pedidoData = doc.data()!;
         
-        // Fetch related prescription
-        final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-        
-        return Pedido.fromMap(pedidoData, prescripcion: prescripcion);
+        // Note: Prescriptions are now managed separately, no longer embedded
+        return Pedido.fromMap(pedidoData, documentId: identificadorPedido);
       }
       return null;
     } catch (e) {
@@ -82,10 +80,8 @@ class PedidoRepository {
 
           final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
           
-          // Fetch related prescription for each pedido
-          final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-          
-          pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+          // Note: Prescriptions are now managed separately
+          pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
         } catch (e) {
           print('Warning: Error processing pedido ${doc.id}: $e');
           // Continue processing other pedidos
@@ -133,12 +129,10 @@ class PedidoRepository {
       
       for (var doc in querySnapshot.docs) {
         final pedidoData = doc.data();
-        final identificadorPedido = pedidoData['identificadorPedido'] as String;
+        final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
         
-        // Fetch related prescription for each pedido
-        final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-        
-        pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+        // Note: Prescriptions are now managed separately
+        pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
       }
       
       return pedidos;
@@ -159,12 +153,10 @@ class PedidoRepository {
       
       for (var doc in querySnapshot.docs) {
         final pedidoData = doc.data();
-        final identificadorPedido = pedidoData['identificadorPedido'] as String;
+        final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
         
-        // Fetch related prescription for each pedido
-        final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-        
-        pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+        // Note: Prescriptions are now managed separately
+        pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
       }
       
       return pedidos;
@@ -200,11 +192,11 @@ class PedidoRepository {
         .collection(_collection)
         .doc(identificadorPedido)
         .snapshots()
-        .asyncMap((doc) async {
+        .map((doc) {
           if (doc.exists && doc.data() != null) {
             final pedidoData = doc.data()!;
-            final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-            return Pedido.fromMap(pedidoData, prescripcion: prescripcion);
+            // Note: Prescriptions are now managed separately
+            return Pedido.fromMap(pedidoData, documentId: identificadorPedido);
           }
           return null;
         });
@@ -216,15 +208,15 @@ class PedidoRepository {
         .collection(_collection)
         .where('usuarioId', isEqualTo: usuarioId)
         .snapshots()
-        .asyncMap((querySnapshot) async {
+        .map((querySnapshot) {
           List<Pedido> pedidos = [];
           
           for (var doc in querySnapshot.docs) {
             final pedidoData = doc.data();
-            final identificadorPedido = pedidoData['identificadorPedido'] as String;
+            final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
             
-            final prescripcion = await _prescripcionRepository.findByPedidoId(identificadorPedido);
-            pedidos.add(Pedido.fromMap(pedidoData, prescripcion: prescripcion));
+            // Note: Prescriptions are now managed separately
+            pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
           }
           
           return pedidos;

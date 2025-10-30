@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mymeds/models/user_preferencias.dart';
 import '../models/user_model.dart';
 
 class AuthService {
@@ -19,7 +21,7 @@ class AuthService {
     required String address,
     required String city,
     required String department,
-    required String zipCode,
+    required String zipCode, required UserPreferencias preferencias,
   }) async {
     try {
       // Create user with Firebase Auth
@@ -31,17 +33,18 @@ class AuthService {
       final User? user = userCredential.user;
       if (user != null) {
         try {
-          // Create user document in Firestore with retry logic
+          // Create user document in Firestore using consistent field names
           final userData = {
             'uid': user.uid,
-            'fullName': fullName,
+            'nombre': fullName,
             'email': email,
-            'phoneNumber': phoneNumber,
-            'address': address,
+            'telefono': phoneNumber,
+            'direccion': address,
             'city': city,
             'department': department,
             'zipCode': zipCode,
             'createdAt': FieldValue.serverTimestamp(),
+            'preferencias': preferencias.toMap(),
           };
           
           await _firestore.collection('usuarios').doc(user.uid).set(userData);
@@ -60,6 +63,26 @@ class AuthService {
           errorMessage: 'Failed to create user account',
         );
       }
+    } on PlatformException catch (e) {
+      // Handle PlatformException which is thrown on some platforms for auth errors
+      String errorMessage;
+      switch (e.code) {
+        case 'ERROR_WEAK_PASSWORD':
+          errorMessage = 'La contraseña es muy débil.';
+          break;
+        case 'ERROR_EMAIL_ALREADY_IN_USE':
+          errorMessage = 'Ya existe una cuenta con este correo electrónico.';
+          break;
+        case 'ERROR_INVALID_EMAIL':
+          errorMessage = 'El formato del correo electrónico no es válido.';
+          break;
+        case 'ERROR_INVALID_CREDENTIAL':
+          errorMessage = 'Las credenciales son inválidas.';
+          break;
+        default:
+          errorMessage = 'Error al crear la cuenta: ${e.message ?? 'Error desconocido'}';
+      }
+      return AuthResult(success: false, errorMessage: errorMessage);
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {
@@ -89,21 +112,31 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    debugPrint('🚀 AuthService.signInWithEmailAndPassword called with email: $email');
+    
     try {
+      debugPrint('📡 About to call Firebase Auth signInWithEmailAndPassword...');
       final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-
+      debugPrint('✅ Firebase Auth signInWithEmailAndPassword successful');
+      
       return AuthResult(success: true, user: userCredential.user);
+      
     } on FirebaseAuthException catch (e) {
+      debugPrint('🔥 FirebaseAuthException caught: Code=${e.code}');
+      
       String errorMessage;
       switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No existe una cuenta con este correo electrónico.';
+        case 'invalid-credential':
+          errorMessage = 'Correo o contraseña incorrecta.';
           break;
         case 'wrong-password':
-          errorMessage = 'Contraseña incorrecta.';
+          errorMessage = 'Correo o contraseña incorrectos.';
+          break;
+        case 'user-not-found':
+          errorMessage = 'No existe una cuenta con este correo electrónico.';
           break;
         case 'invalid-email':
           errorMessage = 'El formato del correo electrónico no es válido.';
@@ -112,13 +145,16 @@ class AuthService {
           errorMessage = 'Demasiados intentos fallidos. Intenta más tarde.';
           break;
         default:
-          errorMessage = 'Error al iniciar sesión: ${e.message}';
+          errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.';
       }
+      
       return AuthResult(success: false, errorMessage: errorMessage);
+      
     } catch (e) {
+      debugPrint('🔥 General Exception caught: Type=${e.runtimeType}');
       return AuthResult(
         success: false,
-        errorMessage: 'Error inesperado: ${e.toString()}',
+        errorMessage: 'Error inesperado. Intenta nuevamente más tarde.',
       );
     }
   }
@@ -131,9 +167,14 @@ class AuthService {
   // Get user data from Firestore
   static Future<UserModel?> getUserData(String uid) async {
     try {
+      if (uid.isEmpty) {
+        debugPrint('Error getting user data: UID is empty');
+        return null;
+      }
+      
       final DocumentSnapshot doc = await _firestore.collection('usuarios').doc(uid).get();
       if (doc.exists && doc.data() != null) {
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
+        return UserModel.fromMap(doc.data() as Map<String, dynamic>, documentId: uid);
       }
       return null;
     } catch (e) {

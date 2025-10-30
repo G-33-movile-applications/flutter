@@ -5,18 +5,28 @@ import 'package:mymeds/ui/delivery/delivery_screen.dart';
 import '../ui/home/home_screen.dart';
 import '../ui/map/map_screen.dart';
 import '../ui/upload/upload_prescription.dart';
+import '../ui/upload/nfc_upload_page.dart';
+import '../ui/upload/ocr_upload_page.dart';
+import '../ui/upload/pdf_upload_page.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
+import '../ui/stats/user_stats_screen.dart';
 import '../models/punto_fisico.dart';
+import '../models/prescripcion.dart';
 
 class AppRouter {
   static const String login = '/';
   static const String register = '/register';
   static const String home = '/home';
   static const String map = '/map';
+  static const String mapSelect = '/map-select'; // For prescription flow
   static const String upload = '/upload';
+  static const String uploadNfc = '/upload/nfc';
+  static const String uploadOcr = '/upload/ocr';
+  static const String uploadPdf = '/upload/pdf';
   static const String profile = '/profile';
   static const String delivery = '/delivery';
+  static const String stats = '/stats';
   static const String forgotPassword = '/forgot-password';
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -45,9 +55,31 @@ class AppRouter {
           builder: (_) => const MapScreen(),
           settings: settings,
         );
+      case mapSelect:
+        // For prescription flow: map with prescription context
+        final prescripcion = settings.arguments as Prescripcion?;
+        return MaterialPageRoute(
+          builder: (_) => MapScreen(prescripcion: prescripcion),
+          settings: settings,
+        );
       case upload:
         return MaterialPageRoute(
           builder: (_) => const UploadPrescriptionPage(),
+          settings: settings,
+        );
+      case uploadNfc:
+        return MaterialPageRoute(
+          builder: (_) => const NfcUploadPage(),
+          settings: settings,
+        );
+      case uploadOcr:
+        return MaterialPageRoute(
+          builder: (_) => const OcrUploadPage(),
+          settings: settings,
+        );
+      case uploadPdf:
+        return MaterialPageRoute(
+          builder: (_) => const PdfUploadPage(),
           settings: settings,
         );
       case profile:
@@ -57,9 +89,26 @@ class AppRouter {
           settings: settings,
         );
       case delivery:
-        final pharmacy = settings.arguments as PuntoFisico?;
+        // Handle both single pharmacy and pharmacy + prescription arguments
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => DeliveryScreen(
+              pharmacy: args['pharmacy'] as PuntoFisico?,
+              prescripcion: args['prescripcion'] as Prescripcion?,
+            ),
+            settings: settings,
+          );
+        } else {
+          final pharmacy = args as PuntoFisico?;
+          return MaterialPageRoute(
+            builder: (_) => DeliveryScreen(pharmacy: pharmacy),
+            settings: settings,
+          );
+        }
+      case stats:
         return MaterialPageRoute(
-          builder: (_) => DeliveryScreen(pharmacy: pharmacy),
+          builder: (_) => const UserStatsScreen(),
           settings: settings,
         );
       default:

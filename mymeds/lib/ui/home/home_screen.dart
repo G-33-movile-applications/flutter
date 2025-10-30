@@ -1,31 +1,132 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
+import 'widgets/motion_debug_bar.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
 import '../analytics/delivery_analytics_screen.dart';
+import '../prescriptions/prescriptions_list_widget.dart';
+import 'package:provider/provider.dart';
+import '../../providers/motion_provider.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  bool _dialogOpen = false; // Guard to prevent duplicate dialogs
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    
+    // Add listener to MotionProvider for confirmation needs
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final motionProvider = context.read<MotionProvider>();
+      motionProvider.addListener(_checkDrivingConfirmation);
+      _checkDrivingConfirmation(); // Initial check
+    });
+  }
+
+  void _checkDrivingConfirmation() {
+    if (!mounted) return;
+    
+    final motionProvider = context.read<MotionProvider>();
+    
+    // Guard: only show dialog if needed and not already open
+    if (motionProvider.needsUserConfirmation && 
+        !motionProvider.alertShown && 
+        !_dialogOpen) {
+      _showDrivingConfirmationDialog();
+    }
+  }
+
+  void _showDrivingConfirmationDialog() {
+    if (_dialogOpen) return; // Extra safety guard
+    
+    final motionProvider = context.read<MotionProvider>();
+    
+    // Mark as shown BEFORE showing dialog to prevent duplicates
+    motionProvider.markDialogShown();
+    _dialogOpen = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.directions_car_rounded, color: Colors.orange, size: 32),
+            SizedBox(width: 12),
+            Text('¿Estás conduciendo?'),
+          ],
+        ),
+        content: const Text(
+          'Detectamos que podrías estar conduciendo. Por tu seguridad, '
+          'algunas funciones se desactivarán si confirmas que estás al volante.',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              context.read<MotionProvider>().setIsDrivingConfirmed(false);
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'No, no estoy conduciendo',
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              context.read<MotionProvider>().setIsDrivingConfirmed(true);
+              Navigator.pop(context);
+            },
+            child: const Text('Sí, estoy conduciendo'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      // Reset guard when dialog closes
+      if (mounted) {
+        context.read<MotionProvider>().markDialogClosed();
+        _dialogOpen = false;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
+    // Watch for provider changes (listener will handle confirmation checks)
+    context.watch<MotionProvider>();
+    
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('HOME'),
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () {
-            // TODO: implement drawer/navigation menu
-          },
-        ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'Mis estadísticas',
+            onPressed: () {
+              Navigator.pushNamed(context, '/stats');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Ver estadísticas',
+            tooltip: 'Ver análisis de entregas',
             onPressed: () {
               Navigator.push(
                 context, 
@@ -33,12 +134,6 @@ class HomeScreen extends StatelessWidget {
                   builder: (context) => const DeliveryAnalyticsScreen(),
                 ),
               );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: implement notifications
             },
           ),
           IconButton(
@@ -52,64 +147,122 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.home),
+              text: 'Inicio',
+            ),
+            Tab(
+              icon: Icon(Icons.medication),
+              text: 'Prescripciones',
+            ),
+          ],
+        ),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Greeting section
-                _buildGreetingSection(theme),
-                const SizedBox(height: 24),
-                
-                // Feature cards
-                FeatureCard(
-                  overline: 'FUNCIONALIDAD',
-                  title: 'Ver mapa de farmacias',
-                  description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
-                  icon: Icons.map_rounded,
-                  buttonText: 'Abrir mapa',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/map');
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                FeatureCard(
-                  overline: 'FUNCIONALIDAD',
-                  title: 'Sube tu prescripción',
-                  description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
-                  icon: Icons.upload_file_rounded,
-                  buttonText: 'Subir',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/upload');
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                FeatureCard(
-                  overline: 'CUENTA',
-                  title: 'Ver tu perfil',
-                  description: 'Datos del usuario, preferencias y accesibilidad.',
-                  icon: Icons.person_rounded,
-                  buttonText: 'Ver perfil',
-                  onPressed: () {
-                    Navigator.pushNamed(
+      body: Column(
+        children: [
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildHomeTab(theme),
+                _buildPrescriptionsTab(),
+              ],
+            ),
+          ),
+          // Debug status bar at bottom
+          const MotionDebugBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHomeTab(ThemeData theme) {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Greeting section
+              _buildGreetingSection(theme),
+              const SizedBox(height: 24),
+              // Feature cards
+              FeatureCard(
+                overline: 'FUNCIONALIDAD',
+                title: 'Ver mapa de farmacias',
+                description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
+                icon: Icons.map_rounded,
+                buttonText: 'Abrir mapa',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/map');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              FeatureCard(
+                overline: 'FUNCIONALIDAD',
+                title: 'Sube tu prescripción',
+                description: 'Escanea o carga la fórmula para validar y agilizar tu pedido.',
+                icon: Icons.upload_file_rounded,
+                buttonText: 'Subir',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/upload');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              FeatureCard(
+                overline: 'CUENTA',
+                title: 'Ver tu perfil',
+                description: 'Datos del usuario, preferencias y accesibilidad.',
+                icon: Icons.person_rounded,
+                buttonText: 'Ver perfil',
+                onPressed: () {
+                  Navigator.pushNamed(
                     context,
                     '/profile',
                     arguments: UserSession().currentUser.value?.uid,
                   );
-                  },
-                ),
-                
-                // Bottom spacing for better scroll experience
-                const SizedBox(height: 24),
-              ]),
-            ),
+                },
+              ),
+              
+              // Bottom spacing for better scroll experience
+              const SizedBox(height: 24),
+            ]),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrescriptionsTab() {
+    return PrescriptionsListWidget(
+      onPrescriptionTap: (prescripcion) async {
+        // Navigate to map screen to select pharmacy
+        final selectedPharmacy = await Navigator.pushNamed(
+          context,
+          '/map-select',
+          arguments: prescripcion,
+        );
+        
+        // If pharmacy was selected, navigate to delivery screen
+        if (selectedPharmacy != null && context.mounted) {
+          Navigator.pushNamed(
+            context,
+            '/delivery',
+            arguments: {
+              'pharmacy': selectedPharmacy,
+              'prescripcion': prescripcion,
+            },
+          );
+        }
+      },
     );
   }
 

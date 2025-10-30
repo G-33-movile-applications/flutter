@@ -1,16 +1,23 @@
 import 'dart:math';
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
+import '../../models/prescripcion.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
+import 'package:provider/provider.dart'; 
+import '../../providers/motion_provider.dart';
+import '../widgets/driving_overlay.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final Prescripcion? prescripcion; // Optional: if user is selecting pharmacy for a prescription
+  
+  const MapScreen({super.key, this.prescripcion});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -92,7 +99,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _setupFirestoreListener() {
     _firestoreSubscription = _firestore
-        .collection('puntos_fisicos')
+        .collection('puntosFisicos')
         .snapshots()
         .listen(
       (snapshot) {
@@ -121,7 +128,7 @@ class _MapScreenState extends State<MapScreen> {
         .where((pharmacy) {
           final pharmacyLocation = LatLng(pharmacy.latitud, pharmacy.longitud);
           final distance = _haversineKm(userLocation, pharmacyLocation);
-          return distance <= 5.0; // Only pharmacies within 5km
+          return distance <= 100.0; // Only pharmacies within 100km for testing
         })
         .toList()
       ..sort((a, b) {
@@ -154,7 +161,7 @@ class _MapScreenState extends State<MapScreen> {
           position: pharmacyLocation,
           infoWindow: InfoWindow(
             title: pharmacy.nombre,
-            snippet: '${pharmacy.cadena} • ${distance.toStringAsFixed(1)} km',
+            snippet: '${pharmacy.nombre} • ${distance.toStringAsFixed(1)} km',
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           onTap: () => _showPharmacyDetails(pharmacy, distance),
@@ -169,6 +176,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showPharmacyDetails(PuntoFisico pharmacy, double distance) {
+    final isSelectionMode = widget.prescripcion != null;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -178,8 +187,15 @@ class _MapScreenState extends State<MapScreen> {
         distance: distance,
         onDelivery: () => _goToDelivery(pharmacy),
         onViewInventory: () => _viewInventory(pharmacy),
+        onSelect: isSelectionMode ? () => _selectPharmacy(pharmacy) : null,
       ),
     );
+  }
+
+  void _selectPharmacy(PuntoFisico pharmacy) {
+    // Return the selected pharmacy to the previous screen
+    Navigator.pop(context); // Close bottom sheet
+    Navigator.pop(context, pharmacy); // Return pharmacy to home screen
   }
 
   void _goToDelivery(PuntoFisico pharmacy) {
@@ -265,13 +281,24 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final motionProvider = context.watch<MotionProvider>();
+    final isDriving = motionProvider.isDriving;
+
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('MAPA'),
+     backgroundColor: AppTheme.scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text('MAPA')),
+      body: Stack(
+        children: [
+          _buildBody(),
+          if (isDriving)
+            DrivingOverlay(
+              customMessage: "Por tu seguridad, el mapa está bloqueado mientras conduces.",
+              customIcon: Icons.directions_car_filled,
+              useBlur: true,
+            ),
+        ],
       ),
-      body: _buildBody(),
-      floatingActionButton: _buildFABStack(),
+      floatingActionButton: isDriving ? null : _buildFABStack(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
