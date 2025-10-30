@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/motion_debug_bar.dart';
-import '../../theme/app_theme.dart';
+import '../../providers/system_conditions_provider.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
 import '../analytics/delivery_analytics_screen.dart';
@@ -59,17 +59,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        backgroundColor: Theme.of(context).dialogBackgroundColor,
+        title: Row(
           children: [
-            Icon(Icons.directions_car_rounded, color: Colors.orange, size: 32),
-            SizedBox(width: 12),
-            Text('¿Estás conduciendo?'),
+            Icon(Icons.directions_car_rounded, 
+              color: Theme.of(context).colorScheme.error, 
+              size: 32
+            ),
+            const SizedBox(width: 12),
+            Text('¿Estás conduciendo?',
+              style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'Detectamos que podrías estar conduciendo. Por tu seguridad, '
           'algunas funciones se desactivarán si confirmas que estás al volante.',
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(
+            fontSize: 16,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
         ),
         actions: [
           TextButton(
@@ -112,11 +121,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     context.watch<MotionProvider>();
     
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('HOME'),
         automaticallyImplyLeading: false,
-        actions: [
+          actions: [
+          // Theme toggle button
+          Consumer<SystemConditionsProvider>(
+            builder: (context, systemConditions, _) {
+              return IconButton(
+                icon: Icon(
+                  systemConditions.isDarkMode 
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+                  color: Theme.of(context).iconTheme.color,
+                ),
+                tooltip: systemConditions.isDarkMode 
+                    ? 'Cambiar a modo claro'
+                    : 'Cambiar a modo oscuro',
+                onPressed: () {
+                  systemConditions.toggleThemeMode();
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Mis estadísticas',
@@ -271,11 +299,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.colorScheme.shadow.withOpacity(0.05),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -293,13 +321,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   Text(
                     'Hola, ',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
                   Text(
                     user != null ? user.fullName.split(' ').first : 'Usuario',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textPrimary,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const Text(' 👋'),
@@ -312,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ? '¿Qué deseas hacer hoy?'
                     : 'Inicia sesión para ver tus prescripciones',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],

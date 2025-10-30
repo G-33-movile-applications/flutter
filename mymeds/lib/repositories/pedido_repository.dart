@@ -46,6 +46,28 @@ class PedidoRepository {
     }
   }
 
+  // Read all pedidos for a specific user
+  Future<List<Pedido>> readAllByUser(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(_collection)
+          .where('usuarioId', isEqualTo: userId)
+          .get();
+
+      final List<Pedido> pedidos = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (_isValidPedidoData(data)) {
+          pedidos.add(Pedido.fromMap(data));
+        }
+      }
+      
+      return pedidos;
+    } catch (e) {
+      throw Exception('Error reading pedidos for user: $e');
+    }
+  }
+
   // Read a pedido by ID with its prescription
   Future<Pedido?> read(String identificadorPedido) async {
     try {

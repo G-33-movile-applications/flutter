@@ -4,15 +4,19 @@ import '../repositories/pedido_repository.dart';
 class AnalyticsService {
   final PedidoRepository _pedidoRepository = PedidoRepository();
 
-  /// Get delivery vs pickup statistics
-  Future<DeliveryStats> getDeliveryStats({DateTime? startDate, DateTime? endDate}) async {
+  /// Get delivery vs pickup statistics for a specific user
+  Future<DeliveryStats> getDeliveryStats({
+    required String userId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
     try {
-      print('Analytics - Starting to fetch stats');
+      print('Analytics - Starting to fetch stats for user $userId');
       print('Analytics - Start date: ${startDate?.toIso8601String()}');
       print('Analytics - End date: ${endDate?.toIso8601String()}');
 
-      // Get all orders
-      final pedidos = await _pedidoRepository.readAll();
+      // Get only orders for this user
+      final pedidos = await _pedidoRepository.readAllByUser(userId);
       print('Analytics - Found ${pedidos.length} total orders');
 
       // Filter by date if needed

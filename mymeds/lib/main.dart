@@ -1,5 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'providers/system_conditions_provider.dart';
+import 'widgets/low_battery_toast.dart';
 import 'theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'services/user_session.dart';
@@ -30,8 +32,11 @@ Future<void> main() async {
           motionProvider.start();
           return motionProvider;
         }),
+        ChangeNotifierProvider(create: (_) => SystemConditionsProvider()),
       ],
-      child: const MyMedsApp(),
+      child: const LowBatteryToast(
+        child: MyMedsApp(),
+      ),
     ),
   );
 }
@@ -41,9 +46,17 @@ class MyMedsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final systemConditions = context.watch<SystemConditionsProvider>();
+    
     return MaterialApp(
       title: 'MyMeds',
-      theme: AppTheme.lightTheme,
+      theme: systemConditions.isLowPowerMode 
+          ? AppTheme.getLowPowerTheme(false)
+          : AppTheme.lightTheme,
+      darkTheme: systemConditions.isLowPowerMode 
+          ? AppTheme.getLowPowerTheme(true)
+          : AppTheme.darkTheme,
+      themeMode: systemConditions.themeMode,
       initialRoute: AppRouter.login,
       onGenerateRoute: AppRouter.generateRoute,
       debugShowCheckedModeBanner: false,

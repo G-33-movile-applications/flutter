@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -60,9 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
 	@override
 	Widget build(BuildContext context) {
-		final theme = AppTheme.lightTheme;
+		final theme = Theme.of(context);
 
 		return Scaffold(
+			backgroundColor: theme.colorScheme.background,
 			body: Center(
 				child: SingleChildScrollView(
 					padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -106,9 +106,18 @@ class _LoginScreenState extends State<LoginScreen> {
 									labelText: 'Correo electrónico',
 									hintText: 'ejemplo1@mail.com',
 									filled: true,
-									fillColor: const Color(0xFFF2F4F7),
+									fillColor: theme.colorScheme.surface,
 									border: OutlineInputBorder(
 										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.outline),
+									),
+									enabledBorder: OutlineInputBorder(
+										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.outline),
+									),
+									focusedBorder: OutlineInputBorder(
+										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
 									),
 								),
 							),
@@ -133,9 +142,18 @@ class _LoginScreenState extends State<LoginScreen> {
 									labelText: 'Contraseña',
 									hintText: 'Tu contraseña',
 									filled: true,
-									fillColor: const Color(0xFFF2F4F7),
+									fillColor: theme.colorScheme.surface,
 									border: OutlineInputBorder(
 										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.outline),
+									),
+									enabledBorder: OutlineInputBorder(
+										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.outline),
+									),
+									focusedBorder: OutlineInputBorder(
+										borderRadius: BorderRadius.circular(16),
+										borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
 									),
 									suffixIcon: GestureDetector(
 										onTapDown: (_) {
@@ -178,7 +196,8 @@ class _LoginScreenState extends State<LoginScreen> {
 								width: double.infinity,
 								child: ElevatedButton(
 									style: ElevatedButton.styleFrom(
-										backgroundColor: const Color(0xFF9EC6F3),
+										backgroundColor: theme.colorScheme.primary,
+										foregroundColor: theme.colorScheme.onPrimary,
 										shape: RoundedRectangleBorder(
 											borderRadius: BorderRadius.circular(16),
 										),
@@ -186,13 +205,13 @@ class _LoginScreenState extends State<LoginScreen> {
 									),
 									onPressed: _isLoading ? null : _login,
 									child: _isLoading
-											? const CircularProgressIndicator(
-													valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+											? CircularProgressIndicator(
+													valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
 												)
 											: Text(
 													'INICIAR SESIÓN',
 													style: GoogleFonts.poetsenOne(
-														color: Colors.white,
+														color: theme.colorScheme.onPrimary,
 														fontSize: 18,
 													),
 												),
@@ -204,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
 								width: double.infinity,
 								child: OutlinedButton(
 									style: OutlinedButton.styleFrom(
-										side: const BorderSide(color: Color(0xFF9EC6F3)),
+										side: BorderSide(color: theme.colorScheme.primary),
 										shape: RoundedRectangleBorder(
 											borderRadius: BorderRadius.circular(16),
 										),
@@ -216,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
 									child: Text(
 										'REGISTRAR',
 										style: GoogleFonts.poetsenOne(
-											color: const Color(0xFF9EC6F3),
+											color: theme.colorScheme.primary,
 											fontSize: 18,
 										),
 									),
