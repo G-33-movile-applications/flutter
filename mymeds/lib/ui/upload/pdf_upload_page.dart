@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
 import 'widget/upload_prescription_widget.dart';
+import '../../services/pdf_processing_service.dart';
 
 class PdfUploadPage extends StatefulWidget {
   const PdfUploadPage({super.key});
@@ -20,7 +21,8 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
   bool isUploading = false;
   String? selectedFileName;
   Map<String, dynamic>? pdfAsJson;
-  List<String> selectedFiles = [];
+  List<String> selectedFiles = []; // Almacenará las rutas completas de los archivos
+  List<String> selectedFileNames = []; // Almacenará los nombres de los archivos para mostrar
 
   /// Selección de archivo PDF
   Future<void> _selectFile() async {
@@ -42,7 +44,8 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
       final fileName = result.files.single.name;
       setState(() {
         selectedFileName = fileName;
-        selectedFiles.add(fileName);
+        selectedFiles.add(filePath); // Guardamos la ruta completa
+        selectedFileNames.add(fileName); // Guardamos el nombre para mostrar
       });
 
       // Convertir PDF a JSON
@@ -76,7 +79,7 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
     debugPrint("PDF en JSON: ${jsonEncode(jsonData)}");
   }
 
-  void _startUpload() {
+  Future<void> _startUpload() async {
     if (selectedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Por favor, selecciona al menos un archivo.")),
@@ -88,20 +91,71 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
       isUploading = true;
     });
 
-  // Simulación de "subida"
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      int processedFiles = 0;
+      
+      // Procesamiento de archivos PDF
+      for (String filePath in selectedFiles) {
+        try {
+          final file = File(filePath);
+          if (!await file.exists()) {
+            debugPrint('Archivo no encontrado: $filePath');
+            continue;
+          }
+
+          // Procesar el PDF
+          final result = await PdfProcessingService().processPrescription(file);
+          
+          // Aquí deberías guardar en Firebase:
+          // - result.prescripcion en la colección prescripciones
+          // - result.medicamentos en la colección medicamentosUsuario
+          
+          debugPrint('Prescripción procesada: ${result.prescripcion.id}');
+          debugPrint('Medicamentos encontrados: ${result.medicamentos.length}');
+          
+          processedFiles++;
+        } catch (e) {
+          debugPrint('Error procesando archivo: $e');
+          // Continuamos con el siguiente archivo
+        }
+      }
+
       if (!mounted) return;
 
+      final int filesCount = processedFiles;
+
+      // Mostrar mensaje de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Se procesaron $filesCount prescripción(es) correctamente"),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Limpiar el estado
+      setState(() {
+        isUploading = false;
+        selectedFiles.clear();
+        selectedFileNames.clear();
+        selectedFileName = null;
+        pdfAsJson = null;
+      });
+    } catch (e) {
+      debugPrint('Error durante el procesamiento: $e');
+      if (!mounted) return;
+      
       setState(() {
         isUploading = false;
       });
-
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Se subieron ${selectedFiles.length} archivo(s) correctamente."),
+          content: Text("Error: ${e.toString()}"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
         ),
       );
-    });
+    }
   }
 
   @override
@@ -169,10 +223,20 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
                             ],
                           ),
                           const SizedBox(height: 10),
-                          ...selectedFiles.map(
-                            (file) => ListTile(
+                          ...selectedFileNames.map(
+                            (fileName) => ListTile(
                               leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                              title: Text(file, style: theme.textTheme.bodyMedium),
+                              title: Text(fileName, style: theme.textTheme.bodyMedium),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close, color: Colors.red),
+                                onPressed: () {
+                                  final index = selectedFileNames.indexOf(fileName);
+                                  setState(() {
+                                    selectedFileNames.removeAt(index);
+                                    selectedFiles.removeAt(index);
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ],
