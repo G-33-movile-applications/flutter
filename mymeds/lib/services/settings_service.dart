@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service for managing application settings persistence
 class SettingsService {
@@ -12,6 +13,8 @@ class SettingsService {
   static const String _notificationsEnabledKey = 'notifications_enabled';
   static const String _pushNotificationsEnabledKey = 'push_notifications_enabled';
   static const String _emailNotificationsEnabledKey = 'email_notifications_enabled';
+  static const String _hasPromptedDataSaverKey = 'has_prompted_data_saver';
+  static const String _lastMobileDataPromptKey = 'last_mobile_data_prompt_time';
 
   SettingsService._internal();
 
@@ -78,6 +81,37 @@ class SettingsService {
   Future<bool> clearAllSettings() async {
     _ensureInitialized();
     return _prefs.clear();
+  }
+
+  /// Check if user has already been prompted about Data Saver on mobile data
+  bool getHasPromptedDataSaver() {
+    _ensureInitialized();
+    return _prefs.getBool(_hasPromptedDataSaverKey) ?? false;
+  }
+
+  /// Mark that user has been prompted about Data Saver
+  Future<bool> setHasPromptedDataSaver(bool prompted) async {
+    _ensureInitialized();
+    return _prefs.setBool(_hasPromptedDataSaverKey, prompted);
+  }
+
+  /// Get the last time user was prompted about mobile data
+  DateTime? getLastMobileDataPromptTime() {
+    _ensureInitialized();
+    final timestamp = _prefs.getString(_lastMobileDataPromptKey);
+    if (timestamp == null) return null;
+    try {
+      return DateTime.parse(timestamp);
+    } catch (e) {
+      debugPrint('Error parsing last prompt time: $e');
+      return null;
+    }
+  }
+
+  /// Set the last time user was prompted about mobile data
+  Future<bool> setLastMobileDataPromptTime(DateTime time) async {
+    _ensureInitialized();
+    return _prefs.setString(_lastMobileDataPromptKey, time.toIso8601String());
   }
 
   /// Ensure the service is initialized

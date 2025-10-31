@@ -3,6 +3,7 @@ import '../services/settings_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../services/cache_service.dart';
+import '../services/data_saver_auto_detector.dart';
 
 /// Provider for managing application settings state
 class SettingsProvider with ChangeNotifier {
@@ -10,6 +11,7 @@ class SettingsProvider with ChangeNotifier {
   final ConnectivityService _connectivityService = ConnectivityService();
   final SyncService _syncService = SyncService();
   final CacheService _cacheService = CacheService();
+  final DataSaverAutoDetector _autoDetector = DataSaverAutoDetector();
 
   // Private state variables
   bool _dataSaverModeEnabled = false;
@@ -18,6 +20,7 @@ class SettingsProvider with ChangeNotifier {
   bool _emailNotificationsEnabled = true;
   bool _isLoading = false;
   int _syncQueueSize = 0;
+  bool _showMobileDataPrompt = false;
 
   // Getters
   bool get dataSaverModeEnabled => _dataSaverModeEnabled;
@@ -28,6 +31,8 @@ class SettingsProvider with ChangeNotifier {
   int get syncQueueSize => _syncQueueSize;
   ConnectionType get currentConnectionType =>
       _connectivityService.currentConnectionType;
+  bool get showMobileDataPrompt => _showMobileDataPrompt;
+  bool get isOnMobileData => _autoDetector.isOnMobileData;
 
   /// Initialize the provider by loading settings from storage
   Future<void> init() async {
@@ -39,6 +44,11 @@ class SettingsProvider with ChangeNotifier {
       await _connectivityService.init();
       await _syncService.init();
       await _cacheService.init();
+
+      // Initialize auto-detector with callback for mobile data prompt
+      await _autoDetector.init(
+        onMobileDataDetected: _handleMobileDataDetected,
+      );
 
       // Load all settings from persistent storage
       _dataSaverModeEnabled = _settingsService.getDataSaverMode();
@@ -58,6 +68,13 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
+  /// Handle mobile data detection (called by auto-detector)
+  Future<void> _handleMobileDataDetected(bool currentlyEnabled) async {
+    debugPrint('⚙️ Mobile data detected, triggering prompt');
+    _showMobileDataPrompt = true;
+    notifyListeners();
+  }
+
   /// Update sync queue size and rebuild UI
   void _updateSyncQueueSize() {
     _syncQueueSize = _syncService.queueSize;
@@ -67,6 +84,7 @@ class SettingsProvider with ChangeNotifier {
   /// Toggle Data Saver Mode
   Future<void> toggleDataSaverMode(bool value) async {
     _dataSaverModeEnabled = value;
+    _showMobileDataPrompt = false; // Hide prompt after action
     notifyListeners();
 
     try {
@@ -87,6 +105,26 @@ class SettingsProvider with ChangeNotifier {
       _dataSaverModeEnabled = !value;
       notifyListeners();
     }
+  }
+
+  /// Enable Data Saver from mobile data prompt
+  Future<void> enableDataSaverFromPrompt() async {
+    debugPrint('⚙️ Enabling Data Saver from mobile data prompt');
+    await toggleDataSaverMode(true);
+  }
+
+  /// Decline mobile data prompt without enabling Data Saver
+  Future<void> declineMobileDataPrompt() async {
+    debugPrint('⚙️ User declined mobile data prompt');
+    _showMobileDataPrompt = false;
+    notifyListeners();
+  }
+
+  /// Don't ask again for 24 hours (resets throttle)
+  Future<void> dontAskAgainMobileDataPrompt() async {
+    debugPrint('⚙️ User selected "don\'t ask again" for 24 hours');
+    await _autoDetector.resetThrottle();
+    await declineMobileDataPrompt();
   }
 
   /// Toggle Notifications
