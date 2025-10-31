@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'widgets/feature_card.dart';
 import 'widgets/motion_debug_bar.dart';
-import '../../providers/system_conditions_provider.dart';
+import 'widgets/data_saver_indicator.dart';
+import 'widgets/settings_view.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
-import '../analytics/delivery_analytics_screen.dart';
 import '../prescriptions/prescriptions_list_widget.dart';
 import 'package:provider/provider.dart';
 import '../../providers/motion_provider.dart';
@@ -125,43 +125,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       appBar: AppBar(
         title: const Text('HOME'),
         automaticallyImplyLeading: false,
-          actions: [
-          // Theme toggle button
-          Consumer<SystemConditionsProvider>(
-            builder: (context, systemConditions, _) {
-              return IconButton(
-                icon: Icon(
-                  systemConditions.isDarkMode 
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
-                  color: Theme.of(context).iconTheme.color,
-                ),
-                tooltip: systemConditions.isDarkMode 
-                    ? 'Cambiar a modo claro'
-                    : 'Cambiar a modo oscuro',
-                onPressed: () {
-                  systemConditions.toggleThemeMode();
-                },
-              );
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            tooltip: 'Configuración',
+            onPressed: () {
+              Scaffold.of(context).openDrawer();
             },
           ),
+        ),
+          actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Mis estadísticas',
             onPressed: () {
               Navigator.pushNamed(context, '/stats');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Ver análisis de entregas',
-            onPressed: () {
-              Navigator.push(
-                context, 
-                MaterialPageRoute(
-                  builder: (context) => const DeliveryAnalyticsScreen(),
-                ),
-              );
             },
           ),
           IconButton(
@@ -209,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           const MotionDebugBar(),
         ],
       ),
+      drawer: const SettingsView(),
     );
   }
 

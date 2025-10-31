@@ -30,6 +30,10 @@ Future<void> main() async {
   // Initialize settings service
   await SettingsService().init();
 
+  // Initialize SettingsProvider
+  final settingsProvider = SettingsProvider();
+  await settingsProvider.init();
+
   runApp(
      MultiProvider(
       providers: [
@@ -39,6 +43,7 @@ Future<void> main() async {
           return motionProvider;
         }),
         ChangeNotifierProvider(create: (_) => SystemConditionsProvider()),
+        ChangeNotifierProvider(create: (_) => settingsProvider),
       ],
       child: const LowBatteryToast(
         child: MyMedsApp(),

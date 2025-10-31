@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 import '../../../providers/settings_provider.dart';
+import '../../../providers/system_conditions_provider.dart';
 import 'package:provider/provider.dart';
 import '../../../services/user_session.dart';
 
@@ -61,6 +62,29 @@ class _SettingsViewState extends State<SettingsView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Theme Section
+                        _buildSectionTitle(theme, 'Tema'),
+                        const SizedBox(height: 12),
+                        Consumer<SystemConditionsProvider>(
+                          builder: (context, systemConditions, child) {
+                            return _buildSettingCard(
+                              context: context,
+                              icon: systemConditions.isDarkMode
+                                  ? Icons.light_mode_rounded
+                                  : Icons.dark_mode_rounded,
+                              title: 'Modo Oscuro',
+                              subtitle: systemConditions.isDarkMode
+                                  ? 'Actualmente en modo oscuro'
+                                  : 'Actualmente en modo claro',
+                              value: systemConditions.isDarkMode,
+                              onChanged: (value) {
+                                systemConditions.toggleThemeMode();
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
                         // Data Saver Mode Section
                         _buildSectionTitle(theme, 'Datos'),
                         const SizedBox(height: 12),
