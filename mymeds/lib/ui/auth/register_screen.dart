@@ -1,6 +1,5 @@
   import 'package:flutter/material.dart';
   import 'package:google_fonts/google_fonts.dart';
-  import '../../theme/app_theme.dart';
   import '../../services/auth_service.dart';
   import '../../models/user_preferencias.dart';
 
@@ -236,7 +235,7 @@
         }
     @override
     Widget build(BuildContext context) {
-      final theme = AppTheme.lightTheme;
+      final theme = Theme.of(context);
 
       return Scaffold(
         body: Center(

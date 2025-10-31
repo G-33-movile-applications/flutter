@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import '../../models/delivery_stats.dart';
 import '../../services/analytics_service.dart';
+import '../../services/user_session.dart';
 
 class DeliveryAnalyticsScreen extends StatefulWidget {
   const DeliveryAnalyticsScreen({super.key});
@@ -31,7 +31,13 @@ class _DeliveryAnalyticsScreenState extends State<DeliveryAnalyticsScreen> {
         _error = null;
       });
 
+      final currentUser = UserSession().currentUser.value;
+      if (currentUser == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
       final stats = await _analyticsService.getDeliveryStats(
+        userId: currentUser.uid,
         startDate: _startDate,
         endDate: _endDate,
       );
@@ -69,8 +75,9 @@ class _DeliveryAnalyticsScreenState extends State<DeliveryAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Análisis de Entregas'),
         actions: [
@@ -204,7 +211,7 @@ class _DeliveryAnalyticsScreenState extends State<DeliveryAnalyticsScreen> {
         Text(
           '${percentage.toStringAsFixed(1)}%',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
         ),
       ],

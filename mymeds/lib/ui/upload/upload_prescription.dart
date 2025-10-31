@@ -19,14 +19,14 @@ class UploadPrescriptionPage extends StatelessWidget {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: AppTheme.scaffoldBackgroundColor,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
             title: Text(
               "Cargar Prescripción",
               style: theme.appBarTheme.titleTextStyle,
             ),
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
             actions: [
               IconButton(
                 icon: const Icon(Icons.home_outlined),
@@ -94,7 +94,7 @@ class UploadPrescriptionPage extends StatelessWidget {
 
             // Help Section
             Card(
-              color: Colors.blue.shade50,
+              color: theme.colorScheme.primaryContainer.withOpacity(0.3),
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),

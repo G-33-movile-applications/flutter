@@ -11,6 +11,11 @@ class AppTheme {
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF1F2937);
   
+  static const Color darkPrimaryColor = Color(0xFF5B89D4);
+  static const Color darkCardColor = Color(0xFF2C3B52);
+  static const Color darkScaffoldBackgroundColor = Color(0xFF121212);
+  static const Color darkTextPrimary = Color(0xFFE2E8F0);
+  static const Color darkTextSecondary = Color(0xFFCBD5E1);
   // Enhanced pharmacy colors for better contrast
   static const Color pharmacyPrimaryBlue = Color(0xFF1565C0);
   static const Color pharmacySuccessGreen = Color(0xFF2E7D32);
@@ -147,6 +152,116 @@ class AppTheme {
           borderRadius: BorderRadius.circular(24),
         ),
       ),
+    );
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      primaryColor: darkPrimaryColor,
+      cardColor: darkCardColor,
+      scaffoldBackgroundColor: darkScaffoldBackgroundColor,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: darkPrimaryColor,
+        brightness: Brightness.dark,
+        primary: darkPrimaryColor,
+        surface: darkCardColor,
+      ),
+      
+      appBarTheme: AppBarTheme(
+        backgroundColor: darkCardColor,
+        foregroundColor: darkTextPrimary,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: darkPrimaryColor,
+          foregroundColor: darkTextPrimary,
+          elevation: 4,
+          shadowColor: Colors.black45,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          minimumSize: const Size(88, 48),
+          textStyle: GoogleFonts.balsamiqSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+
+      textTheme: TextTheme(
+        headlineLarge: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineSmall: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+        ),
+        titleLarge: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+        titleMedium: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+        titleSmall: GoogleFonts.poetsenOne(
+          color: darkTextPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+        bodyLarge: GoogleFonts.balsamiqSans(
+          color: darkTextSecondary,
+          fontSize: 16,
+          fontWeight: FontWeight.normal,
+        ),
+        bodyMedium: GoogleFonts.balsamiqSans(
+          color: darkTextSecondary,
+          fontSize: 14,
+          fontWeight: FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  static ThemeData getLowPowerTheme(bool isDark) {
+    final baseTheme = isDark ? darkTheme : lightTheme;
+    
+    return baseTheme.copyWith(
+      colorScheme: baseTheme.colorScheme.copyWith(
+        primary: (isDark ? darkPrimaryColor : primaryColor).withOpacity(0.7),
+        secondary: (isDark ? darkCardColor : cardColor).withOpacity(0.7),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: (baseTheme.elevatedButtonTheme.style ?? ElevatedButton.styleFrom()).copyWith(
+          elevation: MaterialStateProperty.all(2),
+          animationDuration: const Duration(milliseconds: 0),
+        ),
+      ),
+      cardTheme: baseTheme.cardTheme.copyWith(
+        elevation: 1,
+      ),
+      visualDensity: VisualDensity.compact,
     );
   }
 }
