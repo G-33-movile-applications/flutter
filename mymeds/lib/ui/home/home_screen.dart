@@ -194,6 +194,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       body: Column(
         children: [
+          // Data Saver indicator (shown when Data Saver Mode is active)
+          const DataSaverIndicator(),
           Expanded(
             child: TabBarView(
               controller: _tabController,
