@@ -117,13 +117,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       drawer: const SettingsView(),
       appBar: AppBar(
         title: const Text('HOME'),
-        automaticallyImplyLeading: true,
-        leading: IconButton(
-          icon: const Icon(Icons.settings_rounded),
-          tooltip: 'Configuración',
-          onPressed: () {
-            Scaffold.of(context).openDrawer();
-          },
+        automaticallyImplyLeading: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            tooltip: 'Configuración',
+            onPressed: () {
+              Scaffold.of(context).openDrawer();
+            },
+          ),
         ),
         actions: [
           IconButton(
