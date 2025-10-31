@@ -3,6 +3,7 @@ import 'widgets/feature_card.dart';
 import 'widgets/motion_debug_bar.dart';
 import 'widgets/data_saver_indicator.dart';
 import 'widgets/settings_view.dart';
+import '../widgets/connectivity_feedback_banner.dart';
 import '../../services/user_session.dart';
 import '../../models/user_model.dart';
 import '../prescriptions/prescriptions_list_widget.dart';
@@ -172,6 +173,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       body: Column(
         children: [
+          // Connectivity feedback banner (shows when offline)
+          const ConnectivityFeedbackBanner(),
           // Data Saver indicator (shown when Data Saver Mode is active)
           const DataSaverIndicator(),
           Expanded(
