@@ -55,82 +55,105 @@ class MyMedsApp extends StatefulWidget {
 }
 
 class _MyMedsAppState extends State<MyMedsApp> {
+  late SettingsProvider _settingsProvider;
+  bool _listenerSetup = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     
-    // Listen for mobile data prompt from SettingsProvider
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Set up listener on first build
+    if (!_listenerSetup) {
       _setupMobileDataListener();
-    });
+      _listenerSetup = true;
+    }
   }
 
   /// Setup listener for mobile data detection
   void _setupMobileDataListener() {
-    final settingsProvider = context.read<SettingsProvider>();
-    settingsProvider.addListener(_checkMobileDataPrompt);
-    
-    // Initial check in case prompt was triggered during init
-    _checkMobileDataPrompt();
+    try {
+      _settingsProvider = context.read<SettingsProvider>();
+      debugPrint('🎯 Adding listener to SettingsProvider');
+      _settingsProvider.addListener(_checkMobileDataPrompt);
+      
+      // Initial check
+      debugPrint('🎯 Performing initial prompt check');
+      _checkMobileDataPrompt();
+    } catch (e) {
+      debugPrint('❌ Error setting up listener: $e');
+    }
   }
 
   /// Check if mobile data prompt should be shown
   void _checkMobileDataPrompt() {
-    if (!mounted) return;
+    if (!mounted) {
+      debugPrint('🎯 Widget not mounted, skipping check');
+      return;
+    }
     
-    final settingsProvider = context.read<SettingsProvider>();
+    debugPrint('🎯 Checking if prompt should be shown');
+    debugPrint('🎯 showMobileDataPrompt = ${_settingsProvider.showMobileDataPrompt}');
     
-    if (settingsProvider.showMobileDataPrompt) {
+    if (_settingsProvider.showMobileDataPrompt) {
+      debugPrint('🎯 Showing mobile data prompt dialog');
       _showMobileDataPromptDialog();
     }
   }
 
   /// Show the mobile data prompt dialog
   void _showMobileDataPromptDialog() {
-    if (!mounted) return;
+    if (!mounted) {
+      debugPrint('❌ Widget not mounted, cannot show dialog');
+      return;
+    }
     
-    final settingsProvider = context.read<SettingsProvider>();
+    debugPrint('💬 Creating and showing MobileDataPromptDialog');
     
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => MobileDataPromptDialog(
+      builder: (dialogContext) => MobileDataPromptDialog(
         onEnableDataSaver: () async {
+          debugPrint('✅ User selected: Enable Data Saver');
           if (mounted) {
-            await settingsProvider.enableDataSaverFromPrompt();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ Data Saver Mode enabled successfully!'),
-                duration: Duration(seconds: 2),
-                backgroundColor: Colors.green,
-              ),
-            );
+            await _settingsProvider.enableDataSaverFromPrompt();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Data Saver Mode enabled successfully!'),
+                  duration: Duration(seconds: 2),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
           }
         },
         onDecline: () async {
+          debugPrint('❌ User selected: Not Now');
           if (mounted) {
-            await settingsProvider.declineMobileDataPrompt();
+            await _settingsProvider.declineMobileDataPrompt();
           }
         },
         onDontAskAgain: () async {
+          debugPrint('⏰ User selected: Don\'t ask for 24 hours');
           if (mounted) {
-            await settingsProvider.dontAskAgainMobileDataPrompt();
+            await _settingsProvider.dontAskAgainMobileDataPrompt();
           }
         },
       ),
-    ).whenComplete(() {
-      // Reset state after dialog closes
-      if (mounted) {
-        settingsProvider.removeListener(_checkMobileDataPrompt);
-        _setupMobileDataListener();
-      }
+    ).then((_) {
+      // Dialog closed
+      debugPrint('💬 Dialog closed');
     });
   }
 
   @override
   void dispose() {
     try {
-      context.read<SettingsProvider>().removeListener(_checkMobileDataPrompt);
+      if (_listenerSetup) {
+        debugPrint('🎯 Removing listener from SettingsProvider');
+        _settingsProvider.removeListener(_checkMobileDataPrompt);
+      }
     } catch (e) {
       debugPrint('Error removing listener: $e');
     }

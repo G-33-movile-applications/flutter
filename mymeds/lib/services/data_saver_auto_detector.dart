@@ -42,19 +42,34 @@ class DataSaverAutoDetector {
   Future<void> init({
     required OnMobileDataDetected onMobileDataDetected,
   }) async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      debugPrint('📊 DataSaverAutoDetector already initialized, skipping');
+      return;
+    }
 
     _onMobileDataDetected = onMobileDataDetected;
     _lastConnectionType = _connectivityService.currentConnectionType;
 
-    debugPrint('📊 DataSaverAutoDetector initialized');
+    debugPrint('📊 DataSaverAutoDetector initializing...');
+    debugPrint('📊 Current connection type: $_lastConnectionType');
+    debugPrint('📊 Data Saver already enabled: ${_settingsService.getDataSaverMode()}');
 
     // Listen to connectivity changes and detect mobile data transitions
-    _connectivityService.connectionStream.listen((connectionType) {
-      _handleConnectionTypeChange(connectionType);
-    });
+    _connectivityService.connectionStream.listen(
+      (connectionType) {
+        debugPrint('📊 Stream event: connectionType = $connectionType');
+        _handleConnectionTypeChange(connectionType);
+      },
+      onError: (error) {
+        debugPrint('❌ Connection stream error: $error');
+      },
+      onDone: () {
+        debugPrint('📊 Connection stream closed');
+      },
+    );
 
     _isInitialized = true;
+    debugPrint('📊 DataSaverAutoDetector initialized and listening');
   }
 
   /// Handle changes in connection type
@@ -130,6 +145,12 @@ class DataSaverAutoDetector {
       DateTime.now().subtract(_promptThrottleDuration),
     );
     debugPrint('📊 Throttle timer reset');
+  }
+
+  /// FOR TESTING: Manually trigger mobile data detected (ignore throttle)
+  Future<void> debugTriggerMobileDataPrompt() async {
+    debugPrint('📊 [DEBUG] Manually triggering mobile data prompt');
+    await _onMobileDataDetected?.call(_settingsService.getDataSaverMode());
   }
 
   /// Get current connection type

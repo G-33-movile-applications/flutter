@@ -45,11 +45,6 @@ class SettingsProvider with ChangeNotifier {
       await _syncService.init();
       await _cacheService.init();
 
-      // Initialize auto-detector with callback for mobile data prompt
-      await _autoDetector.init(
-        onMobileDataDetected: _handleMobileDataDetected,
-      );
-
       // Load all settings from persistent storage
       _dataSaverModeEnabled = _settingsService.getDataSaverMode();
       _notificationsEnabled = _settingsService.getNotificationsEnabled();
@@ -58,6 +53,12 @@ class SettingsProvider with ChangeNotifier {
 
       // Listen to sync queue changes
       _updateSyncQueueSize();
+
+      // Initialize auto-detector AFTER connectivity service is ready
+      // Use Future.delayed to ensure UI is built before triggering prompts
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _initializeAutoDetector();
+      });
 
       debugPrint('⚙️ SettingsProvider initialized successfully');
     } catch (e) {
@@ -68,10 +69,32 @@ class SettingsProvider with ChangeNotifier {
     }
   }
 
+  /// Initialize auto-detector after UI is ready
+  Future<void> _initializeAutoDetector() async {
+    try {
+      await _autoDetector.init(
+        onMobileDataDetected: _handleMobileDataDetected,
+      );
+      debugPrint('⚙️ Auto-detector initialized and listening');
+    } catch (e) {
+      debugPrint('❌ Error initializing auto-detector: $e');
+    }
+  }
+
   /// Handle mobile data detection (called by auto-detector)
   Future<void> _handleMobileDataDetected(bool currentlyEnabled) async {
     debugPrint('⚙️ Mobile data detected, triggering prompt');
+    debugPrint('⚙️ Currently enabled: $currentlyEnabled');
+    debugPrint('⚙️ Setting showMobileDataPrompt to true');
+    
+    // Check if already showing prompt
+    if (_showMobileDataPrompt) {
+      debugPrint('⚙️ Prompt already showing, skipping');
+      return;
+    }
+    
     _showMobileDataPrompt = true;
+    debugPrint('⚙️ Notifying listeners about mobile data prompt');
     notifyListeners();
   }
 
