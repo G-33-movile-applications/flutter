@@ -67,6 +67,36 @@ class Pedido {
     };
   }
 
+  // Convert Pedido to JSON-serializable Map (for offline queue)
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'id': id,
+      'prescripcionId': prescripcionId,
+      'puntoFisicoId': puntoFisicoId,
+      'tipoEntrega': tipoEntrega,
+      'direccionEntrega': direccionEntrega,
+      'estado': estado,
+      'fechaPedido': fechaPedido.toIso8601String(),
+      if (fechaEntrega != null) 'fechaEntrega': fechaEntrega!.toIso8601String(),
+    };
+  }
+
+  // Create from JSON-serializable map
+  factory Pedido.fromJsonMap(Map<String, dynamic> map) {
+    return Pedido(
+      id: map['id'] as String,
+      prescripcionId: map['prescripcionId'] as String,
+      puntoFisicoId: map['puntoFisicoId'] as String,
+      tipoEntrega: map['tipoEntrega'] as String,
+      direccionEntrega: map['direccionEntrega'] as String,
+      estado: map['estado'] as String,
+      fechaPedido: DateTime.parse(map['fechaPedido'] as String),
+      fechaEntrega: map['fechaEntrega'] != null 
+          ? DateTime.parse(map['fechaEntrega'] as String)
+          : null,
+    );
+  }
+
   // Create from JSON string
   factory Pedido.fromJson(String jsonStr) {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;

@@ -10,7 +10,6 @@ import '../../services/nfc_service.dart';
 import '../../services/user_session.dart';
 import '../../adapters/prescription_adapter.dart';
 import '../../repositories/prescripcion_repository.dart';
-import '../../theme/app_theme.dart';
 import 'widgets/prescription_preview_widget.dart';
 
 class NfcUploadPage extends StatefulWidget {
@@ -67,11 +66,11 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.nfc, color: Colors.grey),
-            SizedBox(width: 12),
-            Text('NFC No Disponible'),
+            Icon(Icons.nfc, color: Theme.of(context).disabledColor),
+            const SizedBox(width: 12),
+            const Text('NFC No Disponible'),
           ],
         ),
         content: const Text(
@@ -81,7 +80,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('Entendido'),
           ),
@@ -94,11 +93,11 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.nfc, color: AppTheme.primaryColor),
-            SizedBox(width: 12),
-            Text('NFC Desactivado'),
+            Icon(Icons.nfc, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            const Text('NFC Desactivado'),
           ],
         ),
         content: const Text(
@@ -108,7 +107,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('Entendido'),
           ),
@@ -272,7 +271,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'existing'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('Prescripción Existente'),
           ),
@@ -495,7 +494,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               Navigator.pop(context, prescription);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('Crear'),
           ),
@@ -525,7 +524,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: prescription.activa 
-                        ? AppTheme.primaryColor 
+                        ? Theme.of(context).colorScheme.primary 
                         : Colors.grey,
                     child: Icon(
                       prescription.activa ? Icons.check : Icons.close,
@@ -713,7 +712,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDestructive ? Colors.red : AppTheme.primaryColor,
+              backgroundColor: isDestructive ? Colors.red : Theme.of(context).colorScheme.primary,
             ),
             child: Text(confirmText),
           ),
@@ -748,7 +747,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('OK'),
           ),
@@ -803,7 +802,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
       ),
@@ -830,17 +829,20 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: Colors.orange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Los permisos son necesarios para el correcto funcionamiento de la app.',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
                     ),
                   ),
                 ],
@@ -860,7 +862,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               // For now, user needs to manually go to settings
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             child: const Text('Entendido'),
           ),
@@ -876,8 +878,8 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cargar Prescripción por NFC'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -898,8 +900,8 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                       Icons.nfc,
                       size: 64,
                       color: _isNfcAvailable && _isNfcEnabled
-                          ? AppTheme.primaryColor
-                          : Colors.grey,
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -909,8 +911,8 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: _isNfcAvailable && _isNfcEnabled
-                            ? AppTheme.textPrimary
-                            : Colors.grey,
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -922,7 +924,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                           : 'Este dispositivo no soporta NFC',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -947,7 +949,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               label: 'Leer Prescripción desde NFC',
               description: 'Escanea un tag NFC para cargar una prescripción',
               onPressed: _isProcessing ? null : _handleNfcRead,
-              color: AppTheme.primaryColor,
+              color: theme.colorScheme.primary,
             ),
 
             const SizedBox(height: 12),
@@ -1048,7 +1050,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
 
             // Help Section
             Card(
-              color: Colors.blue.shade50,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1056,13 +1058,13 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.help_outline, color: Colors.blue.shade700),
+                        Icon(Icons.help_outline, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 12),
                         Text(
                           'Cómo usar NFC',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ],
@@ -1104,7 +1106,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 28),

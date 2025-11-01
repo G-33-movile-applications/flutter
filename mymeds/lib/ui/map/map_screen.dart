@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
+import '../widgets/connectivity_feedback_banner.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
 import 'package:provider/provider.dart'; 
@@ -305,71 +306,102 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: AppTheme.primaryColor,
+      return Column(
+        children: [
+          const ConnectivityFeedbackBanner(),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Obteniendo tu ubicación...',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Obteniendo tu ubicación...',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
     if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.location_off_rounded,
-                size: 64,
-                color: AppTheme.textSecondary,
+      return Column(
+        children: [
+          const ConnectivityFeedbackBanner(),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.location_off_rounded,
+                      size: 64,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _initializeLocation,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _initializeLocation,
-                child: const Text('Reintentar'),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (_currentPosition == null) {
-      return const Center(
-        child: Text('No se pudo obtener la ubicación'),
+      return Column(
+        children: [
+          const ConnectivityFeedbackBanner(),
+          Expanded(
+            child: Center(
+              child: Text(
+                'No se pudo obtener la ubicación',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ),
+        ],
       );
     }
 
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        zoom: 15.0,
-      ),
-      markers: _markers,
-      myLocationEnabled: true,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      onMapCreated: (GoogleMapController controller) {
-        _mapController = controller;
-      },
+    return Column(
+      children: [
+        const ConnectivityFeedbackBanner(),
+        Expanded(
+          child: GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+              zoom: 15.0,
+            ),
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -387,7 +419,7 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'layers',
             onPressed: _showLayersOptions,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppTheme.primaryColor,
             child: const Icon(Icons.layers_rounded),
           ),
@@ -413,7 +445,7 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'settings',
             onPressed: _showSettingsOptions,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppTheme.textSecondary,
             child: const Icon(Icons.tune_rounded),
           ),

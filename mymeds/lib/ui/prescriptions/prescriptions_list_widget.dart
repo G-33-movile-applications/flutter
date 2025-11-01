@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/prescripcion.dart';
-import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
+import '../../services/background_loader.dart';
+import '../../services/cache_service.dart';
+import '../../services/connectivity_service.dart';
 
 class PrescriptionsListWidget extends StatefulWidget {
   final Function(Prescripcion)? onPrescriptionTap;
@@ -17,7 +18,8 @@ class PrescriptionsListWidget extends StatefulWidget {
 }
 
 class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
-  bool _isLoading = true;
+  bool _isLoadingBackground = false; // Background refresh in progress
+  bool _hasLoadedFromCache = false; // Cached data loaded
   List<Prescripcion> _prescripciones = [];
   String? _errorMessage;
   String _filterStatus = 'all'; // 'all', 'active', 'inactive'
@@ -25,49 +27,134 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
   @override
   void initState() {
     super.initState();
-    _loadPrescripciones();
+    _loadPrescripcionesWithCache();
   }
 
-  Future<void> _loadPrescripciones() async {
-    try {
+  /// Load prescriptions with cache-first strategy
+  /// 
+  /// Strategy:
+  /// 1. Load cached prescriptions immediately (instant UI update)
+  /// 2. Check connectivity
+  /// 3. Launch background refresh only if online
+  /// 4. Update UI when background fetch completes
+  Future<void> _loadPrescripcionesWithCache({bool forceRefresh = false}) async {
+    final userId = UserSession().currentUser.value?.uid;
+    if (userId == null) {
       setState(() {
-        _isLoading = true;
-        _errorMessage = null;
+        _errorMessage = 'Usuario no autenticado';
       });
-
-      final userId = UserSession().currentUser.value?.uid;
-      if (userId == null) {
-        throw Exception('Usuario no autenticado');
+      return;
+    }
+    
+    debugPrint('🔄 [PrescriptionsListWidget] Starting data load for user: $userId (forceRefresh: $forceRefresh)');
+    
+    // Step 1: Load from cache first (instant UI)
+    _loadFromCache(userId);
+    
+    // Step 2: Check connectivity status
+    final connectivity = ConnectivityService();
+    final isOnline = await connectivity.checkConnectivity();
+    
+    if (!isOnline && !forceRefresh) {
+      debugPrint('📴 [PrescriptionsListWidget] Offline - using cached data only');
+      if (mounted && _hasLoadedFromCache) {
+        setState(() => _errorMessage = null);
       }
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userId)
-          .collection('prescripciones')
-          .get();
-
-      final prescripciones = snapshot.docs
-          .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
-          .toList();
-
+      return;
+    }
+    
+    // Step 3: Launch background fetch
+    setState(() => _isLoadingBackground = true);
+    
+    try {
+      debugPrint('🚀 [PrescriptionsListWidget] Launching background fetch...');
+      
+      // Use BackgroundLoader for async non-blocking fetch
+      final result = await BackgroundLoader.loadPrescriptions(
+        userId: userId,
+        includeInactive: true, // Load all for filtering
+      );
+      
+      if (!mounted) return;
+      
+      final prescriptions = result['prescriptions'] as List<Prescripcion>;
+      
       // Sort: active first, then by date (newest first)
-      prescripciones.sort((a, b) {
+      prescriptions.sort((a, b) {
         if (a.activa != b.activa) {
           return a.activa ? -1 : 1; // Active first
         }
         return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
       });
-
+      
       setState(() {
-        _prescripciones = prescripciones;
-        _isLoading = false;
+        _prescripciones = prescriptions;
+        _isLoadingBackground = false;
+        _errorMessage = null;
       });
+      
+      // Save to cache for next load
+      _saveToCache(userId, prescriptions);
+      
+      debugPrint('✅ [PrescriptionsListWidget] Background fetch completed - ${prescriptions.length} prescriptions');
+      
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Error cargando prescripciones: $e';
-        _isLoading = false;
-      });
+      debugPrint('❌ [PrescriptionsListWidget] Error loading prescriptions: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingBackground = false;
+          if (!_hasLoadedFromCache) {
+            _errorMessage = 'Error cargando prescripciones: $e';
+          }
+        });
+      }
     }
+  }
+  
+  /// Load prescriptions from cache (instant, synchronous)
+  void _loadFromCache(String userId) {
+    final cacheService = CacheService();
+    
+    // Try to load prescriptions from cache
+    final cachedPrescriptions = cacheService.get<List<Prescripcion>>(
+      'prescriptions_$userId',
+    );
+    
+    if (cachedPrescriptions != null && cachedPrescriptions.isNotEmpty) {
+      // Sort cached data
+      cachedPrescriptions.sort((a, b) {
+        if (a.activa != b.activa) {
+          return a.activa ? -1 : 1; // Active first
+        }
+        return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
+      });
+      
+      setState(() {
+        _prescripciones = cachedPrescriptions;
+        _hasLoadedFromCache = true;
+        _errorMessage = null;
+      });
+      
+      final cacheKey = 'prescriptions_$userId';
+      final remainingTtl = cacheService.getRemainingTtl(cacheKey);
+      debugPrint('🧠 [PrescriptionsListWidget] Loaded ${cachedPrescriptions.length} prescriptions from cache (TTL: ${remainingTtl}s)');
+    } else {
+      debugPrint('💾 [PrescriptionsListWidget] No cached prescriptions found');
+      setState(() => _hasLoadedFromCache = false);
+    }
+  }
+  
+  /// Save prescriptions to cache for next load
+  void _saveToCache(String userId, List<Prescripcion> prescriptions) {
+    final cacheService = CacheService();
+    
+    cacheService.set(
+      'prescriptions_$userId',
+      prescriptions,
+      ttl: const Duration(hours: 1),
+    );
+    
+    debugPrint('💾 [PrescriptionsListWidget] Saved ${prescriptions.length} prescriptions to cache');
   }
 
   List<Prescripcion> get _filteredPrescripciones {
@@ -129,6 +216,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     required int count,
   }) {
     final isSelected = _filterStatus == value;
+    final theme = Theme.of(context);
     
     return FilterChip(
       label: Text('$label ($count)'),
@@ -140,35 +228,37 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
           });
         }
       },
-      backgroundColor: Colors.white,
-      selectedColor: AppTheme.primaryColor,
-      checkmarkColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
+      selectedColor: theme.colorScheme.primary,
+      checkmarkColor: theme.colorScheme.onPrimary,
       side: BorderSide(
-        color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
         width: 1,
       ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : const Color(0xFF37474F), // Darker grey for better contrast
+        color: isSelected ? theme.colorScheme.onPrimary : theme.textTheme.bodyMedium?.color,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
       ),
     );
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
+    // Show loading ONLY if no cached data exists
+    if (_isLoadingBackground && !_hasLoadedFromCache) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    if (_errorMessage != null) {
+    // Show error ONLY if no cached data exists
+    if (_errorMessage != null && !_hasLoadedFromCache) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
@@ -177,7 +267,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadPrescripciones,
+                onPressed: () => _loadPrescripcionesWithCache(forceRefresh: true),
                 child: const Text('Reintentar'),
               ),
             ],
@@ -198,7 +288,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               Icon(
                 Icons.medication_outlined,
                 size: 64,
-                color: Colors.grey.shade400,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 16),
               Text(
@@ -206,7 +296,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                     ? 'No tienes prescripciones'
                     : 'No hay prescripciones ${_filterStatus == "active" ? "activas" : "inactivas"}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -214,7 +304,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               Text(
                 'Sube una prescripción para comenzar',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -233,20 +323,56 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadPrescripciones,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: filteredList.length,
-        itemBuilder: (context, index) {
-          final prescripcion = filteredList[index];
-          return _buildPrescripcionCard(prescripcion);
-        },
+      onRefresh: () => _loadPrescripcionesWithCache(forceRefresh: true),
+      child: Stack(
+        children: [
+          ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: filteredList.length,
+            itemBuilder: (context, index) {
+              final prescripcion = filteredList[index];
+              return _buildPrescripcionCard(prescripcion);
+            },
+          ),
+          // Background loading indicator (non-intrusive)
+          if (_isLoadingBackground && _hasLoadedFromCache)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Actualizando...',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildPrescripcionCard(Prescripcion prescripcion) {
     final isActive = prescripcion.activa;
+    final theme = Theme.of(context);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -255,8 +381,8 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isActive
-              ? AppTheme.primaryColor.withOpacity(0.3)
-              : Colors.grey.withOpacity(0.2),
+              ? theme.colorScheme.primary.withValues(alpha: 0.3)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -275,13 +401,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                     ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? const Color(0xFF1B5E20) // Dark green background for better contrast
-                          : const Color(0xFF424242), // Dark grey background for better contrast
+                          ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                          : theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isActive
-                            ? const Color(0xFF2E7D32) // Medium green border
-                            : const Color(0xFF616161), // Medium grey border
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outlineVariant,
                       ),
                     ),
                     child: Row(
@@ -290,15 +416,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                         Icon(
                           isActive ? Icons.check_circle : Icons.cancel,
                           size: 14,
-                          color: Colors.white, // White icon for contrast
+                          color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           isActive ? 'Activa' : 'Inactiva',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white, // White text for contrast
+                            color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
                           ),
                         ),
                       ],
@@ -308,8 +434,8 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                   // Date
                   Text(
                     _formatDate(prescripcion.fechaCreacion),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -319,10 +445,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               // Doctor
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.medical_services_outlined,
                     size: 20,
-                    color: AppTheme.textSecondary,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -331,15 +457,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                       children: [
                         Text(
                           'Médico',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                         ),
                         Text(
                           prescripcion.medico.isNotEmpty
                               ? prescripcion.medico
                               : 'No especificado',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -355,10 +481,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.assignment_outlined,
                       size: 20,
-                      color: AppTheme.textSecondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -367,13 +493,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                         children: [
                           Text(
                             'Diagnóstico',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                           ),
                           Text(
                             prescripcion.diagnostico,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -397,10 +523,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                       icon: const Icon(Icons.local_pharmacy, size: 18),
                       label: const Text('Buscar Farmacia'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         elevation: 2,
-                        shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+                        shadowColor: theme.colorScheme.primary.withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

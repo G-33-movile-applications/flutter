@@ -72,8 +72,56 @@ class UserStatsService {
       // Determine preferred delivery mode
       final preferredMode = deliveryCount >= pickupCount ? 'domicilio' : 'recogida';
 
+      // Business Question Type 2: Calculate medicine statistics
+      int totalMedicinesRequested = 0;
+      DateTime? lastClaimDate;
+
+      // Get all prescriptions for this user
+      final prescripcionesSnapshot = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .get();
+
+      print('📊 UserStatsService - Found ${prescripcionesSnapshot.docs.length} prescriptions');
+
+      // Count medicines in parallel (MUCH faster than sequential)
+      final medicineFutures = prescripcionesSnapshot.docs.map((prescDoc) async {
+        try {
+          final medicamentosSnapshot = await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(userId)
+              .collection('prescripciones')
+              .doc(prescDoc.id)
+              .collection('medicamentos')
+              .get();
+          
+          final count = medicamentosSnapshot.docs.length;
+          print('📊 UserStatsService - Prescription ${prescDoc.id}: $count medicines');
+          return count;
+        } catch (e) {
+          print('⚠️ UserStatsService - Error counting medicines for prescription ${prescDoc.id}: $e');
+          return 0;
+        }
+      }).toList();
+
+      // Wait for all queries to complete in parallel
+      final medicineCounts = await Future.wait(medicineFutures);
+      totalMedicinesRequested = medicineCounts.fold(0, (sum, count) => sum + count);
+
+      // Find most recent delivery date from delivered orders
+      for (var pedido in pedidos) {
+        if (pedido.fechaEntrega != null) {
+          if (lastClaimDate == null || pedido.fechaEntrega!.isAfter(lastClaimDate)) {
+            lastClaimDate = pedido.fechaEntrega;
+          }
+        }
+      }
+
       print('📊 UserStatsService - Stats calculated: delivery=$deliveryCount, pickup=$pickupCount');
       print('📊 UserStatsService - Most frequent pharmacy: $mostFrequentPharmacyName');
+      print('📊 UserStatsService - Total medicines requested: $totalMedicinesRequested');
+      print('📊 UserStatsService - Last claim date: $lastClaimDate');
 
       return UserStats(
         totalOrders: pedidos.length,
@@ -83,6 +131,8 @@ class UserStatsService {
         mostFrequentPharmacyId: mostFrequentPharmacyId,
         mostFrequentPharmacyName: mostFrequentPharmacyName,
         preferredDeliveryMode: preferredMode,
+        totalMedicinesRequested: totalMedicinesRequested,
+        lastClaimDate: lastClaimDate,
       );
     } catch (e, stack) {
       print('❌ UserStatsService - Error fetching user stats: $e');
@@ -92,12 +142,14 @@ class UserStatsService {
   }
 
   /// Get top N pharmacies by order count for a user
-  Future<List<Map<String, dynamic>>> getTopPharmacies(String userId, {int limit = 5}) async {
+  /// Optimized version that accepts pre-calculated stats to avoid duplicate queries
+  Future<List<Map<String, dynamic>>> getTopPharmacies(String userId, {int limit = 5, UserStats? stats}) async {
     try {
-      final stats = await getUserStats(userId);
+      // Use provided stats or fetch them (avoid duplicate query)
+      final userStats = stats ?? await getUserStats(userId);
       
       // Sort pharmacies by order count
-      var sortedPharmacies = stats.pharmacyOrderCounts.entries.toList()
+      var sortedPharmacies = userStats.pharmacyOrderCounts.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
 
       // Take top N
@@ -105,23 +157,24 @@ class UserStatsService {
         sortedPharmacies = sortedPharmacies.take(limit).toList();
       }
 
-      // Fetch pharmacy details
-      List<Map<String, dynamic>> result = [];
-      for (var entry in sortedPharmacies) {
+      // Fetch pharmacy details in parallel (much faster)
+      final pharmacyFutures = sortedPharmacies.map((entry) async {
         try {
           final pharmacy = await _puntoFisicoRepository.read(entry.key);
           if (pharmacy != null) {
-            result.add({
+            return {
               'pharmacy': pharmacy,
               'orderCount': entry.value,
-            });
+            };
           }
         } catch (e) {
           print('⚠️ Error fetching pharmacy ${entry.key}: $e');
         }
-      }
+        return null;
+      }).toList();
 
-      return result;
+      final results = await Future.wait(pharmacyFutures);
+      return results.whereType<Map<String, dynamic>>().toList();
     } catch (e) {
       print('❌ UserStatsService - Error fetching top pharmacies: $e');
       rethrow;

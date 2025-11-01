@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
-import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
@@ -421,7 +420,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   /// Widget displayed when user has no prescriptions
   /// Shows informative message and redirect button to upload screen
   Widget _buildNoPrescriptionsWidget() {
-    final theme = AppTheme.lightTheme;
+    final theme = Theme.of(context);
     
     return Center(
       child: Padding(
@@ -434,7 +433,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Icon(
@@ -460,7 +459,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             Text(
               'No puedes crear un pedido porque no tienes ninguna prescripción subida o associada a tu cuenta.',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -492,6 +491,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   /// Widget containing the main delivery form
   /// Displayed when user has valid prescriptions
   Widget _buildDeliveryForm() {
+    final theme = Theme.of(context);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -506,20 +507,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 children: [
                   Text(
                     'Farmacia Seleccionada',
-                    style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _selectedPharmacy!.nombre,
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                    style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     _selectedPharmacy!.direccion,
-                    style: AppTheme.lightTheme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium,
                   ),
                 ],
               ),
@@ -530,7 +531,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           // Prescription selection
           Text(
             'Selecciona una prescripción:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -541,10 +542,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -552,13 +553,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   Icon(
                     Icons.lock,
                     size: 16,
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Prescripción preseleccionada',
-                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryColor,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -576,7 +577,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 hintText: 'Selecciona una prescripción',
                 filled: widget.prescripcion != null,
                 fillColor: widget.prescripcion != null 
-                    ? Colors.grey.withOpacity(0.1) 
+                    ? Colors.grey.withValues(alpha: 0.1) 
                     : null,
               ),
               items: _prescripciones.map((prescripcion) {
@@ -587,8 +588,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: widget.prescripcion != null 
-                          ? AppTheme.textSecondary.withOpacity(0.6)
-                          : AppTheme.textSecondary,
+                          ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 );
@@ -605,7 +606,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           // Delivery mode selection
           Text(
             'Método de entrega:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -634,7 +635,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             const SizedBox(height: 16),
             Text(
               'Dirección de entrega:',
-              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -695,7 +696,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   ? _createPedido
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.lightTheme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -853,39 +854,64 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       print('🔄 Creating pedido with ID: $pedidoId for user: $userId');
       print('📦 Pedido details: tipoEntrega=${pedido.tipoEntrega}, estado=${pedido.estado}, prescripcionId=${pedido.prescripcionId}');
 
-      // Create only the pedido - no prescription creation
-      await _facade.createPedido(pedido, userId: userId);
+      // 🌐 Use offline-aware method that handles connectivity
+      final result = await _facade.createPedidoWithSync(
+        pedido: pedido,
+        userId: userId,
+        prescripcionId: _selectedPrescripcion!.id,
+        prescripcionUpdates: {'activa': false}, // Deactivate prescription after order
+      );
       
-      print('✅ Pedido successfully saved to Firestore: usuarios/$userId/pedidos/$pedidoId');
+      final success = result['success'] as bool? ?? false;
+      final isOffline = result['isOffline'] as bool? ?? false;
+      final message = result['message'] as String? ?? 'Unknown result';
+      
+      if (!success) {
+        // Handle error case
+        throw Exception(message);
+      }
+      
+      print(isOffline 
+        ? '📴 Pedido queued offline: $message'
+        : '✅ Pedido created online: usuarios/$userId/pedidos/$pedidoId');
 
       if (mounted) {
-        // Show success message
+        // Show appropriate message based on connectivity
+        final snackBarColor = isOffline ? Colors.orange : Colors.green;
+        final snackBarIcon = isOffline ? Icons.cloud_off : Icons.check_circle;
+        final snackBarMessage = isOffline 
+          ? '📴 Tu pedido se enviará cuando tengas conexión' 
+          : '✅ Pedido creado exitosamente';
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido creado exitosamente'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(snackBarIcon, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(snackBarMessage)),
+              ],
+            ),
+            backgroundColor: snackBarColor,
+            duration: Duration(seconds: isOffline ? 6 : 3),
           ),
         );
 
-        // If pickup selected, open Google Maps with directions
-        if (_isPickup) {
-          await _openGoogleMapsDirections();
+        // If pickup selected and ONLINE, open Google Maps with directions
+        if (_isPickup && !isOffline) {
+          // Wrap in try-catch to prevent crash if Maps fails
+          try {
+            await _openGoogleMapsDirections();
+          } catch (e) {
+            print('⚠️ Warning: Could not open Google Maps: $e');
+            // Don't throw - order was created successfully
+          }
         }
 
-        // Navigate away BEFORE deactivating prescription to avoid UI rebuild issues
+        // Navigate away after showing message
         if (mounted) {
           Navigator.popUntil(context, (route) => route.settings.name == '/map' || route.isFirst);
         }
-      }
-
-      // Auto-deactivate the prescription AFTER navigation to avoid dropdown assertion error
-      try {
-        final updatedPrescription = _selectedPrescripcion!.copyWith(activa: false);
-        await _facade.updatePrescripcion(updatedPrescription, userId: userId);
-        print('✅ Prescription ${_selectedPrescripcion!.id} deactivated after order creation');
-      } catch (e) {
-        print('⚠️ Warning: Could not deactivate prescription: $e');
-        // Don't throw - order was created successfully, this is just a warning
       }
     } catch (e) {
       print('❌ Error creating pedido: $e');
@@ -946,7 +972,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightTheme;
+    final theme = Theme.of(context);
 
     if (_selectedPharmacy == null) {
       return Scaffold(
