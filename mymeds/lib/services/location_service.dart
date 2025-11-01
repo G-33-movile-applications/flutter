@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../utils/address_validator.dart';
+import 'connectivity_service.dart';
 
 /// Service class that handles location-related operations
 /// Provides methods to get current location and convert coordinates to addresses
@@ -10,6 +11,8 @@ class LocationService {
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
   LocationService._internal();
+  
+  final ConnectivityService _connectivityService = ConnectivityService();
 
   /// Checks if location permissions are granted and location services are enabled
   /// Returns a tuple of (permission granted, service enabled, error message)
@@ -84,7 +87,14 @@ class LocationService {
 
   /// Converts coordinates to a human-readable address
   /// Returns a formatted address string or null if geocoding fails
+  /// Throws exception with user-friendly message if offline
   Future<String?> getAddressFromCoordinates(double latitude, double longitude) async {
+    // Check connectivity before attempting geocoding (requires network)
+    final isOnline = await _connectivityService.checkConnectivity();
+    if (!isOnline) {
+      throw Exception('No tienes conexión a internet. Necesitas conexión para obtener tu ubicación actual.');
+    }
+    
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
       
@@ -114,10 +124,14 @@ class LocationService {
       }
       
       debugPrint('LocationService: No placemarks found for coordinates');
-      return null;
+      throw Exception('No se pudo convertir las coordenadas a una dirección');
     } catch (e) {
+      // Re-throw connectivity errors as-is
+      if (e.toString().contains('conexión')) {
+        rethrow;
+      }
       debugPrint('LocationService: Error getting address from coordinates: $e');
-      return null;
+      throw Exception('No se pudo obtener la dirección: ${e.toString()}');
     }
   }
 

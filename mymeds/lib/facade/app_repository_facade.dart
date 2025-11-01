@@ -12,6 +12,8 @@ import '../repositories/prescripcion_repository.dart';
 import '../repositories/medicamento_repository.dart';
 import '../repositories/punto_fisico_repository.dart';
 import '../repositories/medicamento_punto_fisico_repository.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_queue_service.dart';
 
 /// Façade class that provides a simplified interface to all repositories
 /// This class acts as a single entry point for the UI layer, hiding the complexity
@@ -24,6 +26,10 @@ class AppRepositoryFacade {
   final MedicamentoRepository _medicamentoRepository;
   final PuntoFisicoRepository _puntoFisicoRepository;
   final MedicamentoPuntoFisicoRepository _medicamentoPuntoFisicoRepository;
+  
+  // Service instances for connectivity and offline sync
+  final ConnectivityService _connectivityService;
+  final SyncQueueService _syncQueueService;
 
   // Constructor with optional dependency injection
   AppRepositoryFacade({
@@ -33,12 +39,43 @@ class AppRepositoryFacade {
     MedicamentoRepository? medicamentoRepository,
     PuntoFisicoRepository? puntoFisicoRepository,
     MedicamentoPuntoFisicoRepository? medicamentoPuntoFisicoRepository,
+    ConnectivityService? connectivityService,
+    SyncQueueService? syncQueueService,
   })  : _usuarioRepository = usuarioRepository ?? UsuarioRepository(),
         _pedidoRepository = pedidoRepository ?? PedidoRepository(),
         _prescripcionRepository = prescripcionRepository ?? PrescripcionRepository(),
         _medicamentoRepository = medicamentoRepository ?? MedicamentoRepository(),
         _puntoFisicoRepository = puntoFisicoRepository ?? PuntoFisicoRepository(),
-        _medicamentoPuntoFisicoRepository = medicamentoPuntoFisicoRepository ?? MedicamentoPuntoFisicoRepository();
+        _medicamentoPuntoFisicoRepository = medicamentoPuntoFisicoRepository ?? MedicamentoPuntoFisicoRepository(),
+        _connectivityService = connectivityService ?? ConnectivityService(),
+        _syncQueueService = syncQueueService ?? SyncQueueService() {
+    // Wire up sync callbacks for offline operations
+    _initializeSyncCallbacks();
+  }
+  
+  /// Initialize callbacks for sync queue service
+  void _initializeSyncCallbacks() {
+    // Set callback for creating pedido when sync occurs
+    _syncQueueService.onCreatePedido = (Map<String, dynamic> pedidoData) async {
+      final pedido = Pedido.fromJsonMap(pedidoData['pedido']); // Use fromJsonMap
+      final userId = pedidoData['userId'] as String;
+      await createPedido(pedido, userId: userId);
+    };
+    
+    // Set callback for updating prescripcion when sync occurs
+    _syncQueueService.onUpdatePrescripcion = (String prescripcionId, Map<String, dynamic> updates) async {
+      final userId = updates['userId'] as String;
+      final actualUpdates = Map<String, dynamic>.from(updates);
+      actualUpdates.remove('userId'); // Remove userId from updates map as it's not a field to update
+      
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .doc(prescripcionId)
+          .update(actualUpdates);
+    };
+  }
 
   // ==================== USER OPERATIONS ====================
 
@@ -635,6 +672,92 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
     } catch (e) {
       print('❌ [AppRepositoryFacade] Error creating pedido in Firestore: $e');
       throw Exception('Error creating pedido: $e');
+    }
+  }
+  
+  /// Create a pedido with offline support and automatic sync
+  /// This method checks connectivity and either executes immediately or queues for later sync
+  /// Returns a Map with 'success' (bool) and 'isOffline' (bool) status
+  Future<Map<String, dynamic>> createPedidoWithSync({
+    required Pedido pedido,
+    required String userId,
+    String? prescripcionId,
+    Map<String, dynamic>? prescripcionUpdates,
+  }) async {
+    try {
+      print('🔍 [AppRepositoryFacade] createPedidoWithSync - Checking connectivity');
+      
+      // Check if device is online - use fresh check instead of cached state
+      final isOnline = await _connectivityService.checkConnectivity();
+      print('🌐 [AppRepositoryFacade] Connectivity status: ${isOnline ? "ONLINE" : "OFFLINE"}');
+      
+      if (isOnline) {
+        // Device is online - execute immediately
+        print('✅ [AppRepositoryFacade] Device online - executing pedido creation immediately');
+        try {
+          await createPedido(pedido, userId: userId);
+          
+          // Update prescription if needed (e.g., mark as used)
+          if (prescripcionId != null && prescripcionUpdates != null) {
+            final updatesWithUserId = Map<String, dynamic>.from(prescripcionUpdates);
+            updatesWithUserId['userId'] = userId;
+            await _syncQueueService.onUpdatePrescripcion?.call(prescripcionId, updatesWithUserId);
+          }
+          
+          return {
+            'success': true,
+            'isOffline': false,
+            'message': 'Pedido created successfully',
+          };
+        } catch (e) {
+          print('❌ [AppRepositoryFacade] Error creating pedido online: $e');
+          // If network error, queue instead of failing
+          if (e.toString().toLowerCase().contains('network') ||
+              e.toString().toLowerCase().contains('unavailable') ||
+              e.toString().toLowerCase().contains('firestore')) {
+            print('📴 [AppRepositoryFacade] Network error detected, falling back to offline queue');
+            // Fall through to offline queueing
+          } else {
+            rethrow;
+          }
+        }
+      }
+      
+      // Device is offline - queue for later sync
+      print('📴 [AppRepositoryFacade] Device offline - queuing pedido for sync');
+      try {
+        await _syncQueueService.queueDeliveryCreation({
+          'pedido': pedido.toJsonMap(), // Use JSON-serializable map
+          'userId': userId,
+        });
+        
+        print('✅ [AppRepositoryFacade] Pedido queued successfully');
+        
+        // Queue prescription update if needed
+        if (prescripcionId != null && prescripcionUpdates != null) {
+          final updatesWithUserId = Map<String, dynamic>.from(prescripcionUpdates);
+          updatesWithUserId['userId'] = userId;
+          await _syncQueueService.queuePrescriptionUpdate(prescripcionId, updatesWithUserId);
+          print('✅ [AppRepositoryFacade] Prescription update queued successfully');
+        }
+        
+        return {
+          'success': true,
+          'isOffline': true,
+          'message': 'Pedido queued for sync when connection is restored',
+        };
+      } catch (e) {
+        print('❌ [AppRepositoryFacade] Error queuing pedido: $e');
+        rethrow;
+      }
+    } catch (e) {
+      print('❌ [AppRepositoryFacade] Unexpected error in createPedidoWithSync: $e');
+      // Return error instead of crashing
+      return {
+        'success': false,
+        'isOffline': false,
+        'message': 'Error: ${e.toString()}',
+      };
     }
   }
 

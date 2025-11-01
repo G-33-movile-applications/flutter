@@ -853,39 +853,64 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       print('🔄 Creating pedido with ID: $pedidoId for user: $userId');
       print('📦 Pedido details: tipoEntrega=${pedido.tipoEntrega}, estado=${pedido.estado}, prescripcionId=${pedido.prescripcionId}');
 
-      // Create only the pedido - no prescription creation
-      await _facade.createPedido(pedido, userId: userId);
+      // 🌐 Use offline-aware method that handles connectivity
+      final result = await _facade.createPedidoWithSync(
+        pedido: pedido,
+        userId: userId,
+        prescripcionId: _selectedPrescripcion!.id,
+        prescripcionUpdates: {'activa': false}, // Deactivate prescription after order
+      );
       
-      print('✅ Pedido successfully saved to Firestore: usuarios/$userId/pedidos/$pedidoId');
+      final success = result['success'] as bool? ?? false;
+      final isOffline = result['isOffline'] as bool? ?? false;
+      final message = result['message'] as String? ?? 'Unknown result';
+      
+      if (!success) {
+        // Handle error case
+        throw Exception(message);
+      }
+      
+      print(isOffline 
+        ? '📴 Pedido queued offline: $message'
+        : '✅ Pedido created online: usuarios/$userId/pedidos/$pedidoId');
 
       if (mounted) {
-        // Show success message
+        // Show appropriate message based on connectivity
+        final snackBarColor = isOffline ? Colors.orange : Colors.green;
+        final snackBarIcon = isOffline ? Icons.cloud_off : Icons.check_circle;
+        final snackBarMessage = isOffline 
+          ? '📴 Tu pedido se enviará cuando tengas conexión' 
+          : '✅ Pedido creado exitosamente';
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pedido creado exitosamente'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(snackBarIcon, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(snackBarMessage)),
+              ],
+            ),
+            backgroundColor: snackBarColor,
+            duration: Duration(seconds: isOffline ? 6 : 3),
           ),
         );
 
-        // If pickup selected, open Google Maps with directions
-        if (_isPickup) {
-          await _openGoogleMapsDirections();
+        // If pickup selected and ONLINE, open Google Maps with directions
+        if (_isPickup && !isOffline) {
+          // Wrap in try-catch to prevent crash if Maps fails
+          try {
+            await _openGoogleMapsDirections();
+          } catch (e) {
+            print('⚠️ Warning: Could not open Google Maps: $e');
+            // Don't throw - order was created successfully
+          }
         }
 
-        // Navigate away BEFORE deactivating prescription to avoid UI rebuild issues
+        // Navigate away after showing message
         if (mounted) {
           Navigator.popUntil(context, (route) => route.settings.name == '/map' || route.isFirst);
         }
-      }
-
-      // Auto-deactivate the prescription AFTER navigation to avoid dropdown assertion error
-      try {
-        final updatedPrescription = _selectedPrescripcion!.copyWith(activa: false);
-        await _facade.updatePrescripcion(updatedPrescription, userId: userId);
-        print('✅ Prescription ${_selectedPrescripcion!.id} deactivated after order creation');
-      } catch (e) {
-        print('⚠️ Warning: Could not deactivate prescription: $e');
-        // Don't throw - order was created successfully, this is just a warning
       }
     } catch (e) {
       print('❌ Error creating pedido: $e');

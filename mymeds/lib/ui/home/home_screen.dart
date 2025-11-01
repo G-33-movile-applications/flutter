@@ -28,8 +28,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Background loading state
   bool _isLoadingBackground = false;
   bool _hasLoadedFromCache = false;
-  List<Prescripcion> _cachedPrescriptions = [];
-  List<Pedido> _cachedOrders = [];
   DateTime? _lastRefreshTime; // Track last refresh for debouncing
 
   @override
@@ -143,8 +141,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final orders = result['orders'] as List<Pedido>;
       
       setState(() {
-        _cachedPrescriptions = prescriptions;
-        _cachedOrders = orders;
         _isLoadingBackground = false;
         _hasLoadedFromCache = true;
       });
@@ -214,8 +210,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       debugPrint('   - Cached orders: ${cachedOrders?.length ?? 0}');
       
       setState(() {
-        _cachedPrescriptions = cachedPrescriptions ?? [];
-        _cachedOrders = cachedOrders ?? [];
         _hasLoadedFromCache = true;
       });
       
@@ -374,12 +368,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
         actions: [
-          // Refresh button - triggers background reload
+          // Refresh button - triggers background reload with force refresh
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Actualizar datos',
             onPressed: _isLoadingBackground ? null : () {
-              _loadDataWithBackgroundLoader();
+              _loadDataWithBackgroundLoader(forceRefresh: true);
             },
           ),
           IconButton(
@@ -445,15 +439,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadDataWithBackgroundLoader,
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildHomeTab(theme),
-                  _buildPrescriptionsTab(),
-                ],
-              ),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                RefreshIndicator(
+                  onRefresh: () => _loadDataWithBackgroundLoader(forceRefresh: true),
+                  child: _buildHomeTab(theme),
+                ),
+                _buildPrescriptionsTab(),
+              ],
             ),
           ),
           // Debug status bar at bottom
@@ -597,58 +591,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
-              // Data status indicator (for Viva Voce demonstration)
-              if (user != null) ...[
-                const SizedBox(height: 12),
-                _buildDataStatusChip(theme),
-              ],
             ],
           );
         },
       ),
-    );
-  }
-  
-  /// Build a chip showing data status (cached vs fresh)
-  /// This helps demonstrate the background loading feature during Viva Voce
-  Widget _buildDataStatusChip(ThemeData theme) {
-    IconData icon;
-    String label;
-    Color color;
-    
-    if (_isLoadingBackground) {
-      icon = Icons.cloud_sync_rounded;
-      label = 'Sincronizando...';
-      color = Colors.blue;
-    } else if (_hasLoadedFromCache) {
-      icon = Icons.cloud_done_rounded;
-      label = 'Datos actualizados';
-      color = Colors.green;
-    } else {
-      icon = Icons.cloud_off_rounded;
-      label = 'Sin conexión';
-      color = Colors.orange;
-    }
-    
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '• ${_cachedPrescriptions.length} prescripciones • ${_cachedOrders.length} pedidos',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.5),
-          ),
-        ),
-      ],
     );
   }
 }
