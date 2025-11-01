@@ -6,6 +6,10 @@ class UserStats {
   final String? mostFrequentPharmacyId;
   final String? mostFrequentPharmacyName;
   final String preferredDeliveryMode; // "domicilio" or "recogida"
+  
+  // Business Question Type 2 fields
+  final int totalMedicinesRequested; // Total count of medicines across all prescriptions
+  final DateTime? lastClaimDate; // Most recent delivery date
 
   UserStats({
     required this.totalOrders,
@@ -15,6 +19,8 @@ class UserStats {
     this.mostFrequentPharmacyId,
     this.mostFrequentPharmacyName,
     required this.preferredDeliveryMode,
+    this.totalMedicinesRequested = 0,
+    this.lastClaimDate,
   });
 
   double get deliveryPercentage => 
@@ -30,6 +36,8 @@ class UserStats {
       pickupCount: 0,
       pharmacyOrderCounts: {},
       preferredDeliveryMode: 'domicilio',
+      totalMedicinesRequested: 0,
+      lastClaimDate: null,
     );
   }
 
@@ -42,6 +50,24 @@ class UserStats {
       'mostFrequentPharmacyId': mostFrequentPharmacyId,
       'mostFrequentPharmacyName': mostFrequentPharmacyName,
       'preferredDeliveryMode': preferredDeliveryMode,
+      'totalMedicinesRequested': totalMedicinesRequested,
+      'lastClaimDate': lastClaimDate?.toIso8601String(),
     };
+  }
+  
+  factory UserStats.fromMap(Map<String, dynamic> map) {
+    return UserStats(
+      totalOrders: map['totalOrders'] ?? 0,
+      deliveryCount: map['deliveryCount'] ?? 0,
+      pickupCount: map['pickupCount'] ?? 0,
+      pharmacyOrderCounts: Map<String, int>.from(map['pharmacyOrderCounts'] ?? {}),
+      mostFrequentPharmacyId: map['mostFrequentPharmacyId'],
+      mostFrequentPharmacyName: map['mostFrequentPharmacyName'],
+      preferredDeliveryMode: map['preferredDeliveryMode'] ?? 'domicilio',
+      totalMedicinesRequested: map['totalMedicinesRequested'] ?? 0,
+      lastClaimDate: map['lastClaimDate'] != null 
+          ? DateTime.parse(map['lastClaimDate'])
+          : null,
+    );
   }
 }

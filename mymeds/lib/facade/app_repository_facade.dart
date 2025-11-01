@@ -428,6 +428,67 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
       'pedidos': pedidos,
     };
   }
+  
+  /// Get user medicine statistics (Business Question Type 2)
+  /// Returns: total medicines requested and last claim date
+  Future<Map<String, dynamic>> getUserMedicineStats(String userId) async {
+    try {
+      int totalMedicinesRequested = 0;
+      DateTime? lastClaimDate;
+
+      // Get all prescriptions for this user from subcollection
+      final prescripcionesSnapshot = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('prescripciones')
+          .get();
+
+      // Count medicines in each prescription (medicines are in subcollections)
+      for (var prescDoc in prescripcionesSnapshot.docs) {
+        try {
+          final medicamentosSnapshot = await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(userId)
+              .collection('prescripciones')
+              .doc(prescDoc.id)
+              .collection('medicamentos')
+              .get();
+          
+          totalMedicinesRequested += medicamentosSnapshot.docs.length;
+        } catch (e) {
+          print('⚠️ Error counting medicines for prescription ${prescDoc.id}: $e');
+        }
+      }
+
+      // Get all orders to find most recent delivery date
+      final pedidosSnapshot = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .collection('pedidos')
+          .get();
+
+      final pedidos = pedidosSnapshot.docs
+          .map((doc) => Pedido.fromMap(doc.data(), documentId: doc.id))
+          .toList();
+
+      // Find most recent delivery date
+      for (var pedido in pedidos) {
+        if (pedido.fechaEntrega != null) {
+          if (lastClaimDate == null || pedido.fechaEntrega!.isAfter(lastClaimDate)) {
+            lastClaimDate = pedido.fechaEntrega;
+          }
+        }
+      }
+
+      return {
+        'medicineCount': totalMedicinesRequested,
+        'lastClaimDate': lastClaimDate,
+      };
+    } catch (e) {
+      print('❌ Error fetching medicine stats: $e');
+      rethrow;
+    }
+  }
 
   /// Search medications by name across all pharmacies
   Future<List<Map<String, dynamic>>> searchMedicamentosWithAvailability(String query) async {

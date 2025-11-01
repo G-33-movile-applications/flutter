@@ -38,7 +38,8 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
       }
 
       final stats = await _statsService.getUserStats(userId);
-      final topPharmacies = await _statsService.getTopPharmacies(userId, limit: 5);
+      // Pass stats to avoid duplicate query
+      final topPharmacies = await _statsService.getTopPharmacies(userId, limit: 5, stats: stats);
 
       setState(() {
         _stats = stats;
@@ -118,6 +119,10 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
           _buildTotalOrdersCard(),
           const SizedBox(height: 16),
 
+          // Medicine Statistics Card (Business Question Type 2)
+          _buildMedicineStatsCard(),
+          const SizedBox(height: 16),
+
           // Delivery Mode Preference Card
           _buildDeliveryModeCard(),
           const SizedBox(height: 16),
@@ -161,6 +166,174 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildMedicineStatsCard() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.medical_services, color: Color(0xFF1565C0)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Estadísticas de Medicamentos',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF212121),
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Total medicines requested
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1565C0).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF1565C0).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.medication_liquid,
+                          color: Color(0xFF1565C0),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_stats!.totalMedicinesRequested}',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: const Color(0xFF1565C0),
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Medicamentos Solicitados',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Last claim date
+            if (_stats!.lastClaimDate != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF2E7D32).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      color: Color(0xFF2E7D32),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Último Reclamo',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFF37474F),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatDate(_stats!.lastClaimDate!),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: const Color(0xFF2E7D32),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.grey.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Color(0xFF37474F),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No hay medicamentos reclamados aún',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF37474F),
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Hoy';
+    } else if (difference.inDays == 1) {
+      return 'Ayer';
+    } else if (difference.inDays < 7) {
+      return 'Hace ${difference.inDays} días';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return 'Hace ${weeks} ${weeks == 1 ? 'semana' : 'semanas'}';
+    } else if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return 'Hace ${months} ${months == 1 ? 'mes' : 'meses'}';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 
   Widget _buildDeliveryModeCard() {
