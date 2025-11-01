@@ -4,6 +4,7 @@ import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
 import '../services/cache_service.dart';
 import '../services/data_saver_auto_detector.dart';
+import '../services/profile_sync_service.dart';
 
 /// Provider for managing application settings state
 class SettingsProvider with ChangeNotifier {
@@ -12,6 +13,7 @@ class SettingsProvider with ChangeNotifier {
   final SyncService _syncService = SyncService();
   final CacheService _cacheService = CacheService();
   final DataSaverAutoDetector _autoDetector = DataSaverAutoDetector();
+  final ProfileSyncService _profileSyncService = ProfileSyncService();
 
   // Private state variables
   bool _dataSaverModeEnabled = false;
@@ -113,12 +115,15 @@ class SettingsProvider with ChangeNotifier {
     try {
       await _settingsService.setDataSaverMode(value);
 
+      // Notify ProfileSyncService about Data Saver mode change
+      await _profileSyncService.onDataSaverModeChanged(value);
+
       if (value) {
         debugPrint('💾 Data Saver Mode ENABLED');
         // Clear cache on enable to ensure fresh data on next load
         // (user consciously enabled data saver)
       } else {
-        debugPrint('💾 Data Saver Mode DISABLED');
+        debugPrint('💾 Data Saver Mode DISABLED - triggering profile sync');
         // Optionally clear cache on disable
         _cacheService.clear();
       }

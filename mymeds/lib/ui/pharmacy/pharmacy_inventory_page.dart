@@ -160,7 +160,7 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
     return Card(
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 16),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -254,27 +254,27 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(context).dividerColor,
                       width: 1,
                     ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.info_outline,
                         size: 18,
-                        color: Color(0xFF475569),
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           descripcion,
-                          style: const TextStyle(
-                            color: Color(0xFF475569),
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                             fontSize: 13,
                             height: 1.5,
                           ),
@@ -506,9 +506,9 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -532,7 +532,7 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 20),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade400,
+                        color: Theme.of(context).disabledColor.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -619,17 +619,17 @@ class _PharmacyInventoryPageState extends State<PharmacyInventoryPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.grey.shade300,
+                        color: Theme.of(context).dividerColor,
                         width: 1,
                       ),
                     ),
                     child: Text(
                       descripcion,
-                      style: const TextStyle(
-                        color: Color(0xFF475569),
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
                         fontSize: 14,
                         height: 1.6,
                       ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
-import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
@@ -421,7 +420,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   /// Widget displayed when user has no prescriptions
   /// Shows informative message and redirect button to upload screen
   Widget _buildNoPrescriptionsWidget() {
-    final theme = AppTheme.lightTheme;
+    final theme = Theme.of(context);
     
     return Center(
       child: Padding(
@@ -434,7 +433,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Icon(
@@ -460,7 +459,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             Text(
               'No puedes crear un pedido porque no tienes ninguna prescripción subida o associada a tu cuenta.',
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -492,6 +491,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   /// Widget containing the main delivery form
   /// Displayed when user has valid prescriptions
   Widget _buildDeliveryForm() {
+    final theme = Theme.of(context);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -506,20 +507,20 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 children: [
                   Text(
                     'Farmacia Seleccionada',
-                    style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _selectedPharmacy!.nombre,
-                    style: AppTheme.lightTheme.textTheme.bodyLarge?.copyWith(
+                    style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     _selectedPharmacy!.direccion,
-                    style: AppTheme.lightTheme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium,
                   ),
                 ],
               ),
@@ -530,7 +531,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           // Prescription selection
           Text(
             'Selecciona una prescripción:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -541,10 +542,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -552,13 +553,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   Icon(
                     Icons.lock,
                     size: 16,
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Prescripción preseleccionada',
-                    style: AppTheme.lightTheme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.primaryColor,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -576,7 +577,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                 hintText: 'Selecciona una prescripción',
                 filled: widget.prescripcion != null,
                 fillColor: widget.prescripcion != null 
-                    ? Colors.grey.withOpacity(0.1) 
+                    ? Colors.grey.withValues(alpha: 0.1) 
                     : null,
               ),
               items: _prescripciones.map((prescripcion) {
@@ -587,8 +588,8 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: widget.prescripcion != null 
-                          ? AppTheme.textSecondary.withOpacity(0.6)
-                          : AppTheme.textSecondary,
+                          ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 );
@@ -605,7 +606,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
           // Delivery mode selection
           Text(
             'Método de entrega:',
-            style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -634,7 +635,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             const SizedBox(height: 16),
             Text(
               'Dirección de entrega:',
-              style: AppTheme.lightTheme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -695,7 +696,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   ? _createPedido
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.lightTheme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -946,7 +947,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightTheme;
+    final theme = Theme.of(context);
 
     if (_selectedPharmacy == null) {
       return Scaffold(

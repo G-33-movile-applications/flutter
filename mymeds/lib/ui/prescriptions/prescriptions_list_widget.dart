@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/prescripcion.dart';
-import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
 import '../../services/background_loader.dart';
 import '../../services/cache_service.dart';
@@ -217,6 +216,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     required int count,
   }) {
     final isSelected = _filterStatus == value;
+    final theme = Theme.of(context);
     
     return FilterChip(
       label: Text('$label ($count)'),
@@ -228,15 +228,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
           });
         }
       },
-      backgroundColor: Colors.white,
-      selectedColor: AppTheme.primaryColor,
-      checkmarkColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
+      selectedColor: theme.colorScheme.primary,
+      checkmarkColor: theme.colorScheme.onPrimary,
       side: BorderSide(
-        color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
         width: 1,
       ),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : const Color(0xFF37474F), // Darker grey for better contrast
+        color: isSelected ? theme.colorScheme.onPrimary : theme.textTheme.bodyMedium?.color,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
       ),
     );
@@ -258,7 +258,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 _errorMessage!,
@@ -288,7 +288,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               Icon(
                 Icons.medication_outlined,
                 size: 64,
-                color: Colors.grey.shade400,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 16),
               Text(
@@ -296,7 +296,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                     ? 'No tienes prescripciones'
                     : 'No hay prescripciones ${_filterStatus == "active" ? "activas" : "inactivas"}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -304,7 +304,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               Text(
                 'Sube una prescripción para comenzar',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -372,6 +372,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
 
   Widget _buildPrescripcionCard(Prescripcion prescripcion) {
     final isActive = prescripcion.activa;
+    final theme = Theme.of(context);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -380,8 +381,8 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isActive
-              ? AppTheme.primaryColor.withOpacity(0.3)
-              : Colors.grey.withOpacity(0.2),
+              ? theme.colorScheme.primary.withValues(alpha: 0.3)
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -400,13 +401,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                     ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? const Color(0xFF1B5E20) // Dark green background for better contrast
-                          : const Color(0xFF424242), // Dark grey background for better contrast
+                          ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                          : theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isActive
-                            ? const Color(0xFF2E7D32) // Medium green border
-                            : const Color(0xFF616161), // Medium grey border
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outlineVariant,
                       ),
                     ),
                     child: Row(
@@ -415,15 +416,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                         Icon(
                           isActive ? Icons.check_circle : Icons.cancel,
                           size: 14,
-                          color: Colors.white, // White icon for contrast
+                          color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           isActive ? 'Activa' : 'Inactiva',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white, // White text for contrast
+                            color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
                           ),
                         ),
                       ],
@@ -433,8 +434,8 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                   // Date
                   Text(
                     _formatDate(prescripcion.fechaCreacion),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -444,10 +445,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               // Doctor
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.medical_services_outlined,
                     size: 20,
-                    color: AppTheme.textSecondary,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -456,15 +457,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                       children: [
                         Text(
                           'Médico',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                         ),
                         Text(
                           prescripcion.medico.isNotEmpty
                               ? prescripcion.medico
                               : 'No especificado',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -480,10 +481,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.assignment_outlined,
                       size: 20,
-                      color: AppTheme.textSecondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -492,13 +493,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                         children: [
                           Text(
                             'Diagnóstico',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                           ),
                           Text(
                             prescripcion.diagnostico,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -522,10 +523,10 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
                       icon: const Icon(Icons.local_pharmacy, size: 18),
                       label: const Text('Buscar Farmacia'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         elevation: 2,
-                        shadowColor: AppTheme.primaryColor.withOpacity(0.3),
+                        shadowColor: theme.colorScheme.primary.withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

@@ -6,6 +6,9 @@ import 'theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'services/user_session.dart';
 import 'services/settings_service.dart';
+import 'services/connectivity_service.dart';
+import 'services/profile_cache_service.dart';
+import 'services/profile_sync_service.dart';
 import 'services/cache_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/storage_service.dart';
@@ -41,6 +44,21 @@ Future<void> main() async {
 
   // Initialize settings service
   await SettingsService().init();
+
+  // Initialize connectivity service
+  await ConnectivityService().init();
+
+  // Initialize profile cache service
+  await ProfileCacheService().init();
+
+  // Initialize profile sync service
+  final profileSyncService = ProfileSyncService();
+  await profileSyncService.init(
+    onSyncEvent: (event) async {
+      debugPrint('📤 Sync Event: ${event.type} - ${event.message}');
+      // You can handle sync events globally here if needed
+    },
+  );
 
   // Initialize cache service for background loading
   await CacheService().init(

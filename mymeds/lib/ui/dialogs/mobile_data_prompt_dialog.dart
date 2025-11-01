@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 
 /// Dialog for prompting user to enable Data Saver Mode on mobile data
 class MobileDataPromptDialog extends StatefulWidget {
@@ -23,11 +22,12 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -37,12 +37,12 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.signal_cellular_alt_rounded,
-                color: AppTheme.primaryColor,
+                color: theme.colorScheme.primary,
                 size: 32,
               ),
             ),
@@ -51,9 +51,9 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
             // Title
             Text(
               'Mobile Data Detected',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: theme.colorScheme.onSurface,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -62,8 +62,8 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
             // Description
             Text(
               'You are currently using mobile data. Would you like to enable Data Saver Mode to reduce network usage and save your data plan?',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[700],
+              style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                     height: 1.5,
                   ),
               textAlign: TextAlign.center,
@@ -74,7 +74,7 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.05),
+                color: theme.colorScheme.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -82,16 +82,16 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
                 children: [
                   Text(
                     'Data Saver Mode will:',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
+                          color: theme.colorScheme.primary,
                         ),
                   ),
                   const SizedBox(height: 8),
-                  _buildBenefitItem('📦 Cache data to avoid repeated downloads'),
-                  _buildBenefitItem('⏱️ Queue sync operations for Wi-Fi'),
-                  _buildBenefitItem('📊 Show real-time savings'),
-                  _buildBenefitItem('🔄 Prioritize cached content'),
+                  _buildBenefitItem(context, theme, '📦 Cache data to avoid repeated downloads'),
+                  _buildBenefitItem(context, theme, '⏱️ Queue sync operations for Wi-Fi'),
+                  _buildBenefitItem(context, theme, '📊 Show real-time savings'),
+                  _buildBenefitItem(context, theme, '🔄 Prioritize cached content'),
                 ],
               ),
             ),
@@ -105,17 +105,17 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
                   onChanged: (value) {
                     setState(() => _dontAskAgain = value ?? false);
                   },
-                  activeColor: AppTheme.primaryColor,
+                  activeColor: theme.colorScheme.primary,
                   side: BorderSide(
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                     width: 2,
                   ),
                 ),
                 Expanded(
                   child: Text(
                     "Don't ask again for 24 hours",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[700],
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ),
@@ -139,7 +139,7 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       side: BorderSide(
-                        color: Colors.grey[400]!,
+                        color: theme.colorScheme.outlineVariant,
                         width: 1.5,
                       ),
                       shape: RoundedRectangleBorder(
@@ -149,7 +149,7 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
                     child: Text(
                       'Not Now',
                       style: TextStyle(
-                        color: Colors.grey[700],
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -165,8 +165,8 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
                       Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -187,7 +187,7 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
   }
 
   /// Build a benefit list item
-  Widget _buildBenefitItem(String text) {
+  Widget _buildBenefitItem(BuildContext context, ThemeData theme, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -198,7 +198,7 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
             child: Text(
               '✓',
               style: TextStyle(
-                color: AppTheme.primaryColor,
+                color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -208,8 +208,8 @@ class _MobileDataPromptDialogState extends State<MobileDataPromptDialog> {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[700],
+              style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                     height: 1.4,
                   ),
             ),

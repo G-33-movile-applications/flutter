@@ -35,7 +35,7 @@ class AppTheme {
         seedColor: primaryColor,
         brightness: Brightness.light,
         primary: primaryColor,
-        surface: cardColor,
+        surface: Colors.white,
       ),
       
       // AppBar theme
@@ -145,7 +145,7 @@ class AppTheme {
 
       // Card theme
       cardTheme: CardThemeData(
-        color: cardColor,
+        color: Colors.white,
         elevation: 2,
         shadowColor: Colors.black12,
         shape: RoundedRectangleBorder(

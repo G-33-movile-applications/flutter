@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/system_conditions_provider.dart';
 import 'package:provider/provider.dart';
@@ -20,7 +19,7 @@ class _SettingsViewState extends State<SettingsView> {
     final theme = Theme.of(context);
 
     return Drawer(
-      backgroundColor: AppTheme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       child: SafeArea(
         child: Column(
           children: [
@@ -29,7 +28,7 @@ class _SettingsViewState extends State<SettingsView> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
+                color: theme.colorScheme.primary,
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(16),
                   bottomRight: Radius.circular(16),
@@ -39,14 +38,14 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   Icon(
                     Icons.settings_rounded,
-                    color: Colors.white,
+                    color: theme.colorScheme.onPrimary,
                     size: 28,
                   ),
                   const SizedBox(width: 12),
                   Text(
                     'Configuración',
                     style: theme.textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   ),
                 ],
@@ -224,7 +223,7 @@ class _SettingsViewState extends State<SettingsView> {
     return Text(
       title,
       style: theme.textTheme.titleMedium?.copyWith(
-        color: AppTheme.textPrimary,
+        color: theme.colorScheme.onSurface,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -240,13 +239,14 @@ class _SettingsViewState extends State<SettingsView> {
     required ValueChanged<bool> onChanged,
     bool enabled = true,
   }) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.shadowColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -259,12 +259,12 @@ class _SettingsViewState extends State<SettingsView> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 icon,
-                color: AppTheme.primaryColor,
+                color: theme.colorScheme.primary,
                 size: 24,
               ),
             ),
@@ -275,16 +275,16 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textPrimary,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                         ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -298,7 +298,7 @@ class _SettingsViewState extends State<SettingsView> {
               child: Switch(
                 value: value && enabled,
                 onChanged: enabled ? onChanged : null,
-                activeThumbColor: AppTheme.primaryColor,
+                activeThumbColor: theme.colorScheme.primary,
               ),
             ),
           ],
@@ -311,11 +311,11 @@ class _SettingsViewState extends State<SettingsView> {
   Widget _buildAccountInfoCard(BuildContext context, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.shadowColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -332,7 +332,7 @@ class _SettingsViewState extends State<SettingsView> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -341,7 +341,7 @@ class _SettingsViewState extends State<SettingsView> {
                           ? user!.fullName[0].toUpperCase()
                           : '?',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                       ),
                     ),
                   ),
@@ -354,7 +354,7 @@ class _SettingsViewState extends State<SettingsView> {
                       Text(
                         user?.fullName ?? 'Usuario',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textPrimary,
+                          color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -362,7 +362,7 @@ class _SettingsViewState extends State<SettingsView> {
                       Text(
                         user?.email ?? 'Sin email',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -385,13 +385,14 @@ class _SettingsViewState extends State<SettingsView> {
     required String title,
     required VoidCallback onPressed,
   }) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.shadowColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -409,12 +410,12 @@ class _SettingsViewState extends State<SettingsView> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon,
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                     size: 24,
                   ),
                 ),
@@ -422,15 +423,15 @@ class _SettingsViewState extends State<SettingsView> {
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textPrimary,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
                 ),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                   size: 16,
                 ),
               ],
