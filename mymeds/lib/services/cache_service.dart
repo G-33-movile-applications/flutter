@@ -118,6 +118,20 @@ class CacheService {
     return true;
   }
 
+  /// Check if cache is still valid for a key (not expired)
+  bool isValid(String key) {
+    final item = _cache[key];
+    if (item == null) return false;
+    return !item.isExpired;
+  }
+
+  /// Get remaining TTL for a cache key in seconds
+  int getRemainingTtl(String key) {
+    final item = _cache[key];
+    if (item == null) return 0;
+    return item.remainingTtl;
+  }
+
   /// Remove a specific cached item
   void remove(String key) {
     _cache.remove(key);

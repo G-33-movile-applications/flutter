@@ -3,14 +3,14 @@ import 'dart:convert';
 
 /// User session tracking
 /// Collection path: user_sessions/{sessionId}
-class UserSession {
+class SessionLog {
   final String id; // sessionId
   final String userId;
   final DateTime fechaInicio;
   final DateTime? fechaFin;
   final int? duracionSegundos;
 
-  const UserSession({
+  const SessionLog({
     required this.id,
     required this.userId,
     required this.fechaInicio,
@@ -18,9 +18,9 @@ class UserSession {
     this.duracionSegundos,
   });
 
-  // Create UserSession from Firestore document
-  factory UserSession.fromMap(Map<String, dynamic> map, {String? documentId}) {
-    return UserSession(
+  // Create SessionLog from Firestore document
+  factory SessionLog.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    return SessionLog(
       id: documentId ?? map['id'] ?? '',
       userId: map['userId'] ?? '',
       fechaInicio: map['fechaInicio'] != null 
@@ -33,7 +33,7 @@ class UserSession {
     );
   }
 
-  // Convert UserSession to Map for Firestore
+  // Convert SessionLog to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
@@ -44,23 +44,24 @@ class UserSession {
   }
 
   // Create from JSON string
-  factory UserSession.fromJson(String jsonStr) {
+  factory SessionLog.fromJson(String jsonStr) {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-    return UserSession.fromMap(map);
+    return SessionLog.fromMap(map);
+    
   }
 
   // Convert to JSON string
   String toJson() => jsonEncode(toMap());
 
   // Create a copy with some fields updated
-  UserSession copyWith({
+  SessionLog copyWith({
     String? id,
     String? userId,
     DateTime? fechaInicio,
     DateTime? fechaFin,
     int? duracionSegundos,
   }) {
-    return UserSession(
+    return SessionLog(
       id: id ?? this.id,
       userId: userId ?? this.userId,
       fechaInicio: fechaInicio ?? this.fechaInicio,
@@ -71,13 +72,13 @@ class UserSession {
 
   @override
   String toString() {
-    return 'UserSession(id: $id, userId: $userId, fechaInicio: $fechaInicio)';
+    return 'SessionLog(id: $id, userId: $userId, fechaInicio: $fechaInicio)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is UserSession && other.id == id;
+    return other is SessionLog && other.id == id;
   }
 
   @override
