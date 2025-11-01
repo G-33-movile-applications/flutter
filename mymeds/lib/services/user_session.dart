@@ -7,6 +7,8 @@ import '../models/pedido.dart';
 import '../models/prescripcion.dart';
 import '../repositories/pedido_repository.dart';
 import '../repositories/prescripcion_repository.dart';
+import '../services/favorites_service.dart';
+
 /// Thread-safe Singleton that manages the current user session across the app.
 /// 
 /// This class automatically keeps the user model in sync with Firebase Auth
@@ -40,6 +42,7 @@ class UserSession {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final PedidoRepository _pedidoRepo = PedidoRepository();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
+  final FavoritesService _favoritesService = FavoritesService();
 
   // Reactive current user state - null means not authenticated
   final ValueNotifier<UserModel?> currentUser = ValueNotifier<UserModel?>(null);
@@ -104,10 +107,16 @@ class UserSession {
         debugPrint('UserSession: User signed in: ${authUser.uid}');
         await _loadUserData(authUser.uid);
         await _loadSessionEntities(authUser.uid);
+        
+        // Load favorites on login
+        await _favoritesService.onUserLogin();
       } else {
         debugPrint('UserSession: User signed out');
         _clearEntities();
         currentUser.value = null;
+        
+        // Clear favorites on logout
+        await _favoritesService.onUserLogout();
       }
     } catch (e) {
       debugPrint('UserSession: Error handling auth state change: $e');
