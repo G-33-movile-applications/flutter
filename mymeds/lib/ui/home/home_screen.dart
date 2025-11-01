@@ -15,6 +15,7 @@ import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
 import '../prescriptions/prescriptions_list_widget.dart';
 import '../orders/orders_view.dart';
+import '../pharmacy/favorites_pharmacies_view.dart';
 import 'package:provider/provider.dart';
 import '../../providers/motion_provider.dart';
 
@@ -508,6 +509,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 buttonText: 'Abrir mapa',
                 onPressed: () {
                   Navigator.pushNamed(context, '/map');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              FeatureCard(
+                overline: 'MIS FAVORITAS',
+                title: 'Farmacias favoritas',
+                description: 'Accede rápidamente a tus farmacias favoritas y frecuentes, disponible sin conexión.',
+                icon: Icons.favorite,
+                buttonText: 'Ver favoritas',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FavoritesPharmaciesView(),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 16),

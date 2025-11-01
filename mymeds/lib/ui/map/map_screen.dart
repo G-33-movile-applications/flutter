@@ -11,6 +11,7 @@ import '../../models/prescripcion.dart';
 import '../widgets/connectivity_feedback_banner.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
+import '../pharmacy/favorites_pharmacies_view.dart';
 import 'package:provider/provider.dart'; 
 import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
@@ -413,6 +414,26 @@ class _MapScreenState extends State<MapScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Favorites FAB - NEW
+        Semantics(
+          label: 'Ver farmacias favoritas',
+          child: FloatingActionButton(
+            heroTag: 'favorites',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FavoritesPharmaciesView(),
+                ),
+              );
+            },
+            backgroundColor: Colors.pink,
+            foregroundColor: Colors.white,
+            child: const Icon(Icons.favorite),
+          ),
+        ),
+        const SizedBox(height: 12),
+        
         // Layers FAB
         Semantics(
           label: 'Opciones de capas del mapa',
