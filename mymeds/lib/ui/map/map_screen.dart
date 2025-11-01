@@ -419,7 +419,7 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'layers',
             onPressed: _showLayersOptions,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppTheme.primaryColor,
             child: const Icon(Icons.layers_rounded),
           ),
@@ -445,7 +445,7 @@ class _MapScreenState extends State<MapScreen> {
           child: FloatingActionButton(
             heroTag: 'settings',
             onPressed: _showSettingsOptions,
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             foregroundColor: AppTheme.textSecondary,
             child: const Icon(Icons.tune_rounded),
           ),

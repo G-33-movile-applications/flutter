@@ -48,8 +48,10 @@ class UploadPrescriptionWidget extends StatelessWidget {
                 color: AppTheme.primaryColor,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: Icon(Icons.add, color: Colors.white, size: 40),
+              child: Icon(
+                Icons.add, 
+                color: Theme.of(context).colorScheme.onPrimary, 
+                size: 40,
               ),
             ),
           ),

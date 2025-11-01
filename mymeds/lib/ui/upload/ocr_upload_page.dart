@@ -6,7 +6,6 @@ import '../../models/prescripcion.dart';
 import '../../services/ocr_service.dart';
 import '../../services/user_session.dart';
 import '../../repositories/prescripcion_repository.dart';
-import '../../theme/app_theme.dart';
 
 class OcrUploadPage extends StatefulWidget {
   const OcrUploadPage({super.key});
@@ -406,7 +405,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
             Icon(confidenceIcon, color: confidenceColor),
@@ -423,7 +422,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: confidenceColor.withOpacity(0.1),
+                  color: confidenceColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: confidenceColor, width: 2),
                 ),
@@ -473,17 +472,17 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.blue),
-                    SizedBox(width: 8),
+                    Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Puedes editar todos los campos en el formulario de abajo.',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
                       ),
                     ),
                   ],
@@ -494,9 +493,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         ),
         actions: [
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(dialogContext).colorScheme.primary,
             ),
             child: const Text('Revisar y Editar'),
           ),
@@ -525,7 +524,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               '$label: ${detected ? (value is DateTime ? 'Detectado' : value.toString()) : 'No detectado'}',
               style: TextStyle(
                 fontSize: 13,
-                color: detected ? Colors.black87 : Colors.red.shade700,
+                color: detected ? Theme.of(context).textTheme.bodyMedium?.color : Colors.red.shade700,
               ),
             ),
           ),
@@ -619,7 +618,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       } else if (frecuencia < 1) {
         errors.add('❌ Medicamento #$medNum: La frecuencia debe ser al menos 1 hora');
       } else if (frecuencia > 168) {
-        errors.add('⚠️ Medicamento #$medNum: La frecuencia parece muy alta (cada ${frecuencia} horas)');
+        errors.add('⚠️ Medicamento #$medNum: La frecuencia parece muy alta (cada $frecuencia horas)');
       }
       
       // Validate duration is a valid number
@@ -750,18 +749,18 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   }) async {
     return showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(dialogContext).colorScheme.primary,
             ),
             child: Text(confirmText),
           ),
@@ -773,7 +772,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   void _showSuccessDialog({required String title, required String message}) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
             const Icon(Icons.check_circle, color: Colors.green),
@@ -784,9 +783,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         content: Text(message),
         actions: [
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(dialogContext).colorScheme.primary,
             ),
             child: const Text('OK'),
           ),
@@ -798,7 +797,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   void _showValidationErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.error_outline, color: Colors.red),
@@ -816,17 +815,17 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Colors.red.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.red.shade700, size: 20),
+                    Icon(Icons.info_outline, color: Colors.red, size: 20),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Por favor corrige los errores para poder guardar la prescripción.',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
                       ),
                     ),
                   ],
@@ -837,9 +836,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         ),
         actions: [
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(dialogContext).colorScheme.primary,
             ),
             child: const Text('Entendido'),
           ),
@@ -920,7 +919,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   void _showPermissionDeniedDialog(String title, String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
             const Icon(Icons.warning, color: Colors.orange),
@@ -937,17 +936,17 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: Colors.orange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Los permisos son necesarios para el correcto funcionamiento de la app.',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
                     ),
                   ),
                 ],
@@ -962,12 +961,12 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               // Note: Opening settings requires permission_handler package
               // For now, user needs to manually go to settings
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: Theme.of(dialogContext).colorScheme.primary,
             ),
             child: const Text('Entendido'),
           ),
@@ -1022,7 +1021,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1035,7 +1034,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cargar Prescripción por Imagen'),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -1053,17 +1052,17 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.camera_alt,
                       size: 64,
-                      color: AppTheme.primaryColor,
+                      color: theme.colorScheme.primary,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Captura tu Prescripción',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1071,7 +1070,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       'Toma una foto o selecciona una imagen de tu galería para extraer automáticamente los datos de la prescripción',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1084,12 +1083,12 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             // Multi-Image Info Card
             if (_selectedImages.isNotEmpty) ...[
               Card(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
-                      Icon(Icons.collections, color: AppTheme.primaryColor),
+                      Icon(Icons.collections, color: theme.colorScheme.primary),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1097,7 +1096,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                               ? 'Puedes agregar ${_maxImages - _selectedImages.length} imagen(es) más'
                               : 'Máximo de imágenes alcanzado',
                           style: TextStyle(
-                            color: AppTheme.primaryColor,
+                            color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1105,7 +1104,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       Text(
                         '${_selectedImages.length}/$_maxImages',
                         style: TextStyle(
-                          color: AppTheme.primaryColor,
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -1151,18 +1150,18 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
             // Show message when max images reached
             if (_selectedImages.length >= _maxImages) ...[
               Card(
-                color: Colors.orange.shade50,
+                color: Colors.orange.withValues(alpha: 0.15),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700),
+                      Icon(Icons.info_outline, color: Colors.orange),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Máximo $_maxImages imágenes alcanzado. Elimina una imagen para agregar otra.',
                           style: TextStyle(
-                            color: Colors.orange.shade900,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1348,7 +1347,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                     icon: const Icon(Icons.add),
                     label: const Text('Agregar'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
+                      backgroundColor: theme.colorScheme.primary,
                     ),
                   ),
                 ],
@@ -1382,7 +1381,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                       : const Icon(Icons.cloud_upload),
                   label: Text(_isUploading ? 'Guardando...' : 'Guardar Prescripción'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
+                    backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1396,7 +1395,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
 
             // Help Section
             Card(
-              color: Colors.blue.shade50,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1404,13 +1403,13 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.tips_and_updates, color: Colors.blue.shade700),
+                        Icon(Icons.tips_and_updates, color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 12),
                         Text(
                           'Consejos para mejores resultados',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ],
@@ -1466,7 +1465,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
               },
               icon: const Icon(Icons.add_photo_alternate),
               label: Text('Agregar (${_selectedImages.length}/$_maxImages)'),
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: theme.colorScheme.primary,
             )
           : null,
     );
@@ -1489,7 +1488,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Icon(icon, size: 48, color: AppTheme.primaryColor),
+              Icon(icon, size: 48, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 12),
               Text(
                 label,
