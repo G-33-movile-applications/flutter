@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mymeds/models/user_preferencias.dart';
 import '../models/user_model.dart';
+import 'storage_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final StorageService _storage = StorageService();
 
   // Get current user
   static User? get currentUser => _auth.currentUser;
@@ -50,11 +52,16 @@ class AuthService {
           await _firestore.collection('usuarios').doc(user.uid).set(userData);
           debugPrint('AuthService: User document created successfully for ${user.uid}');
           
+          // Save session to local storage after successful registration
+          await _saveSessionToLocal(user);
+          
           return AuthResult(success: true, user: user);
         } catch (firestoreError) {
           debugPrint('AuthService: Failed to create user document: $firestoreError');
           // If Firestore fails, we still return success since Firebase Auth succeeded
           // The UserSession will handle creating a fallback user
+          // Still save session locally
+          await _saveSessionToLocal(user);
           return AuthResult(success: true, user: user);
         }
       } else {
@@ -122,6 +129,11 @@ class AuthService {
       );
       debugPrint('✅ Firebase Auth signInWithEmailAndPassword successful');
       
+      // Save session to local storage after successful login
+      if (userCredential.user != null) {
+        await _saveSessionToLocal(userCredential.user!);
+      }
+      
       return AuthResult(success: true, user: userCredential.user);
       
     } on FirebaseAuthException catch (e) {
@@ -144,6 +156,9 @@ class AuthService {
         case 'too-many-requests':
           errorMessage = 'Demasiados intentos fallidos. Intenta más tarde.';
           break;
+        case 'network-request-failed':
+          errorMessage = 'No tienes acceso a internet. Intenta ingresar más tarde cuando tengas conexión.';
+          break;
         default:
           errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.';
       }
@@ -152,9 +167,20 @@ class AuthService {
       
     } catch (e) {
       debugPrint('🔥 General Exception caught: Type=${e.runtimeType}');
+      
+      // Check if it's a network-related error
+      final errorString = e.toString().toLowerCase();
+      final isNetworkError = errorString.contains('network') || 
+        errorString.contains('connection') || 
+        errorString.contains('timeout') ||
+        errorString.contains('socket') ||
+        errorString.contains('failed host lookup');
+      
       return AuthResult(
         success: false,
-        errorMessage: 'Error inesperado. Intenta nuevamente más tarde.',
+        errorMessage: isNetworkError
+          ? 'No tienes acceso a internet. Intenta ingresar más tarde cuando tengas conexión.'
+          : 'Error inesperado. Intenta nuevamente más tarde.',
       );
     }
   }
@@ -201,6 +227,115 @@ static Future<AuthResult> sendPasswordResetEmail(String email) async {
 
   // Listen to auth state changes
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // ========== Session Persistence Methods ==========
+
+  /// Save user session to local storage after successful login
+  /// 
+  /// This allows the user to stay logged in across app restarts for up to 24 hours.
+  static Future<void> _saveSessionToLocal(User user) async {
+    try {
+      // Get the auth token
+      final token = await user.getIdToken();
+      
+      await _storage.saveUserSession(
+        uid: user.uid,
+        email: user.email ?? '',
+        displayName: user.displayName ?? user.email?.split('@').first ?? 'User',
+        token: token,
+      );
+      
+      debugPrint('AuthService: Session saved to local storage for ${user.uid}');
+    } catch (e) {
+      debugPrint('AuthService: Failed to save session to local storage: $e');
+      // Don't throw - login should succeed even if session storage fails
+    }
+  }
+
+  /// Restore user session from local storage
+  /// 
+  /// Called on app startup to automatically log in the user if a valid session exists.
+  /// Returns true if session was restored successfully, false otherwise.
+  static Future<bool> restoreSessionFromLocal() async {
+    try {
+      debugPrint('AuthService: Attempting to restore session from local storage...');
+      
+      // Check if session is valid
+      final isValid = await _storage.isSessionValid();
+      if (!isValid) {
+        debugPrint('AuthService: No valid session found in local storage');
+        await _storage.clearUserSession(); // Clean up expired session
+        return false;
+      }
+      
+      // Get session data
+      final sessionData = await _storage.getUserSession();
+      if (sessionData == null) {
+        debugPrint('AuthService: Session data is null');
+        return false;
+      }
+      
+      // Check if user is already authenticated with Firebase
+      final currentUser = _auth.currentUser;
+      if (currentUser != null && currentUser.uid == sessionData['uid']) {
+        debugPrint('AuthService: User already authenticated with Firebase');
+        return true;
+      }
+      
+      // If Firebase user doesn't match, the session is invalid
+      // (user might have been deleted or signed out on another device)
+      if (currentUser == null) {
+        debugPrint('AuthService: Firebase user is null, but local session exists');
+        debugPrint('AuthService: This likely means offline mode - session is still valid');
+        // In offline mode, we consider the session valid
+        // The UserSession will handle loading cached user data
+        return true;
+      }
+      
+      debugPrint('AuthService: Session restored successfully for ${sessionData['uid']}');
+      return true;
+      
+    } catch (e) {
+      debugPrint('AuthService: Error restoring session from local storage: $e');
+      return false;
+    }
+  }
+
+  /// Logout and clear all session data
+  /// 
+  /// This signs out the user from Firebase and clears all local session data.
+  static Future<void> logout() async {
+    try {
+      debugPrint('AuthService: Logging out user...');
+      
+      // Sign out from Firebase
+      await signOut();
+      
+      // Clear local session storage
+      await _storage.clearUserSession();
+      
+      debugPrint('AuthService: User logged out and session cleared');
+    } catch (e) {
+      debugPrint('AuthService: Error during logout: $e');
+      // Force clear session even if signOut fails
+      await _storage.clearUserSession();
+      rethrow;
+    }
+  }
+
+  /// Check if there's a valid local session
+  /// 
+  /// Returns true if a valid session exists in local storage.
+  static Future<bool> hasValidLocalSession() async {
+    return await _storage.isSessionValid();
+  }
+
+  /// Get the session data from local storage
+  /// 
+  /// Returns session data map or null if no session exists.
+  static Future<Map<String, String>?> getLocalSessionData() async {
+    return await _storage.getUserSession();
+  }
 }
 
 // Result class for authentication operations

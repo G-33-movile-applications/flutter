@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
 import '../../../models/punto_fisico.dart';
 
 class PharmacyMarkerSheet extends StatelessWidget {
@@ -23,9 +22,9 @@ class PharmacyMarkerSheet extends StatelessWidget {
     final theme = Theme.of(context);
     
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -36,7 +35,7 @@ class PharmacyMarkerSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -51,7 +50,7 @@ class PharmacyMarkerSheet extends StatelessWidget {
                 Text(
                   pharmacy.nombre,
                   style: theme.textTheme.headlineSmall?.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -62,14 +61,14 @@ class PharmacyMarkerSheet extends StatelessWidget {
                     Text(
                       pharmacy.nombre,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       ' • ${distance.toStringAsFixed(1)} km',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -83,14 +82,14 @@ class PharmacyMarkerSheet extends StatelessWidget {
                     Icon(
                       Icons.place_rounded,
                       size: 20,
-                      color: AppTheme.textSecondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         pharmacy.direccion,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textSecondary,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -111,8 +110,8 @@ class PharmacyMarkerSheet extends StatelessWidget {
                             icon: const Icon(Icons.check_circle),
                             label: const Text('Seleccionar'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),

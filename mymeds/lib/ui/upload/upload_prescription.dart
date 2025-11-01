@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/motion_provider.dart';
 import '../widgets/driving_overlay.dart';
 
@@ -19,14 +18,14 @@ class UploadPrescriptionPage extends StatelessWidget {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: AppTheme.scaffoldBackgroundColor,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
             title: Text(
               "Cargar Prescripción",
               style: theme.appBarTheme.titleTextStyle,
             ),
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
             actions: [
               IconButton(
                 icon: const Icon(Icons.home_outlined),
@@ -44,14 +43,14 @@ class UploadPrescriptionPage extends StatelessWidget {
               'Selecciona un Método',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Elige cómo deseas cargar tu prescripción médica',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 32),
@@ -62,7 +61,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               icon: Icons.nfc,
               title: 'Cargar por NFC',
               description: 'Lee o escribe prescripciones usando tags NFC',
-              color: AppTheme.primaryColor,
+              color: theme.colorScheme.primary,
               onTap: () => Navigator.pushNamed(context, '/upload/nfc'),
             ),
 
@@ -94,7 +93,7 @@ class UploadPrescriptionPage extends StatelessWidget {
 
             // Help Section
             Card(
-              color: Colors.blue.shade50,
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -106,14 +105,14 @@ class UploadPrescriptionPage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700),
+                        Icon(Icons.info_outline, color: theme.colorScheme.primary),
                         const SizedBox(width: 12),
                         Text(
                           '¿Necesitas ayuda?',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: Colors.blue.shade700,
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ],
@@ -133,7 +132,7 @@ class UploadPrescriptionPage extends StatelessWidget {
                       'Todos los métodos guardan tus prescripciones de forma segura en la nube.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade700,
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -163,6 +162,7 @@ class UploadPrescriptionPage extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -197,10 +197,10 @@ class UploadPrescriptionPage extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -208,7 +208,7 @@ class UploadPrescriptionPage extends StatelessWidget {
                       description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade600,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -218,7 +218,7 @@ class UploadPrescriptionPage extends StatelessWidget {
               // Arrow Icon
               Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.grey.shade400,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 size: 20,
               ),
             ],
