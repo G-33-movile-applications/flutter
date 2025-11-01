@@ -54,7 +54,9 @@ class UserModel {
           ? UserPreferencias.fromMap(map['preferencias'] as Map<String, dynamic>)
           : null,
       createdAt: map['createdAt'] != null 
-          ? (map['createdAt'] as Timestamp).toDate()
+          ? (map['createdAt'] is DateTime 
+              ? map['createdAt'] as DateTime  // Already DateTime (from cache)
+              : (map['createdAt'] as Timestamp).toDate())  // Firestore Timestamp
           : null,
     );
   }

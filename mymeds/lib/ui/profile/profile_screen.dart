@@ -1,6 +1,7 @@
   import 'package:flutter/material.dart';
   import '../../models/user_model.dart';
   import '../../repositories/usuario_repository.dart';
+  import '../../services/profile_cache_service.dart';
 
   class ProfilePage extends StatefulWidget {
     final String uid; // ID del usuario logueado
@@ -13,6 +14,7 @@
 
   class _ProfilePageState extends State<ProfilePage> {
     final UsuarioRepository _usuarioRepository = UsuarioRepository();
+    final ProfileCacheService _profileCacheService = ProfileCacheService();
     final _formKey = GlobalKey<FormState>();
 
     final _nameController = TextEditingController();
@@ -69,6 +71,30 @@
     
     Future<void> _loadUser() async {
       try {
+        // Check if there's cached data first (for Data Saver mode)
+        final cachedUser = await _profileCacheService.getPendingUpdate();
+        if (cachedUser != null) {
+          setState(() {
+            _user = cachedUser;
+            _nameController.text = cachedUser.nombre;
+            _emailController.text = cachedUser.email;
+            _phoneController.text = cachedUser.telefono;
+            _addressController.text = cachedUser.direccion;
+            _cityController.text = cachedUser.city;
+            _departmentController.text = cachedUser.department;
+            _zipCodeController.text = cachedUser.zipCode;
+            _modoEntregaPreferido = cachedUser.preferencias?.modoEntregaPreferido ?? "domicilio";
+            _aceptaNotificaciones = cachedUser.preferencias?.notificaciones ?? false;
+            _selectedDepartamento = cachedUser.department; 
+            _selectedCiudad = cachedUser.city;
+            _loading = false;
+          }); 
+          _originalUser = cachedUser.copyWith();
+          debugPrint('📱 Profile loaded from cache (Data Saver mode detected)');
+          return; // Return early, don't fetch from internet
+        }
+        
+        // No cached data, fetch from Firebase normally
         final user = await _usuarioRepository.read(widget.uid);
         if (user != null) {
           setState(() {
@@ -87,6 +113,7 @@
             _loading = false;
           }); 
           _originalUser = user.copyWith();
+          debugPrint('📱 Profile loaded from Firebase');
         }
       } catch (e) {
         setState(() => _loading = false);
@@ -181,7 +208,21 @@
           ),
         );
 
-        await _usuarioRepository.update(updatedUser);
+        // Use Data Saver aware update
+        final (success, message, isCached) = 
+            await _usuarioRepository.updateWithDataSaverSupport(updatedUser);
+
+        if (!success) {
+          setState(() => _updating = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
 
         // Update controllers with trimmed values
         setState(() {
@@ -202,13 +243,24 @@
           _hasChanges = false;
         });
 
+        // Show appropriate success message based on whether data was cached
+        final snackbarColor = isCached ? Colors.orange : Colors.green;
+        final snackbarDuration = isCached ? const Duration(seconds: 4) : const Duration(seconds: 2);
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Usuario actualizado correctamente!")),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: snackbarColor,
+            duration: snackbarDuration,
+          ),
         );
       } catch (e) {
         setState(() => _updating = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error al actualizar el usuario: $e")),
+          SnackBar(
+            content: Text("Error al actualizar el usuario: $e"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
