@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/user_stats.dart';
 import '../../services/user_stats_service.dart';
 import '../../services/user_session.dart';
+import '../../services/connectivity_service.dart';
 import '../../models/punto_fisico.dart';
 
 class UserStatsScreen extends StatefulWidget {
@@ -13,7 +14,9 @@ class UserStatsScreen extends StatefulWidget {
 
 class _UserStatsScreenState extends State<UserStatsScreen> {
   final UserStatsService _statsService = UserStatsService();
+  final ConnectivityService _connectivity = ConnectivityService();
   bool _isLoading = true;
+  bool _isOffline = false;
   String? _error;
   UserStats? _stats;
   List<Map<String, dynamic>> _topPharmacies = [];
@@ -21,7 +24,30 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStats();
+    _checkConnectivityAndLoad();
+  }
+
+  /// Check connectivity before loading stats
+  /// Stats require online connection to fetch from Firestore
+  Future<void> _checkConnectivityAndLoad() async {
+    try {
+      final isOnline = await _connectivity.checkConnectivity();
+      
+      if (!isOnline) {
+        setState(() {
+          _isOffline = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      await _loadStats();
+    } catch (e) {
+      setState(() {
+        _error = 'Error verificando conexión: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadStats() async {
@@ -29,6 +55,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
       setState(() {
         _isLoading = true;
         _error = null;
+        _isOffline = false;
       });
 
       final userId = UserSession().currentUser.value?.uid;
@@ -72,6 +99,48 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
   }
 
   Widget _buildBody() {
+    // Show offline message if no connection
+    if (_isOffline) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.wifi_off,
+                size: 80,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Sin conexión a Internet',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Las estadísticas requieren conexión a Internet para cargar datos actualizados desde la nube.',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: _checkConnectivityAndLoad,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
