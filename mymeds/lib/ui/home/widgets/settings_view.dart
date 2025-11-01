@@ -4,6 +4,7 @@ import '../../../providers/settings_provider.dart';
 import '../../../providers/system_conditions_provider.dart';
 import 'package:provider/provider.dart';
 import '../../../services/user_session.dart';
+import '../../../services/auth_service.dart';
 
 /// Settings drawer widget that slides in from the left
 class SettingsView extends StatefulWidget {
@@ -184,6 +185,12 @@ class _SettingsViewState extends State<SettingsView> {
                             );
                           },
                         ),
+                        const SizedBox(height: 24),
+
+                        // Logout Section
+                        _buildSectionTitle(theme, 'Sesión'),
+                        const SizedBox(height: 12),
+                        _buildLogoutButton(context),
                         const SizedBox(height: 32),
                       ],
                     ),
@@ -432,6 +439,143 @@ class _SettingsViewState extends State<SettingsView> {
         ),
       ),
     );
+  }
+
+  /// Build logout button
+  Widget _buildLogoutButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.red.shade200,
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _handleLogout(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: Colors.red.shade700,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Cerrar Sesión',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.red.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.red.shade400,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Handle logout action
+  Future<void> _handleLogout(BuildContext context) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar Sesión'),
+        content: const Text(
+          '¿Estás seguro de que deseas cerrar sesión?\n\n'
+          'Se eliminará tu sesión guardada y tendrás que iniciar sesión nuevamente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Perform logout
+        await AuthService.logout();
+
+        if (context.mounted) {
+          // Close loading dialog
+          Navigator.of(context).pop();
+
+          // Close settings drawer
+          Navigator.of(context).pop();
+
+          // Navigate to login screen and remove all previous routes
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/',
+            (route) => false,
+          );
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Sesión cerrada correctamente'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          // Close loading dialog if still open
+          Navigator.of(context).pop();
+
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al cerrar sesión: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
   }
 
   /// Show about dialog
