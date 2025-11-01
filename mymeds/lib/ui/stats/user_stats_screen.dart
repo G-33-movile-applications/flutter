@@ -168,6 +168,8 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
   }
 
   Widget _buildMedicineStatsCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
       child: Padding(
@@ -177,14 +179,17 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.medical_services, color: Color(0xFF1565C0)),
+                Icon(
+                  Icons.medical_services,
+                  color: isDark ? const Color(0xFF42A5F5) : const Color(0xFF1565C0),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Estadísticas de Medicamentos',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF212121),
+                          color: Theme.of(context).textTheme.titleLarge?.color,
                         ),
                   ),
                 ),
@@ -247,9 +252,9 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calendar_today,
-                      color: Color(0xFF2E7D32),
+                      color: isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32),
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -260,7 +265,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                           Text(
                             'Último Reclamo',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: const Color(0xFF37474F),
+                                  color: Theme.of(context).textTheme.bodySmall?.color,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -268,7 +273,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                           Text(
                             _formatDate(_stats!.lastClaimDate!),
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: const Color(0xFF2E7D32),
+                                  color: isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32),
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
@@ -290,9 +295,9 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
-                      color: Color(0xFF37474F),
+                      color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -300,7 +305,7 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
                       child: Text(
                         'No hay medicamentos reclamados aún',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF37474F),
+                              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                             ),
                       ),
                     ),

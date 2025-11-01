@@ -8,10 +8,13 @@ import '../../services/user_session.dart';
 import '../../services/background_loader.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
+import '../../services/prescriptions_cache_service.dart';
+import '../../services/orders_sync_service.dart';
 import '../../models/user_model.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
 import '../prescriptions/prescriptions_list_widget.dart';
+import '../orders/orders_view.dart';
 import 'package:provider/provider.dart';
 import '../../providers/motion_provider.dart';
 
@@ -34,16 +37,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);  // Changed from 2 to 3 tabs
+    
+    // Load data immediately (don't wait for postFrameCallback)
+    _loadDataWithBackgroundLoader();
     
     // Add listener to MotionProvider for confirmation needs
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final motionProvider = context.read<MotionProvider>();
       motionProvider.addListener(_checkDrivingConfirmation);
       _checkDrivingConfirmation(); // Initial check
-      
-      // Start background data loading
-      _loadDataWithBackgroundLoader();
     });
   }
   
@@ -192,57 +195,68 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   /// Load data from cache (instant, synchronous)
   /// 
   /// This provides immediate UI feedback while background fetch runs
-  void _loadFromCache(String userId) {
-    final cacheService = CacheService();
+  void _loadFromCache(String userId) async {
+    debugPrint('🔍 [HomeScreen] _loadFromCache called for user: $userId');
     
-    // Try to load prescriptions from cache
-    final cachedPrescriptions = cacheService.get<List<Prescripcion>>(
-      'prescriptions_$userId',
-    );
+    final prescriptionsCache = PrescriptionsCacheService();
+    final ordersSync = OrdersSyncService();
     
-    // Try to load orders from cache
-    final cachedOrders = cacheService.get<List<Pedido>>(
-      'orders_$userId',
-    );
+    debugPrint('🔍 [HomeScreen] Loading prescriptions from cache...');
+    // Try to load prescriptions from persistent cache
+    final cachedPrescriptions = await prescriptionsCache.getCachedPrescriptions(userId);
+    debugPrint('🔍 [HomeScreen] Prescriptions cache result: ${cachedPrescriptions?.length ?? 0} items');
     
-    if (cachedPrescriptions != null || cachedOrders != null) {
-      debugPrint('💾 [HomeScreen] Loaded data from cache');
-      debugPrint('   - Cached prescriptions: ${cachedPrescriptions?.length ?? 0}');
-      debugPrint('   - Cached orders: ${cachedOrders?.length ?? 0}');
+    debugPrint('🔍 [HomeScreen] Loading orders using sync service...');
+    // Try to load orders using sync service (which reads from cache)
+    try {
+      final cachedOrders = await ordersSync.loadOrders(userId);
+      debugPrint('🔍 [HomeScreen] Orders sync result: ${cachedOrders.length} items');
       
-      setState(() {
-        _hasLoadedFromCache = true;
-      });
-      
-      // Update UserSession with cached data
+      if (cachedPrescriptions != null || cachedOrders.isNotEmpty) {
+        debugPrint('💾 [HomeScreen] ✅ Loaded data from persistent cache');
+        debugPrint('   - Cached prescriptions: ${cachedPrescriptions?.length ?? 0}');
+        debugPrint('   - Cached orders: ${cachedOrders.length}');
+        debugPrint('   - UserSession prescriptions before: ${UserSession().currentPrescripciones.value.length}');
+        debugPrint('   - UserSession orders before: ${UserSession().currentPedidos.value.length}');
+        
+        setState(() {
+          _hasLoadedFromCache = true;
+        });
+        
+        // Update UserSession with cached data
+        if (cachedPrescriptions != null) {
+          UserSession().currentPrescripciones.value = cachedPrescriptions;
+          debugPrint('   - UserSession prescriptions updated: ${UserSession().currentPrescripciones.value.length}');
+        }
+        // Note: ordersSync.loadOrders already updated UserSession.currentPedidos
+        debugPrint('   - UserSession orders after: ${UserSession().currentPedidos.value.length}');
+      } else {
+        debugPrint('💾 [HomeScreen] ❌ No persistent cached data found');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('⚠️ [HomeScreen] Error loading from cache: $e');
+      debugPrint('⚠️ [HomeScreen] Stack trace: $stackTrace');
+      // Try prescriptions only
       if (cachedPrescriptions != null) {
+        setState(() {
+          _hasLoadedFromCache = true;
+        });
         UserSession().currentPrescripciones.value = cachedPrescriptions;
+        debugPrint('   - UserSession prescriptions updated (error path): ${UserSession().currentPrescripciones.value.length}');
       }
-      if (cachedOrders != null) {
-        UserSession().currentPedidos.value = cachedOrders;
-      }
-    } else {
-      debugPrint('💾 [HomeScreen] No cached data found');
     }
   }
   
-  /// Save data to cache for next load
-  void _saveToCache(String userId, List<Prescripcion> prescriptions, List<Pedido> orders) {
-    final cacheService = CacheService();
+  /// Save data to persistent cache for next load
+  void _saveToCache(String userId, List<Prescripcion> prescriptions, List<Pedido> orders) async {
+    final prescriptionsCache = PrescriptionsCacheService();
     
-    cacheService.set(
-      'prescriptions_$userId',
-      prescriptions,
-      ttl: const Duration(hours: 1), // Cache for 1 hour
-    );
+    // Save prescriptions to cache
+    await prescriptionsCache.cachePrescriptions(userId, prescriptions);
     
-    cacheService.set(
-      'orders_$userId',
-      orders,
-      ttl: const Duration(hours: 1), // Cache for 1 hour
-    );
+    // Orders are automatically cached by OrdersSyncService, no need to save separately
     
-    debugPrint('💾 [HomeScreen] Data saved to cache');
+    debugPrint('💾 [HomeScreen] Data saved to persistent cache');
   }
 
   @override
@@ -400,6 +414,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.white,
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.normal,
+          ),
+          isScrollable: false, // Allow tabs to fit width
           tabs: const [
             Tab(
               icon: Icon(Icons.home),
@@ -408,6 +431,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Tab(
               icon: Icon(Icons.medication),
               text: 'Prescripciones',
+            ),
+            Tab(
+              icon: Icon(Icons.receipt_long),
+              text: 'Pedidos',
             ),
           ],
         ),
@@ -450,6 +477,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   child: _buildHomeTab(theme),
                 ),
                 _buildPrescriptionsTab(),
+                const OrdersView(), // New Orders tab
               ],
             ),
           ),
