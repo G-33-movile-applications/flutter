@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/prescripcion.dart';
 import '../../theme/app_theme.dart';
 import '../../services/user_session.dart';
+import '../../services/background_loader.dart';
+import '../../services/cache_service.dart';
+import '../../services/connectivity_service.dart';
 
 class PrescriptionsListWidget extends StatefulWidget {
   final Function(Prescripcion)? onPrescriptionTap;
@@ -17,7 +19,8 @@ class PrescriptionsListWidget extends StatefulWidget {
 }
 
 class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
-  bool _isLoading = true;
+  bool _isLoadingBackground = false; // Background refresh in progress
+  bool _hasLoadedFromCache = false; // Cached data loaded
   List<Prescripcion> _prescripciones = [];
   String? _errorMessage;
   String _filterStatus = 'all'; // 'all', 'active', 'inactive'
@@ -25,49 +28,134 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
   @override
   void initState() {
     super.initState();
-    _loadPrescripciones();
+    _loadPrescripcionesWithCache();
   }
 
-  Future<void> _loadPrescripciones() async {
-    try {
+  /// Load prescriptions with cache-first strategy
+  /// 
+  /// Strategy:
+  /// 1. Load cached prescriptions immediately (instant UI update)
+  /// 2. Check connectivity
+  /// 3. Launch background refresh only if online
+  /// 4. Update UI when background fetch completes
+  Future<void> _loadPrescripcionesWithCache({bool forceRefresh = false}) async {
+    final userId = UserSession().currentUser.value?.uid;
+    if (userId == null) {
       setState(() {
-        _isLoading = true;
-        _errorMessage = null;
+        _errorMessage = 'Usuario no autenticado';
       });
-
-      final userId = UserSession().currentUser.value?.uid;
-      if (userId == null) {
-        throw Exception('Usuario no autenticado');
+      return;
+    }
+    
+    debugPrint('🔄 [PrescriptionsListWidget] Starting data load for user: $userId (forceRefresh: $forceRefresh)');
+    
+    // Step 1: Load from cache first (instant UI)
+    _loadFromCache(userId);
+    
+    // Step 2: Check connectivity status
+    final connectivity = ConnectivityService();
+    final isOnline = await connectivity.checkConnectivity();
+    
+    if (!isOnline && !forceRefresh) {
+      debugPrint('📴 [PrescriptionsListWidget] Offline - using cached data only');
+      if (mounted && _hasLoadedFromCache) {
+        setState(() => _errorMessage = null);
       }
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userId)
-          .collection('prescripciones')
-          .get();
-
-      final prescripciones = snapshot.docs
-          .map((doc) => Prescripcion.fromMap(doc.data(), documentId: doc.id))
-          .toList();
-
+      return;
+    }
+    
+    // Step 3: Launch background fetch
+    setState(() => _isLoadingBackground = true);
+    
+    try {
+      debugPrint('🚀 [PrescriptionsListWidget] Launching background fetch...');
+      
+      // Use BackgroundLoader for async non-blocking fetch
+      final result = await BackgroundLoader.loadPrescriptions(
+        userId: userId,
+        includeInactive: true, // Load all for filtering
+      );
+      
+      if (!mounted) return;
+      
+      final prescriptions = result['prescriptions'] as List<Prescripcion>;
+      
       // Sort: active first, then by date (newest first)
-      prescripciones.sort((a, b) {
+      prescriptions.sort((a, b) {
         if (a.activa != b.activa) {
           return a.activa ? -1 : 1; // Active first
         }
         return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
       });
-
+      
       setState(() {
-        _prescripciones = prescripciones;
-        _isLoading = false;
+        _prescripciones = prescriptions;
+        _isLoadingBackground = false;
+        _errorMessage = null;
       });
+      
+      // Save to cache for next load
+      _saveToCache(userId, prescriptions);
+      
+      debugPrint('✅ [PrescriptionsListWidget] Background fetch completed - ${prescriptions.length} prescriptions');
+      
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Error cargando prescripciones: $e';
-        _isLoading = false;
-      });
+      debugPrint('❌ [PrescriptionsListWidget] Error loading prescriptions: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingBackground = false;
+          if (!_hasLoadedFromCache) {
+            _errorMessage = 'Error cargando prescripciones: $e';
+          }
+        });
+      }
     }
+  }
+  
+  /// Load prescriptions from cache (instant, synchronous)
+  void _loadFromCache(String userId) {
+    final cacheService = CacheService();
+    
+    // Try to load prescriptions from cache
+    final cachedPrescriptions = cacheService.get<List<Prescripcion>>(
+      'prescriptions_$userId',
+    );
+    
+    if (cachedPrescriptions != null && cachedPrescriptions.isNotEmpty) {
+      // Sort cached data
+      cachedPrescriptions.sort((a, b) {
+        if (a.activa != b.activa) {
+          return a.activa ? -1 : 1; // Active first
+        }
+        return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
+      });
+      
+      setState(() {
+        _prescripciones = cachedPrescriptions;
+        _hasLoadedFromCache = true;
+        _errorMessage = null;
+      });
+      
+      final cacheKey = 'prescriptions_$userId';
+      final remainingTtl = cacheService.getRemainingTtl(cacheKey);
+      debugPrint('🧠 [PrescriptionsListWidget] Loaded ${cachedPrescriptions.length} prescriptions from cache (TTL: ${remainingTtl}s)');
+    } else {
+      debugPrint('💾 [PrescriptionsListWidget] No cached prescriptions found');
+      setState(() => _hasLoadedFromCache = false);
+    }
+  }
+  
+  /// Save prescriptions to cache for next load
+  void _saveToCache(String userId, List<Prescripcion> prescriptions) {
+    final cacheService = CacheService();
+    
+    cacheService.set(
+      'prescriptions_$userId',
+      prescriptions,
+      ttl: const Duration(hours: 1),
+    );
+    
+    debugPrint('💾 [PrescriptionsListWidget] Saved ${prescriptions.length} prescriptions to cache');
   }
 
   List<Prescripcion> get _filteredPrescripciones {
@@ -155,13 +243,15 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
+    // Show loading ONLY if no cached data exists
+    if (_isLoadingBackground && !_hasLoadedFromCache) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    if (_errorMessage != null) {
+    // Show error ONLY if no cached data exists
+    if (_errorMessage != null && !_hasLoadedFromCache) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -177,7 +267,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadPrescripciones,
+                onPressed: () => _loadPrescripcionesWithCache(forceRefresh: true),
                 child: const Text('Reintentar'),
               ),
             ],
@@ -233,14 +323,49 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadPrescripciones,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: filteredList.length,
-        itemBuilder: (context, index) {
-          final prescripcion = filteredList[index];
-          return _buildPrescripcionCard(prescripcion);
-        },
+      onRefresh: () => _loadPrescripcionesWithCache(forceRefresh: true),
+      child: Stack(
+        children: [
+          ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: filteredList.length,
+            itemBuilder: (context, index) {
+              final prescripcion = filteredList[index];
+              return _buildPrescripcionCard(prescripcion);
+            },
+          ),
+          // Background loading indicator (non-intrusive)
+          if (_isLoadingBackground && _hasLoadedFromCache)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Actualizando...',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

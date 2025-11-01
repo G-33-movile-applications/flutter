@@ -84,6 +84,22 @@ class ConnectivityService {
   /// Check if has any connection
   bool get isConnected => _currentConnectionType != ConnectionType.none;
 
+  /// Force refresh connectivity status
+  /// 
+  /// This performs a fresh check instead of relying on cached state.
+  /// Useful before critical operations like manual refresh.
+  Future<bool> checkConnectivity() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      _currentConnectionType = _mapResultToConnectionType(results);
+      debugPrint('🌐 [ConnectivityService] Fresh check: $_currentConnectionType');
+      return isConnected;
+    } catch (e) {
+      debugPrint('❌ [ConnectivityService] Error checking connectivity: $e');
+      return false;
+    }
+  }
+
   /// Dispose resources (called on app shutdown)
   void dispose() {
     debugPrint('🌐 ConnectivityService disposed');
