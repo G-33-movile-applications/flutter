@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../models/prescripcion.dart';
 import '../../services/user_session.dart';
 import '../../services/background_loader.dart';
-import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
 
 class PrescriptionsListWidget extends StatefulWidget {
@@ -20,14 +19,41 @@ class PrescriptionsListWidget extends StatefulWidget {
 class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
   bool _isLoadingBackground = false; // Background refresh in progress
   bool _hasLoadedFromCache = false; // Cached data loaded
-  List<Prescripcion> _prescripciones = [];
   String? _errorMessage;
   String _filterStatus = 'all'; // 'all', 'active', 'inactive'
   
   @override
   void initState() {
     super.initState();
-    _loadPrescripcionesWithCache();
+    
+    debugPrint('🔍 [PrescriptionsListWidget] initState - UserSession prescriptions: ${UserSession().currentPrescripciones.value.length}');
+    
+    // Listen to UserSession prescriptions (populated from persistent cache in HomeScreen)
+    UserSession().currentPrescripciones.addListener(_onPrescriptionsUpdated);
+    
+    // Check if we already have data from cache
+    if (UserSession().currentPrescripciones.value.isNotEmpty) {
+      debugPrint('✅ [PrescriptionsListWidget] Data already in UserSession, skipping load');
+      _hasLoadedFromCache = true;
+    } else {
+      // If no data yet, trigger a load
+      debugPrint('⚠️ [PrescriptionsListWidget] No data in UserSession, triggering load');
+      _loadPrescripcionesWithCache();
+    }
+  }
+  
+  @override
+  void dispose() {
+    UserSession().currentPrescripciones.removeListener(_onPrescriptionsUpdated);
+    super.dispose();
+  }
+  
+  void _onPrescriptionsUpdated() {
+    if (mounted) {
+      setState(() {
+        _hasLoadedFromCache = UserSession().currentPrescripciones.value.isNotEmpty;
+      });
+    }
   }
 
   /// Load prescriptions with cache-first strategy
@@ -48,8 +74,11 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     
     debugPrint('🔄 [PrescriptionsListWidget] Starting data load for user: $userId (forceRefresh: $forceRefresh)');
     
-    // Step 1: Load from cache first (instant UI)
-    _loadFromCache(userId);
+    // Step 1: Check if we already have cached data from UserSession
+    if (UserSession().currentPrescripciones.value.isNotEmpty) {
+      debugPrint('📦 [PrescriptionsListWidget] Using data from UserSession (${UserSession().currentPrescripciones.value.length} prescriptions)');
+      setState(() => _hasLoadedFromCache = true);
+    }
     
     // Step 2: Check connectivity status
     final connectivity = ConnectivityService();
@@ -87,14 +116,13 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
       });
       
+      // Update UserSession (which triggers our listener)
+      UserSession().currentPrescripciones.value = prescriptions;
+      
       setState(() {
-        _prescripciones = prescriptions;
         _isLoadingBackground = false;
         _errorMessage = null;
       });
-      
-      // Save to cache for next load
-      _saveToCache(userId, prescriptions);
       
       debugPrint('✅ [PrescriptionsListWidget] Background fetch completed - ${prescriptions.length} prescriptions');
       
@@ -111,50 +139,9 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     }
   }
   
-  /// Load prescriptions from cache (instant, synchronous)
-  void _loadFromCache(String userId) {
-    final cacheService = CacheService();
-    
-    // Try to load prescriptions from cache
-    final cachedPrescriptions = cacheService.get<List<Prescripcion>>(
-      'prescriptions_$userId',
-    );
-    
-    if (cachedPrescriptions != null && cachedPrescriptions.isNotEmpty) {
-      // Sort cached data
-      cachedPrescriptions.sort((a, b) {
-        if (a.activa != b.activa) {
-          return a.activa ? -1 : 1; // Active first
-        }
-        return b.fechaCreacion.compareTo(a.fechaCreacion); // Newest first
-      });
-      
-      setState(() {
-        _prescripciones = cachedPrescriptions;
-        _hasLoadedFromCache = true;
-        _errorMessage = null;
-      });
-      
-      final cacheKey = 'prescriptions_$userId';
-      final remainingTtl = cacheService.getRemainingTtl(cacheKey);
-      debugPrint('🧠 [PrescriptionsListWidget] Loaded ${cachedPrescriptions.length} prescriptions from cache (TTL: ${remainingTtl}s)');
-    } else {
-      debugPrint('💾 [PrescriptionsListWidget] No cached prescriptions found');
-      setState(() => _hasLoadedFromCache = false);
-    }
-  }
-  
-  /// Save prescriptions to cache for next load
-  void _saveToCache(String userId, List<Prescripcion> prescriptions) {
-    final cacheService = CacheService();
-    
-    cacheService.set(
-      'prescriptions_$userId',
-      prescriptions,
-      ttl: const Duration(hours: 1),
-    );
-    
-    debugPrint('💾 [PrescriptionsListWidget] Saved ${prescriptions.length} prescriptions to cache');
+  /// Get prescriptions from UserSession (populated from persistent cache)
+  List<Prescripcion> get _prescripciones {
+    return UserSession().currentPrescripciones.value;
   }
 
   List<Prescripcion> get _filteredPrescripciones {
