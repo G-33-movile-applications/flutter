@@ -11,6 +11,10 @@ class Pedido {
   final DateTime fechaPedido;
   final DateTime? fechaEntrega;
   // Note: medicamentos are now stored as a subcollection, not embedded
+  
+  // Cached pharmacy data for offline display (non-persistent, cached only)
+  final String? cachedPharmacyName;
+  final String? cachedPharmacyAddress;
 
   Pedido({
     required this.id,
@@ -21,6 +25,8 @@ class Pedido {
     required this.estado,
     required this.fechaPedido,
     this.fechaEntrega,
+    this.cachedPharmacyName,
+    this.cachedPharmacyAddress,
   });
 
   // Getters for backward compatibility
@@ -51,6 +57,9 @@ class Pedido {
       fechaEntrega: map['fechaEntrega'] != null 
           ? (map['fechaEntrega'] as Timestamp).toDate()
           : null,
+      // Load cached pharmacy data if available (for offline display)
+      cachedPharmacyName: map['cachedPharmacyName'] as String?,
+      cachedPharmacyAddress: map['cachedPharmacyAddress'] as String?,
     );
   }
 
@@ -78,6 +87,9 @@ class Pedido {
       'estado': estado,
       'fechaPedido': fechaPedido.toIso8601String(),
       if (fechaEntrega != null) 'fechaEntrega': fechaEntrega!.toIso8601String(),
+      // Include cached pharmacy data for offline display
+      if (cachedPharmacyName != null) 'cachedPharmacyName': cachedPharmacyName,
+      if (cachedPharmacyAddress != null) 'cachedPharmacyAddress': cachedPharmacyAddress,
     };
   }
 
@@ -94,6 +106,9 @@ class Pedido {
       fechaEntrega: map['fechaEntrega'] != null 
           ? DateTime.parse(map['fechaEntrega'] as String)
           : null,
+      // Load cached pharmacy data
+      cachedPharmacyName: map['cachedPharmacyName'] as String?,
+      cachedPharmacyAddress: map['cachedPharmacyAddress'] as String?,
     );
   }
 
@@ -116,6 +131,8 @@ class Pedido {
     String? estado,
     DateTime? fechaPedido,
     DateTime? fechaEntrega,
+    String? cachedPharmacyName,
+    String? cachedPharmacyAddress,
   }) {
     return Pedido(
       id: id ?? this.id,
@@ -126,6 +143,8 @@ class Pedido {
       estado: estado ?? this.estado,
       fechaPedido: fechaPedido ?? this.fechaPedido,
       fechaEntrega: fechaEntrega ?? this.fechaEntrega,
+      cachedPharmacyName: cachedPharmacyName ?? this.cachedPharmacyName,
+      cachedPharmacyAddress: cachedPharmacyAddress ?? this.cachedPharmacyAddress,
     );
   }
 

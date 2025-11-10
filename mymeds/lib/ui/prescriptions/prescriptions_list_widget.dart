@@ -159,9 +159,29 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Filter chips
-        _buildFilterChips(),
-        const SizedBox(height: 16),
+        // Header with filter chips and drafts button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(child: _buildFilterChips()),
+              const SizedBox(width: 8),
+              // Drafts/Borradores button
+              IconButton(
+                icon: const Icon(Icons.history_rounded),
+                tooltip: 'Ver borradores',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/pending-prescriptions');
+                },
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
         
         // Prescriptions list
         Expanded(child: _buildContent()),
@@ -172,7 +192,6 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
   Widget _buildFilterChips() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           _buildFilterChip(
