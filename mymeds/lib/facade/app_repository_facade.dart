@@ -14,6 +14,7 @@ import '../repositories/punto_fisico_repository.dart';
 import '../repositories/medicamento_punto_fisico_repository.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_queue_service.dart';
+import '../services/favorites_service.dart';
 
 /// Façade class that provides a simplified interface to all repositories
 /// This class acts as a single entry point for the UI layer, hiding the complexity
@@ -30,6 +31,7 @@ class AppRepositoryFacade {
   // Service instances for connectivity and offline sync
   final ConnectivityService _connectivityService;
   final SyncQueueService _syncQueueService;
+  final FavoritesService _favoritesService;
 
   // Constructor with optional dependency injection
   AppRepositoryFacade({
@@ -41,6 +43,7 @@ class AppRepositoryFacade {
     MedicamentoPuntoFisicoRepository? medicamentoPuntoFisicoRepository,
     ConnectivityService? connectivityService,
     SyncQueueService? syncQueueService,
+    FavoritesService? favoritesService,
   })  : _usuarioRepository = usuarioRepository ?? UsuarioRepository(),
         _pedidoRepository = pedidoRepository ?? PedidoRepository(),
         _prescripcionRepository = prescripcionRepository ?? PrescripcionRepository(),
@@ -48,7 +51,8 @@ class AppRepositoryFacade {
         _puntoFisicoRepository = puntoFisicoRepository ?? PuntoFisicoRepository(),
         _medicamentoPuntoFisicoRepository = medicamentoPuntoFisicoRepository ?? MedicamentoPuntoFisicoRepository(),
         _connectivityService = connectivityService ?? ConnectivityService(),
-        _syncQueueService = syncQueueService ?? SyncQueueService() {
+        _syncQueueService = syncQueueService ?? SyncQueueService(),
+        _favoritesService = favoritesService ?? FavoritesService() {
     // Wire up sync callbacks for offline operations
     _initializeSyncCallbacks();
   }
@@ -757,6 +761,18 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
         print('✅ [AppRepositoryFacade] Device online - executing pedido creation immediately');
         try {
           await createPedido(pedido, userId: userId);
+          
+          // Track visit to pharmacy for favorites/frequent tracking
+          try {
+            final pharmacy = await _puntoFisicoRepository.read(pedido.puntoFisicoId);
+            if (pharmacy != null) {
+              await _favoritesService.trackVisit(pharmacy);
+              print('📍 [AppRepositoryFacade] Tracked visit to pharmacy: ${pharmacy.nombre}');
+            }
+          } catch (e) {
+            // Don't fail the order if visit tracking fails
+            print('⚠️ [AppRepositoryFacade] Failed to track pharmacy visit: $e');
+          }
           
           // Update prescription if needed (e.g., mark as used)
           if (prescripcionId != null && prescripcionUpdates != null) {

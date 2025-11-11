@@ -139,26 +139,38 @@ class PedidoRepository {
     }
   }
 
-  // Find pedidos by user ID
+  // Find pedidos by user ID (queries from subcollection usuarios/{userId}/pedidos)
   Future<List<Pedido>> findByUsuarioId(String usuarioId) async {
     try {
+      print('🔍 [PedidoRepository] Querying pedidos for user: $usuarioId from subcollection');
+      
       final querySnapshot = await _firestore
-          .collection(_collection)
-          .where('usuarioId', isEqualTo: usuarioId)
+          .collection('usuarios')
+          .doc(usuarioId)
+          .collection('pedidos')
           .get();
       
       List<Pedido> pedidos = [];
       
       for (var doc in querySnapshot.docs) {
-        final pedidoData = doc.data();
-        final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
-        
-        // Note: Prescriptions are now managed separately
-        pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
+        try {
+          final pedidoData = doc.data();
+          final identificadorPedido = doc.id; // Use document ID from subcollection
+          
+          print('📦 [PedidoRepository] Found pedido: $identificadorPedido, estado: ${pedidoData['estado']}');
+          
+          // Note: Prescriptions are now managed separately
+          pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
+        } catch (e) {
+          print('⚠️ [PedidoRepository] Error parsing pedido ${doc.id}: $e');
+          continue;
+        }
       }
       
+      print('✅ [PedidoRepository] Total pedidos found: ${pedidos.length}');
       return pedidos;
     } catch (e) {
+      print('❌ [PedidoRepository] Error finding pedidos by user ID: $e');
       throw Exception('Error finding pedidos by user ID: $e');
     }
   }
@@ -224,21 +236,27 @@ class PedidoRepository {
         });
   }
 
-  // Stream of pedidos by user
+  // Stream of pedidos by user (queries from subcollection usuarios/{userId}/pedidos)
   Stream<List<Pedido>> streamPedidosByUsuario(String usuarioId) {
     return _firestore
-        .collection(_collection)
-        .where('usuarioId', isEqualTo: usuarioId)
+        .collection('usuarios')
+        .doc(usuarioId)
+        .collection('pedidos')
         .snapshots()
         .map((querySnapshot) {
           List<Pedido> pedidos = [];
           
           for (var doc in querySnapshot.docs) {
-            final pedidoData = doc.data();
-            final identificadorPedido = pedidoData['identificadorPedido'] as String? ?? doc.id;
-            
-            // Note: Prescriptions are now managed separately
-            pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
+            try {
+              final pedidoData = doc.data();
+              final identificadorPedido = doc.id; // Use document ID from subcollection
+              
+              // Note: Prescriptions are now managed separately
+              pedidos.add(Pedido.fromMap(pedidoData, documentId: identificadorPedido));
+            } catch (e) {
+              print('⚠️ [PedidoRepository] Error parsing pedido ${doc.id} in stream: $e');
+              continue;
+            }
           }
           
           return pedidos;

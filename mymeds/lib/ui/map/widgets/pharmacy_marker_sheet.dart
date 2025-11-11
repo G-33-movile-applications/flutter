@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/punto_fisico.dart';
+import '../../../widgets/favorite_heart_button.dart';
 
 class PharmacyMarkerSheet extends StatelessWidget {
   const PharmacyMarkerSheet({
@@ -46,12 +47,23 @@ class PharmacyMarkerSheet extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
-                Text(
-                  pharmacy.nombre,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                  ),
+                // Title row with favorite button
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        pharmacy.nombre,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    // Favorite heart button
+                    CompactFavoriteHeart(
+                      pharmacy: pharmacy,
+                      size: 24,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 
