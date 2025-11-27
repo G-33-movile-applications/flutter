@@ -58,6 +58,8 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   path_provider: ^2.1.1
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
   
   # NFC support
   flutter_nfc_kit: ^3.3.1

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/system_conditions_provider.dart';
+import '../../../providers/smart_notification_provider.dart';
 import 'package:provider/provider.dart';
 import '../../../services/user_session.dart';
 import '../../../services/auth_service.dart';
@@ -149,6 +150,47 @@ class _SettingsViewState extends State<SettingsView> {
                               settingsProvider.notificationsEnabled, // Only if general notifications are on
                           onChanged: (value) {
                             settingsProvider.toggleEmailNotifications(value);
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Smart Notifications Section
+                        _buildSectionTitle(theme, 'Notificaciones Inteligentes'),
+                        const SizedBox(height: 12),
+                        Consumer<SmartNotificationProvider>(
+                          builder: (context, smartNotifications, child) {
+                            return Column(
+                              children: [
+                                _buildSettingCard(
+                                  context: context,
+                                  icon: Icons.psychology_rounded,
+                                  title: 'Optimización Inteligente',
+                                  subtitle: 'Aprende cuándo prefieres recibir notificaciones',
+                                  value: smartNotifications.smartNotificationsEnabled,
+                                  enabled: settingsProvider.notificationsEnabled,
+                                  onChanged: (value) {
+                                    smartNotifications.setSmartNotificationsEnabled(value);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          value
+                                              ? '🧠 Notificaciones inteligentes activadas'
+                                              : 'Notificaciones inteligentes desactivadas',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSmartNotificationInfoCard(
+                                  context,
+                                  theme,
+                                  smartNotifications,
+                                  settingsProvider,
+                                ),
+                              ],
+                            );
                           },
                         ),
                         const SizedBox(height: 24),
@@ -605,6 +647,496 @@ class _SettingsViewState extends State<SettingsView> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build smart notification info card with analytics and controls
+  Widget _buildSmartNotificationInfoCard(
+    BuildContext context,
+    ThemeData theme,
+    SmartNotificationProvider smartNotifications,
+    SettingsProvider settingsProvider,
+  ) {
+    final analytics = smartNotifications.analytics;
+    final isEnabled = smartNotifications.smartNotificationsEnabled && 
+                      settingsProvider.notificationsEnabled;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  Icons.insights_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Información y Estadísticas',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (smartNotifications.analyticsLoading)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Analytics or info message
+            if (!isEnabled)
+              _buildInfoMessage(
+                theme,
+                Icons.info_outline_rounded,
+                'Activa las notificaciones inteligentes para comenzar a aprender tus preferencias',
+                Colors.blue,
+              )
+            else if (analytics == null || !analytics.hasEnoughData)
+              _buildInfoMessage(
+                theme,
+                Icons.schedule_rounded,
+                'Recopilando datos... Se necesitan al menos 20 notificaciones en 7 días para empezar el aprendizaje',
+                Colors.orange,
+              )
+            else
+              Column(
+                children: [
+                  // Statistics
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatBox(
+                          theme,
+                          'Total',
+                          analytics.totalNotifications.toString(),
+                          Icons.notifications_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatBox(
+                          theme,
+                          'Abiertos',
+                          analytics.openedCount.toString(),
+                          Icons.check_circle_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatBox(
+                          theme,
+                          'Tasa',
+                          analytics.openRatePercentage,
+                          Icons.trending_up_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Days tracked
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Rastreando durante ${analytics.daysTracked} días',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // Quiet Hours Section
+            Row(
+              children: [
+                Icon(
+                  Icons.bedtime_rounded,
+                  color: theme.colorScheme.secondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Horario Silencioso',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      smartNotifications.quietHoursDescription,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded, size: 20),
+                    onPressed: () => _showQuietHoursDialog(
+                      context,
+                      smartNotifications,
+                    ),
+                    tooltip: 'Editar horario',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Actualizar'),
+                    onPressed: smartNotifications.analyticsLoading
+                        ? null
+                        : () async {
+                            await smartNotifications.refreshAnalytics();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('✅ Estadísticas actualizadas'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.science_rounded, size: 18),
+                    label: const Text('Prueba'),
+                    onPressed: !isEnabled
+                        ? null
+                        : () async {
+                            await smartNotifications.sendTestNotification();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('🧪 Notificación de prueba enviada'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                  ),
+                ),
+              ],
+            ),
+
+            if (analytics != null && analytics.totalNotifications > 0) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Borrar Historial'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                  ),
+                  onPressed: () => _showClearHistoryDialog(
+                    context,
+                    smartNotifications,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build info message
+  Widget _buildInfoMessage(
+    ThemeData theme,
+    IconData icon,
+    String message,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build stat box
+  Widget _buildStatBox(
+    ThemeData theme,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show quiet hours configuration dialog
+  void _showQuietHoursDialog(
+    BuildContext context,
+    SmartNotificationProvider smartNotifications,
+  ) {
+    int tempStartHour = smartNotifications.quietStartHour;
+    int tempEndHour = smartNotifications.quietEndHour;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                Icons.bedtime_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              const Text('Horario Silencioso'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'No se enviarán notificaciones durante estas horas:',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              
+              // Start hour picker
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Hora de inicio:'),
+                  ),
+                  DropdownButton<int>(
+                    value: tempStartHour,
+                    items: List.generate(24, (hour) {
+                      return DropdownMenuItem(
+                        value: hour,
+                        child: Text('${hour.toString().padLeft(2, '0')}:00'),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setState(() {
+                        tempStartHour = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // End hour picker
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Hora de fin:'),
+                  ),
+                  DropdownButton<int>(
+                    value: tempEndHour,
+                    items: List.generate(24, (hour) {
+                      return DropdownMenuItem(
+                        value: hour,
+                        child: Text('${hour.toString().padLeft(2, '0')}:00'),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setState(() {
+                        tempEndHour = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                smartNotifications.setQuietHours(
+                  startHour: tempStartHour,
+                  endHour: tempEndHour,
+                );
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Horario silencioso actualizado'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Show clear history confirmation dialog
+  void _showClearHistoryDialog(
+    BuildContext context,
+    SmartNotificationProvider smartNotifications,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              color: Colors.orange,
+            ),
+            const SizedBox(width: 12),
+            const Text('Borrar Historial'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas borrar todo el historial de notificaciones?\n\n'
+          'Esta acción eliminará todos los datos de aprendizaje y el sistema '
+          'tendrá que empezar desde cero.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              await smartNotifications.clearHistory();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Historial borrado correctamente'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Borrar Todo'),
           ),
         ],
       ),
