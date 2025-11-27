@@ -78,13 +78,16 @@ class OrdersSyncService {
       
       debugPrint('✅ [OrdersSync] Fetched ${orders.length} orders from Firestore');
       
-      // Step 4: Update cache
-      await _cache.cacheOrders(userId, orders);
+      // Step 3.5: Enrich orders with pharmacy data for offline display
+      final enrichedOrders = await _enrichOrdersWithPharmacyData(orders);
+      
+      // Step 4: Update cache with enriched orders
+      await _cache.cacheOrders(userId, enrichedOrders);
       
       // Update UserSession for UI synchronization
-      UserSession().currentPedidos.value = orders;
+      UserSession().currentPedidos.value = enrichedOrders;
       
-      return orders;
+      return enrichedOrders;
     } catch (e) {
       debugPrint('❌ [OrdersSync] Failed to fetch orders: $e');
       
@@ -118,16 +121,49 @@ class OrdersSyncService {
         final orders = await _facade.getUserPedidos(userId);
         orders.sort((a, b) => b.fechaPedido.compareTo(a.fechaPedido));
         
-        await _cache.cacheOrders(userId, orders);
+        // Enrich orders with pharmacy data
+        final enrichedOrders = await _enrichOrdersWithPharmacyData(orders);
+        
+        await _cache.cacheOrders(userId, enrichedOrders);
         
         // Update UserSession for UI synchronization
-        UserSession().currentPedidos.value = orders;
+        UserSession().currentPedidos.value = enrichedOrders;
         
-        debugPrint('✅ [OrdersSync] Background sync completed (${orders.length} orders)');
+        debugPrint('✅ [OrdersSync] Background sync completed (${enrichedOrders.length} orders)');
       } catch (e) {
         debugPrint('⚠️ [OrdersSync] Background sync failed: $e');
       }
     });
+  }
+  
+  /// Enrich orders with pharmacy data for offline display
+  /// 
+  /// Fetches pharmacy name and address for each order to enable
+  /// proper display when offline (prevents "Cargando..." gray screens)
+  Future<List<Pedido>> _enrichOrdersWithPharmacyData(List<Pedido> orders) async {
+    final enrichedOrders = <Pedido>[];
+    
+    for (final order in orders) {
+      try {
+        // Fetch pharmacy data - use facade method to get pharmacy
+        final pharmacyMap = await _facade.getPharmacyWithMedicamentos(order.puntoFisicoId);
+        final pharmacy = pharmacyMap['pharmacy'];
+        
+        // Create enriched order with cached pharmacy data
+        final enrichedOrder = order.copyWith(
+          cachedPharmacyName: pharmacy?.nombre,
+          cachedPharmacyAddress: pharmacy?.direccion,
+        );
+        
+        enrichedOrders.add(enrichedOrder);
+      } catch (e) {
+        debugPrint('⚠️ [OrdersSync] Failed to enrich order ${order.id}: $e');
+        // Add original order if enrichment fails
+        enrichedOrders.add(order);
+      }
+    }
+    
+    return enrichedOrders;
   }
   
   /// Stream orders with real-time updates

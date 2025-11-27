@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
+import '../../services/connectivity_service.dart';
 import '../widgets/connectivity_feedback_banner.dart';
 import 'widgets/pharmacy_marker_sheet.dart';
 import '../pharmacy/pharmacy_inventory_page.dart';
@@ -30,21 +31,28 @@ class _MapScreenState extends State<MapScreen> {
   Position? _currentPosition;
   Set<Marker> _markers = {};
   bool _isLoading = true;
+  bool _isOnline = true;
   String? _errorMessage;
   List<PuntoFisico> _nearbyPharmacies = [];
   StreamSubscription<QuerySnapshot>? _firestoreSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ConnectivityService _connectivity = ConnectivityService();
 
   @override
   void initState() {
     super.initState();
-    _initializeLocation();
+    _checkConnectivityAndInitialize();
   }
 
   @override
   void dispose() {
     _firestoreSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkConnectivityAndInitialize() async {
+    _isOnline = await _connectivity.checkConnectivity();
+    await _initializeLocation();
   }
 
   Future<void> _initializeLocation() async {
@@ -112,11 +120,29 @@ class _MapScreenState extends State<MapScreen> {
         _filterNearbyPharmacies(allPharmacies);
         _createMarkers();
       },
-      onError: (error) {
-        setState(() {
-          _errorMessage = 'Error al cargar las farmacias. Inténtalo de nuevo.';
-          _isLoading = false;
-        });
+      onError: (error) async {
+        debugPrint('Error al cargar farmacias desde Firestore: $error');
+        
+        // Check if we're online to determine the appropriate error message
+        final isOnline = await _connectivity.checkConnectivity();
+        
+        if (mounted) {
+          setState(() {
+            _isOnline = isOnline;
+            // Only show "no connection" message if we have NO cached pharmacies AND we're offline
+            // If we have cached data, Firestore will use it automatically
+            if (!isOnline && _nearbyPharmacies.isEmpty) {
+              _errorMessage = 'Sin conexión a internet. Conéctate para ver farmacias cercanas.';
+            } else if (!isOnline && _nearbyPharmacies.isNotEmpty) {
+              // We have cached data, no error message needed (Firestore persistence will handle it)
+              _errorMessage = null;
+            } else {
+              // Online but still failed - show generic error
+              _errorMessage = 'Error al cargar las farmacias. Inténtalo de nuevo.';
+            }
+            _isLoading = false;
+          });
+        }
       },
     );
   }
@@ -342,8 +368,8 @@ class _MapScreenState extends State<MapScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.location_off_rounded,
+                    Icon(
+                      _isOnline ? Icons.location_off_rounded : Icons.wifi_off_rounded,
                       size: 64,
                       color: AppTheme.textSecondary,
                     ),
@@ -355,7 +381,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: _initializeLocation,
+                      onPressed: _checkConnectivityAndInitialize,
                       child: const Text('Reintentar'),
                     ),
                   ],
