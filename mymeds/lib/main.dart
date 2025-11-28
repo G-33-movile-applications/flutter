@@ -19,6 +19,7 @@ import 'services/prescriptions_cache_service.dart';
 import 'services/favorites_service.dart';
 import 'services/lru_prescription_cache.dart';
 import 'services/prescription_image_storage.dart';
+import 'services/autofill_service.dart';
 import 'services/prescription_draft_cache.dart';
 import 'ui/auth/auth_wrapper.dart';
 // import 'utils/firebase_seeder.dart'; //for seeding uncomment
@@ -98,6 +99,8 @@ Future<void> main() async {
   // Initialize prescription image storage for offline image persistence
   await PrescriptionImageStorage().init();
 
+  // Initialize autofill service for smart form suggestions
+  await AutofillService().initialize();
   // Initialize prescription draft cache for saving work-in-progress prescriptions
   await PrescriptionDraftCache().init();
 
