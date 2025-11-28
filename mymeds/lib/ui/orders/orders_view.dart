@@ -496,7 +496,7 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
               // Order ID
               const SizedBox(height: 8),
               Text(
-                'ID: ${order.id.substring(0, 16)}...',
+                'ID: ${order.id.length > 16 ? '${order.id.substring(0, 16)}...' : order.id}',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.grey[600] : Colors.grey[500],

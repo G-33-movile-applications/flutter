@@ -10,9 +10,11 @@ import '../../services/nfc_service.dart';
 import '../../services/user_session.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/prescription_draft_cache.dart';
+import '../../services/medicine_validation_service.dart';
 import '../../adapters/prescription_adapter.dart';
 import '../../repositories/prescripcion_repository.dart';
 import 'widgets/prescription_preview_widget.dart';
+import '../widgets/unknown_medicine_dialog.dart';
 
 class NfcUploadPage extends StatefulWidget {
   const NfcUploadPage({super.key});
@@ -25,9 +27,11 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   final NfcService _nfcService = NfcService();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
   final PrescriptionDraftCache _draftCache = PrescriptionDraftCache();
+  final MedicineValidationService _medicineValidation = MedicineValidationService();
   
   // Generate unique draft ID for each NFC session
   late final String _draftId;
+  bool _draftIdInitialized = false;
   
   bool _isNfcAvailable = false;
   bool _isNfcEnabled = false;
@@ -41,18 +45,27 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   @override
   void initState() {
     super.initState();
-    
-    // Generate unique draft ID or load from arguments
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null && args['draftId'] != null) {
-      _draftId = args['draftId'] as String;
-      _loadDraftIfExists();
-    } else {
-      // Generate new draft ID with timestamp for uniqueness
-      _draftId = 'nfc_${DateTime.now().millisecondsSinceEpoch}';
-    }
-    
     _checkNfcAvailability();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'nfc_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    }
   }
 
   @override
@@ -246,39 +259,79 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       // Parse JSON string to Map
       final jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
 
-      // Convert from NFC JSON to Prescripcion
-      final prescripcion = PrescriptionAdapter.fromNdefJson(jsonString);
-      
-      // Create medications from the adapter data
-      final medicamentos = <MedicamentoPrescripcion>[];
-      if (jsonData.containsKey('medicamentos') && jsonData['medicamentos'] != null) {
-        final medsList = jsonData['medicamentos'] as List;
-        for (var medData in medsList) {
+      // Try to read from simplified format first (string data)
+      if (jsonData.containsKey('medicamentos') && jsonData['medicamentos'] is String) {
+        // NEW FORMAT: Simple string format
+        final prescripcion = Prescripcion(
+          id: jsonData['id'] ?? 'presc_nfc_${DateTime.now().millisecondsSinceEpoch}',
+          fechaCreacion: DateTime.tryParse(jsonData['fecha'] ?? '') ?? DateTime.now(),
+          diagnostico: jsonData['diagnostico'] ?? '',
+          medico: jsonData['medico'] ?? '',
+          activa: jsonData['activa'] == 'true',
+        );
+        
+        // Parse medication names from comma-separated string
+        final medicamentos = <MedicamentoPrescripcion>[];
+        final medicationNames = (jsonData['medicamentos'] as String).split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        
+        for (int i = 0; i < medicationNames.length; i++) {
           medicamentos.add(MedicamentoPrescripcion(
-            id: medData['id'] ?? 'med_${DateTime.now().millisecondsSinceEpoch}',
-            medicamentoRef: medData['medicamentoRef'] ?? '',
-            nombre: medData['nombre'] ?? 'Medicamento sin nombre',
-            dosisMg: (medData['dosisMg'] ?? 0).toDouble(),
-            frecuenciaHoras: medData['frecuenciaHoras'] ?? 8,
-            duracionDias: medData['duracionDias'] ?? 7,
-            fechaInicio: DateTime.tryParse(medData['fechaInicio'] ?? '') ?? DateTime.now(),
-            fechaFin: DateTime.tryParse(medData['fechaFin'] ?? '') ?? DateTime.now().add(const Duration(days: 7)),
-            observaciones: medData['observaciones'],
-            activo: medData['activo'] ?? true,
+            id: 'med_nfc_${DateTime.now().millisecondsSinceEpoch}_$i',
+            medicamentoRef: '', // Will be filled during validation
+            nombre: medicationNames[i],
+            dosisMg: 0, // Default values - user will fill these
+            frecuenciaHoras: 8,
+            duracionDias: 7,
+            fechaInicio: DateTime.now(),
+            fechaFin: DateTime.now().add(const Duration(days: 7)),
+            observaciones: '',
+            activo: true,
             userId: UserSession().currentUser.value?.uid ?? '',
             prescripcionId: prescripcion.id,
           ));
         }
+        
+        setState(() {
+          _readPrescription = PrescripcionWithMedications(
+            prescripcion: prescripcion,
+            medicamentos: medicamentos,
+          );
+          _hasJustRead = true;
+        });
+      } else {
+        // OLD FORMAT: Complex JSON with medication objects (backward compatibility)
+        final prescripcion = PrescriptionAdapter.fromNdefJson(jsonString);
+        
+        final medicamentos = <MedicamentoPrescripcion>[];
+        if (jsonData.containsKey('medicamentos') && jsonData['medicamentos'] is List) {
+          final medsList = jsonData['medicamentos'] as List;
+          for (var medData in medsList) {
+            medicamentos.add(MedicamentoPrescripcion(
+              id: medData['id'] ?? 'med_${DateTime.now().millisecondsSinceEpoch}',
+              medicamentoRef: medData['medicamentoRef'] ?? '',
+              nombre: medData['nombre'] ?? 'Medicamento sin nombre',
+              dosisMg: (medData['dosisMg'] ?? 0).toDouble(),
+              frecuenciaHoras: medData['frecuenciaHoras'] ?? 8,
+              duracionDias: medData['duracionDias'] ?? 7,
+              fechaInicio: DateTime.tryParse(medData['fechaInicio'] ?? '') ?? DateTime.now(),
+              fechaFin: DateTime.tryParse(medData['fechaFin'] ?? '') ?? DateTime.now().add(const Duration(days: 7)),
+              observaciones: medData['observaciones'],
+              activo: medData['activo'] ?? true,
+              userId: UserSession().currentUser.value?.uid ?? '',
+              prescripcionId: prescripcion.id,
+            ));
+          }
+        }
+        
+        setState(() {
+          _readPrescription = PrescripcionWithMedications(
+            prescripcion: prescripcion,
+            medicamentos: medicamentos,
+          );
+          _hasJustRead = true;
+        });
       }
 
-      setState(() {
-        _readPrescription = PrescripcionWithMedications(
-          prescripcion: prescripcion,
-          medicamentos: medicamentos,
-        );
-        _hasJustRead = true; // Set flag to prevent re-reading
-      });
-      
       // Save draft after reading prescription
       _saveDraftIfNeeded();
 
@@ -397,46 +450,25 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       
       if (selected == null) return;
 
-      // Convert to NFC format (returns JSON string)
-      final jsonString = PrescriptionAdapter.toNdefJson(selected.prescripcion);
+      // Convert to simple string format for NFC (medications as comma-separated list)
+      final medicationsList = selected.medicamentos.map((med) => med.nombre).join(', ');
       
-      // Parse to Map to add medications
-      Map<String, dynamic> jsonData;
-      try {
-        jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
-      } catch (e) {
-        _showErrorSnackBar('Error al procesar prescripción: formato JSON inválido');
-        return;
-      }
+      // Create simple JSON with string values only
+      final Map<String, String> simpleData = {
+        'id': selected.prescripcion.id,
+        'medico': selected.prescripcion.medico,
+        'diagnostico': selected.prescripcion.diagnostico,
+        'fecha': selected.prescripcion.fechaCreacion.toIso8601String(),
+        'medicamentos': medicationsList, // Simple comma-separated string
+        'activa': selected.prescripcion.activa.toString(),
+      };
       
-      // Add medications to JSON (convert all DateTime to ISO strings for NFC compatibility)
-      try {
-        jsonData['medicamentos'] = selected.medicamentos.map((med) {
-          // Ensure all fields are JSON-serializable
-          return {
-            'id': med.id,
-            'medicamentoRef': med.medicamentoRef,
-            'nombre': med.nombre,
-            'dosisMg': med.dosisMg.toDouble(),
-            'frecuenciaHoras': med.frecuenciaHoras,
-            'duracionDias': med.duracionDias,
-            'fechaInicio': med.fechaInicio.toIso8601String(),
-            'fechaFin': med.fechaFin.toIso8601String(),
-            'observaciones': med.observaciones ?? '',
-            'activo': med.activo,
-          };
-        }).toList();
-      } catch (e) {
-        _showErrorSnackBar('Error al procesar medicamentos: ${e.toString()}');
-        return;
-      }
-
-      // Convert back to JSON string and validate
+      // Convert to JSON string
       String completeJsonString;
       try {
-        completeJsonString = jsonEncode(jsonData);
+        completeJsonString = jsonEncode(simpleData);
       } catch (e) {
-        _showErrorSnackBar('Error al generar JSON: ${e.toString()}');
+        _showErrorSnackBar('Error al generar datos: ${e.toString()}');
         return;
       }
 
@@ -720,29 +752,170 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   Future<void> _handleUploadPrescription() async {
     if (_readPrescription == null) return;
 
-    final confirmed = await _showConfirmDialog(
-      title: 'Subir Prescripción',
-      message: '¿Deseas guardar esta prescripción en tu cuenta de MyMeds?',
-      confirmText: 'Subir',
-    );
-
-    if (confirmed != true) return;
-
     setState(() => _isUploading = true);
 
     try {
       final userId = UserSession().currentUser.value?.uid;
       if (userId == null) {
+        setState(() => _isUploading = false);
         _showErrorSnackBar('Usuario no autenticado');
         return;
       }
 
+      // ========== MEDICINE VALIDATION ==========
+      // Validate each medicine exists in catalog
+      debugPrint('🚀 [NFC] Starting medicine validation for ${_readPrescription!.medicamentos.length} medicines');
+      final validatedMedications = <MedicamentoPrescripcion>[];
+      final medicationsToValidate = _readPrescription!.medicamentos.toList();
+
+      for (int i = 0; i < medicationsToValidate.length; i++) {
+        final med = medicationsToValidate[i];
+        final nombre = med.nombre;
+        
+        debugPrint('🔍 [NFC] Validating medicine ${i + 1}/${medicationsToValidate.length}: "$nombre"');
+        
+        try {
+          debugPrint('🔎 [NFC] Calling validateMedicine for: "$nombre"');
+          final validationResult = await _medicineValidation.validateMedicine(nombre);
+          debugPrint('📊 [NFC] Validation result - found: ${validationResult.found}, confidence: ${validationResult.confidence}');
+          
+          if (!validationResult.found || validationResult.confidence < 0.75) {
+            // Medicine not found or low confidence - show dialog
+            debugPrint('⚠️ [NFC] Medicine needs review - showing dialog');
+            if (!mounted) return;
+            
+            debugPrint('🔔 [NFC] Showing UnknownMedicineDialog for: "$nombre"');
+            final action = await UnknownMedicineDialog.show(
+              context,
+              medicineName: nombre,
+              suggestions: validationResult.suggestions,
+            );
+            debugPrint('✅ [NFC] Dialog returned action: ${action?.type}');
+            
+            if (action == null) {
+              // User cancelled - abort upload
+              debugPrint('❌ [NFC] User cancelled dialog - aborting upload');
+              setState(() => _isUploading = false);
+              return;
+            }
+            
+            if (action.type == UnknownMedicineActionType.skip) {
+              // Skip this medicine - don't add to validated list
+              continue;
+            } else if (action.type == UnknownMedicineActionType.useAlternative) {
+              // Use alternative medicine - create new medication with alternative name
+              validatedMedications.add(
+                MedicamentoPrescripcion(
+                  id: med.id,
+                  medicamentoRef: action.selectedMedicine!.id,
+                  nombre: action.selectedMedicine!.nombre,
+                  dosisMg: med.dosisMg,
+                  frecuenciaHoras: med.frecuenciaHoras,
+                  duracionDias: med.duracionDias,
+                  fechaInicio: med.fechaInicio,
+                  fechaFin: med.fechaFin,
+                  observaciones: med.observaciones,
+                  activo: med.activo,
+                  userId: userId,
+                  prescripcionId: _readPrescription!.prescripcion.id,
+                ),
+              );
+            } else if (action.type == UnknownMedicineActionType.saveForReview) {
+              // Save to unknownMedicines for admin review
+              await _medicineValidation.saveUnknownMedicine(
+                proposedName: nombre,
+                uploadedBy: userId,
+                additionalData: {
+                  'source': 'nfc',
+                  'prescriptionContext': _readPrescription!.prescripcion.diagnostico,
+                },
+              );
+              // Still include in prescription - keep original
+              validatedMedications.add(med);
+            } else if (action.type == UnknownMedicineActionType.addToGlobal) {
+              // Add medicine directly to global catalog
+              final newMedicineId = await _medicineValidation.addMedicineToGlobalCatalog(
+                nombre: action.newMedicineData!['nombre']!,
+                principioActivo: action.newMedicineData!['principioActivo'],
+                presentacion: action.newMedicineData!['presentacion'],
+                laboratorio: action.newMedicineData!['laboratorio'],
+              );
+              // Use the newly added medicine
+              validatedMedications.add(
+                MedicamentoPrescripcion(
+                  id: med.id,
+                  medicamentoRef: newMedicineId,
+                  nombre: action.newMedicineData!['nombre']!,
+                  dosisMg: med.dosisMg,
+                  frecuenciaHoras: med.frecuenciaHoras,
+                  duracionDias: med.duracionDias,
+                  fechaInicio: med.fechaInicio,
+                  fechaFin: med.fechaFin,
+                  observaciones: med.observaciones,
+                  activo: med.activo,
+                  userId: userId,
+                  prescripcionId: _readPrescription!.prescripcion.id,
+                ),
+              );
+            }
+          } else {
+            // Medicine found - update medication reference
+            validatedMedications.add(
+              MedicamentoPrescripcion(
+                id: med.id,
+                medicamentoRef: validationResult.medicine!.id,
+                nombre: validationResult.medicine!.nombre,
+                dosisMg: med.dosisMg,
+                frecuenciaHoras: med.frecuenciaHoras,
+                duracionDias: med.duracionDias,
+                fechaInicio: med.fechaInicio,
+                fechaFin: med.fechaFin,
+                observaciones: med.observaciones,
+                activo: med.activo,
+                userId: userId,
+                prescripcionId: _readPrescription!.prescripcion.id,
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('❌ Error validating medicine $nombre: $e');
+          // Continue with original medicine if validation fails
+          validatedMedications.add(med);
+        }
+      }
+
+      if (validatedMedications.isEmpty) {
+        setState(() => _isUploading = false);
+        _showErrorSnackBar('No hay medicamentos válidos para guardar. Todos los medicamentos fueron omitidos.');
+        return;
+      }
+
+      // Update the prescription with validated medications
+      final updatedPrescriptionWithMeds = PrescripcionWithMedications(
+        prescripcion: _readPrescription!.prescripcion,
+        medicamentos: validatedMedications,
+      );
+
+      setState(() => _isUploading = false);
+
+      // ========== CONFIRMATION DIALOG ==========
+      final confirmed = await _showConfirmDialog(
+        title: 'Subir Prescripción',
+        message: '¿Deseas guardar esta prescripción en tu cuenta de MyMeds?\n\n'
+            'Medicamentos validados: ${validatedMedications.length}',
+        confirmText: 'Subir',
+      );
+
+      if (confirmed != true) return;
+
+      setState(() => _isUploading = true);
+
       // Generate new ID for the prescription
       final newId = 'presc_${DateTime.now().millisecondsSinceEpoch}';
-      final updatedPrescription = _readPrescription!.prescripcion.copyWith(id: newId);
+      final updatedPrescription = updatedPrescriptionWithMeds.prescripcion.copyWith(id: newId);
 
       // Update medication prescription IDs and user IDs
-      final updatedMedications = _readPrescription!.medicamentos.map((med) {
+      final updatedMedications = updatedPrescriptionWithMeds.medicamentos.map((med) {
         return {
           'id': med.id,
           'medicamentoRef': med.medicamentoRef,

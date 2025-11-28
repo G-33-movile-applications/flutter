@@ -7,7 +7,9 @@ import '../../services/ocr_service.dart';
 import '../../services/user_session.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/prescription_draft_cache.dart';
+import '../../services/medicine_validation_service.dart';
 import '../../repositories/prescripcion_repository.dart';
+import '../widgets/unknown_medicine_dialog.dart';
 
 class OcrUploadPage extends StatefulWidget {
   const OcrUploadPage({super.key});
@@ -20,9 +22,11 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   final OcrService _ocrService = OcrService();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
   final PrescriptionDraftCache _draftCache = PrescriptionDraftCache();
+  final MedicineValidationService _medicineValidation = MedicineValidationService();
   
   // Generate unique draft ID for each OCR session
   late final String _draftId;
+  bool _draftIdInitialized = false;
 
   // Changed to support multiple images (max 3)
   final List<File> _selectedImages = [];
@@ -43,15 +47,25 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     
-    // Generate unique draft ID or load from arguments
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null && args['draftId'] != null) {
-      _draftId = args['draftId'] as String;
-      _loadDraftIfExists();
-    } else {
-      // Generate new draft ID with timestamp for uniqueness
-      _draftId = 'ocr_${DateTime.now().millisecondsSinceEpoch}';
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'ocr_${DateTime.now().millisecondsSinceEpoch}';
+      }
     }
   }
 
@@ -126,7 +140,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
                     _medications.isNotEmpty;
     
     if (!hasData) {
-      debugPrint('📄 [OCR Upload] No data to save as draft');
+      debugPrint('📄 [OCR Upload] No data to save as draft test');
       return;
     }
     
@@ -767,6 +781,110 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       );
       return;
     }
+
+    // ========== MEDICINE VALIDATION ==========
+    // Validate each medicine exists in catalog
+    debugPrint('🚀 [OCR] Starting medicine validation for ${_medications.length} medicines');
+    setState(() => _isUploading = true);
+    
+    final List<int> indicesToRemove = [];
+
+    for (int i = 0; i < _medications.length; i++) {
+      final med = _medications[i];
+      final nombre = (med['controller_nombre'] as TextEditingController).text.trim();
+      
+      debugPrint('🔍 [OCR] Validating medicine ${i + 1}/${_medications.length}: "$nombre"');
+      
+      try {
+        debugPrint('🔎 [OCR] Calling validateMedicine for: "$nombre"');
+        final validationResult = await _medicineValidation.validateMedicine(nombre);
+        debugPrint('📊 [OCR] Validation result - found: ${validationResult.found}, confidence: ${validationResult.confidence}');
+        
+        if (!validationResult.found || validationResult.confidence < 0.75) {
+          // Medicine not found or low confidence - show dialog
+          debugPrint('⚠️ [OCR] Medicine needs review - showing dialog');
+          if (!mounted) return;
+          
+          debugPrint('🔔 [OCR] Showing UnknownMedicineDialog for: "$nombre"');
+          final action = await UnknownMedicineDialog.show(
+            context,
+            medicineName: nombre,
+            suggestions: validationResult.suggestions,
+          );
+          debugPrint('✅ [OCR] Dialog returned action: ${action?.type}');
+          
+          if (action == null) {
+            // User cancelled - abort upload
+            debugPrint('❌ [OCR] User cancelled dialog - aborting upload');
+            setState(() => _isUploading = false);
+            return;
+          }
+          
+          if (action.type == UnknownMedicineActionType.skip) {
+            // Skip this medicine
+            indicesToRemove.add(i);
+            continue;
+          } else if (action.type == UnknownMedicineActionType.useAlternative) {
+            // Use alternative medicine
+            med['validatedMedicine'] = action.selectedMedicine;
+            med['medicineId'] = action.selectedMedicine!.id;
+            (med['controller_nombre'] as TextEditingController).text = action.selectedMedicine!.nombre;
+          } else if (action.type == UnknownMedicineActionType.saveForReview) {
+            // Save to unknownMedicines for admin review
+            final userId = UserSession().currentUser.value?.uid;
+            if (userId != null) {
+              await _medicineValidation.saveUnknownMedicine(
+                proposedName: nombre,
+                uploadedBy: userId,
+                additionalData: {
+                  'source': 'ocr',
+                  'prescriptionContext': diagnosticoText,
+                },
+              );
+            }
+            // Still include in prescription with unknown flag
+            med['isUnknown'] = true;
+            med['requiresValidation'] = true;
+          } else if (action.type == UnknownMedicineActionType.addToGlobal) {
+            // Add medicine directly to global catalog
+            final newMedicineId = await _medicineValidation.addMedicineToGlobalCatalog(
+              nombre: action.newMedicineData!['nombre']!,
+              principioActivo: action.newMedicineData!['principioActivo'],
+              presentacion: action.newMedicineData!['presentacion'],
+              laboratorio: action.newMedicineData!['laboratorio'],
+            );
+            med['medicineId'] = newMedicineId;
+            (med['controller_nombre'] as TextEditingController).text = action.newMedicineData!['nombre']!;
+          }
+        } else {
+          // Medicine found - attach metadata
+          med['validatedMedicine'] = validationResult.medicine;
+          med['medicineId'] = validationResult.medicine!.id;
+          med['confidence'] = validationResult.confidence;
+        }
+      } catch (e) {
+        debugPrint('❌ Error validating medicine $nombre: $e');
+        // Continue with original name if validation fails
+        med['isUnknown'] = true;
+        med['requiresValidation'] = true;
+      }
+    }
+
+    // Remove skipped medicines
+    for (final index in indicesToRemove.reversed) {
+      _medications.removeAt(index);
+    }
+
+    if (_medications.isEmpty) {
+      setState(() => _isUploading = false);
+      _showValidationErrorDialog(
+        'No hay medicamentos válidos para guardar.\n\n'
+        'Todos los medicamentos fueron omitidos.'
+      );
+      return;
+    }
+
+    setState(() => _isUploading = false);
 
     // ========== CONFIRMATION DIALOG ==========
     
