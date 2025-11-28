@@ -28,6 +28,7 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   
   // Generate unique draft ID for each NFC session
   late final String _draftId;
+  bool _draftIdInitialized = false;
   
   bool _isNfcAvailable = false;
   bool _isNfcEnabled = false;
@@ -41,18 +42,27 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   @override
   void initState() {
     super.initState();
-    
-    // Generate unique draft ID or load from arguments
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null && args['draftId'] != null) {
-      _draftId = args['draftId'] as String;
-      _loadDraftIfExists();
-    } else {
-      // Generate new draft ID with timestamp for uniqueness
-      _draftId = 'nfc_${DateTime.now().millisecondsSinceEpoch}';
-    }
-    
     _checkNfcAvailability();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'nfc_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    }
   }
 
   @override

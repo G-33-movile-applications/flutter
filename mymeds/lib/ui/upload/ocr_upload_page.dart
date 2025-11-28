@@ -23,6 +23,7 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   
   // Generate unique draft ID for each OCR session
   late final String _draftId;
+  bool _draftIdInitialized = false;
 
   // Changed to support multiple images (max 3)
   final List<File> _selectedImages = [];
@@ -43,15 +44,25 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     
-    // Generate unique draft ID or load from arguments
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (args != null && args['draftId'] != null) {
-      _draftId = args['draftId'] as String;
-      _loadDraftIfExists();
-    } else {
-      // Generate new draft ID with timestamp for uniqueness
-      _draftId = 'ocr_${DateTime.now().millisecondsSinceEpoch}';
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'ocr_${DateTime.now().millisecondsSinceEpoch}';
+      }
     }
   }
 
