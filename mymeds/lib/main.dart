@@ -2,6 +2,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'providers/system_conditions_provider.dart';
+import 'services/notification_service.dart';
+import 'services/reminder_service.dart';
+import 'services/reminder_scheduler.dart';
 import 'widgets/low_battery_toast.dart';
 import 'theme/app_theme.dart';
 import 'routes/app_router.dart';
@@ -39,6 +42,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize NotificationService early for medication reminders
+  // This must be done after WidgetsFlutterBinding and before any reminders can be scheduled
+  try {
+    await NotificationService().init();
+    debugPrint('✅ NotificationService initialized in main()');
+  } catch (e) {
+    debugPrint('⚠️ Failed to initialize NotificationService: $e');
+  }
 
   // 🌱 SEEDING: Uncomment to seed database (run once then comment out)
   //await FirebaseSeeder().seedAll();
@@ -103,6 +115,17 @@ Future<void> main() async {
   await AutofillService().initialize();
   // Initialize prescription draft cache for saving work-in-progress prescriptions
   await PrescriptionDraftCache().init();
+
+  // Initialize in-app reminder scheduler (fallback for zonedSchedule issues)
+  // This provides reliable notifications as long as the app is running
+  final reminderService = InMemoryReminderService();
+  final notificationService = NotificationService();
+  final reminderScheduler = ReminderScheduler(
+    reminderService: reminderService,
+    notificationService: notificationService,
+  );
+  reminderScheduler.start();
+  debugPrint('✅ ReminderScheduler started in main()');
 
   // Initialize SettingsProvider
   final settingsProvider = SettingsProvider();

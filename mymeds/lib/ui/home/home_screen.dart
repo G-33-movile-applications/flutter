@@ -4,12 +4,16 @@ import 'widgets/motion_debug_bar.dart';
 import 'widgets/data_saver_indicator.dart';
 import 'widgets/settings_view.dart';
 import '../widgets/connectivity_feedback_banner.dart';
+import '../medication_reminders/reminder_list_screen.dart';
 import '../../services/user_session.dart';
 import '../../services/background_loader.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/prescriptions_cache_service.dart';
 import '../../services/orders_sync_service.dart';
+import '../../services/reminder_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/medicines_repository.dart';
 import '../../models/user_model.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
@@ -384,6 +388,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
         actions: [
+          // Medication reminders button
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded),
+            tooltip: 'Recordatorios de medicamentos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReminderListScreen(
+                    reminderService: InMemoryReminderService(),
+                    notificationService: NotificationService(),
+                    medicinesRepository: FirestoreMedicinesRepository(),
+                  ),
+                ),
+              );
+            },
+          ),
           // Refresh button - triggers background reload with force refresh
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
