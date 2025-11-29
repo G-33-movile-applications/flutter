@@ -10,6 +10,8 @@ import '../../facade/app_repository_facade.dart';
 import '../../services/location_service.dart';
 import '../../models/user_model.dart';
 import '../../utils/address_validator.dart';
+import '../../services/autofill_service.dart';
+import '../../widgets/autofill_suggestion_widget.dart';
 
 /// Enum to represent different address selection types
 enum AddressType {
@@ -55,6 +57,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   bool _isLoadingCurrentLocation = false;
   bool _isLoadingHomeAddress = false;
   String? _addressValidationError;
+  bool _showAddressSuggestions = false;
 
   @override
   void initState() {
@@ -258,6 +261,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       _addressValidationError = null; // Clear validation error when switching types
     });
 
+    // Record address type preference for autofill
+    AutofillService().recordSelection(
+      entity: 'delivery',
+      field: 'address_type',
+      value: newType.name,
+    );
+
     switch (newType) {
       case AddressType.home:
         if (_homeAddress != null) {
@@ -375,6 +385,13 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       _isPickup = isPickup;
       _addressValidationError = null; // Clear validation error when switching modes
     });
+
+    // Record delivery mode preference for autofill
+    AutofillService().recordSelection(
+      entity: 'delivery',
+      field: 'delivery_mode',
+      value: isPickup ? 'pickup' : 'delivery',
+    );
 
     // If switching to delivery mode and we have home address selected, populate it immediately
     if (!isPickup && _selectedAddressType == AddressType.home && _homeAddress != null) {
@@ -664,25 +681,63 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             ),
             const SizedBox(height: 12),
             
-            // Address input field
-            TextFormField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: 'Dirección',
-                hintText: 'Ingresa tu dirección completa',
-                errorText: _addressValidationError,
-                helperText: _getHelperTextForAddressType(),
-                suffixIcon: _getLoadingStateForType(_selectedAddressType)
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : null,
-              ),
-              onChanged: _onAddressChanged,
-              maxLines: 2,
+            // Address input field with smart autofill
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: _addressController,
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: 'Dirección',
+                    hintText: 'Ingresa tu dirección completa',
+                    errorText: _addressValidationError,
+                    helperText: _getHelperTextForAddressType(),
+                    suffixIcon: _getLoadingStateForType(_selectedAddressType)
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                  onChanged: _onAddressChanged,
+                  onTap: () {
+                    setState(() {
+                      _showAddressSuggestions = true;
+                    });
+                  },
+                  onEditingComplete: () {
+                    final value = _addressController.text;
+                    if (value.isNotEmpty) {
+                      AutofillService().recordSelection(
+                        entity: 'delivery',
+                        field: 'address_${_selectedAddressType.name}',
+                        value: value,
+                      );
+                    }
+                  },
+                  maxLines: 2,
+                ),
+                if (_showAddressSuggestions)
+                  AutofillSuggestionWidget(
+                    entity: 'delivery',
+                    field: 'address_${_selectedAddressType.name}',
+                    controller: _addressController,
+                    onSuggestionSelected: (suggestion) {
+                      _addressController.text = suggestion;
+                      _onAddressChanged(suggestion);
+                      AutofillService().recordSelection(
+                        entity: 'delivery',
+                        field: 'address_${_selectedAddressType.name}',
+                        value: suggestion,
+                      );
+                      setState(() {
+                        _showAddressSuggestions = false;
+                      });
+                    },
+                  ),
+              ],
             ),
           ],
 
@@ -840,6 +895,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       final pedidoId = 'ped_${uuid.v4().replaceAll('-', '').substring(0, 16)}';
       
       // Create pedido with reference to existing prescription - NO PRESCRIPTION CREATION
+      // Note: createPedidoWithSync will stamp analytics fields (createdOffline, createdAt, syncSource)
       final pedido = Pedido(
         id: pedidoId,
         prescripcionId: _selectedPrescripcion!.id,
