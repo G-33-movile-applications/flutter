@@ -498,6 +498,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Expanded(
             child: TabBarView(
               controller: _tabController,
+              // 🚀 MICRO-OPTIMIZATION: Reduce physics overhead
+              physics: const ClampingScrollPhysics(),
               children: [
                 RefreshIndicator(
                   onRefresh: () => _loadDataWithBackgroundLoader(forceRefresh: true),

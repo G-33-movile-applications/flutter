@@ -335,9 +335,19 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
           ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: filteredList.length,
+            // 🚀 MICRO-OPTIMIZATION: Cache extent for smoother scrolling
+            cacheExtent: 500, // Cache 500px beyond viewport
+            // 🚀 MICRO-OPTIMIZATION: Repaint boundaries per item
+            addRepaintBoundaries: true,
+            // 🚀 MICRO-OPTIMIZATION: Keep items alive during scroll
+            addAutomaticKeepAlives: false, // We handle state at card level
             itemBuilder: (context, index) {
               final prescripcion = filteredList[index];
-              return _buildPrescripcionCard(prescripcion);
+              // 🚀 MICRO-OPTIMIZATION: RepaintBoundary isolates each card
+              return RepaintBoundary(
+                key: ValueKey('prescription_${prescripcion.id}'),
+                child: _buildPrescripcionCard(prescripcion),
+              );
             },
           ),
           // Background loading indicator (non-intrusive)
@@ -380,8 +390,12 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
     final isActive = prescripcion.activa;
     final theme = Theme.of(context);
     
+    // 🚀 MICRO-OPTIMIZATION: Use const where possible
+    const cardMargin = EdgeInsets.only(bottom: 12);
+    const cardPadding = EdgeInsets.all(16);
+    
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: cardMargin,
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -393,7 +407,7 @@ class _PrescriptionsListWidgetState extends State<PrescriptionsListWidget> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: cardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

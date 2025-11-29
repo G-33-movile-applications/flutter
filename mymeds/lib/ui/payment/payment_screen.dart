@@ -258,9 +258,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Widget _buildPrescriptionCard(ThemeData theme) {
     final dateFormatter = DateFormat('dd/MM/yyyy');
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       elevation: 2,
+      color: isDark ? const Color(0xFF1E1E1E) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -293,8 +295,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildMedicinesCard(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
+      color: isDark ? const Color(0xFF1E1E1E) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -391,8 +396,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildPharmacyCard(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
+      color: isDark ? const Color(0xFF1E1E1E) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -427,9 +435,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildTotalsCard(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Card(
       elevation: 2,
-      color: Colors.grey[50],
+      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -502,9 +512,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.white,
+                color: isSelected 
+                    ? AppTheme.primaryColor.withOpacity(0.1) 
+                    : (theme.brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white),
                 border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : Colors.grey[300]!,
+                  color: isSelected ? AppTheme.primaryColor : (theme.brightness == Brightness.dark ? Colors.grey[700]! : Colors.grey[300]!),
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -524,7 +536,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           method['name'] as String,
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
-                            color: isSelected ? AppTheme.primaryColor : Colors.black87,
+                            color: isSelected ? AppTheme.primaryColor : theme.textTheme.bodyLarge?.color,
                           ),
                         ),
                         Text(
