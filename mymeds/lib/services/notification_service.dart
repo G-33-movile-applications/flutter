@@ -91,36 +91,48 @@ class NotificationService {
 
   /// Request notification permissions
   Future<void> _requestPermissions() async {
-    // For Android 13+ (API 33+) - Request notification permission
-    final notificationPermission = await _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-    debugPrint('📱 Notification permission: ${notificationPermission ?? "not applicable"}');
-
-    // For Android 12+ (API 31+) - Request exact alarm permission
     final androidImplementation = _notifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     
     if (androidImplementation != null) {
+      // Step 1: Request exact alarm permission first (Android 12+, API 31+)
+      // This is CRITICAL for zonedSchedule to work
       final canSchedule = await androidImplementation.canScheduleExactNotifications();
       debugPrint('📱 Can schedule exact notifications: $canSchedule');
       
       if (canSchedule == false) {
+        debugPrint('⚠️ Requesting SCHEDULE_EXACT_ALARM permission...');
         final granted = await androidImplementation.requestExactAlarmsPermission();
         debugPrint('📱 Exact alarms permission requested, result: $granted');
+        
+        if (granted != true) {
+          debugPrint('❌ CRITICAL: Exact alarm permission was DENIED. Scheduled notifications will NOT work.');
+        }
       } else {
         debugPrint('✅ Exact alarm permission already granted');
       }
+      
+      // Step 2: Request notification permission (Android 13+, API 33+)
+      final notificationPermission = await androidImplementation.requestNotificationsPermission();
+      debugPrint('📱 Notification permission: ${notificationPermission ?? "not applicable"}');
+      
+      if (notificationPermission == false) {
+        debugPrint('❌ WARNING: Notification permission was DENIED. Notifications will not display.');
+      }
     }
 
-    // For iOS
-    await _notifications
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+    // For iOS - Request all permissions
+    final iosImplementation = _notifications
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    
+    if (iosImplementation != null) {
+      await iosImplementation.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('📱 iOS permissions requested');
+    }
   }
 
   /// Handle notification tap
@@ -166,18 +178,25 @@ class NotificationService {
   /// Schedule a one-time notification
   Future<void> _scheduleOnceNotification(MedicationReminder reminder, int notificationId) async {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledTime = _getNextScheduledTime(reminder.time);
+    var scheduledTime = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      reminder.time.hour,
+      reminder.time.minute,
+    );
     
-    // Ensure scheduled time is in the future
-    if (scheduledTime.isBefore(now) || scheduledTime.isAtSameMomentAs(now)) {
-      debugPrint('⚠️ Scheduled time is in the past/now, adding 1 day');
+    // Ensure scheduled time is at least 5 seconds in the future
+    while (scheduledTime.isBefore(now.add(const Duration(seconds: 5)))) {
       scheduledTime = scheduledTime.add(const Duration(days: 1));
+      debugPrint('⚠️ Scheduled time was too close or in past, moved to next day');
     }
     
     final diffSeconds = scheduledTime.difference(now).inSeconds;
     debugPrint('⏰ NOW: $now');
     debugPrint('⏰ SCHEDULED (ONCE): $scheduledTime');
-    debugPrint('⏰ Time until notification: ${diffSeconds}s (~${diffSeconds ~/ 60} minutes)');
+    debugPrint('⏰ Time until notification: ${diffSeconds}s (~${(diffSeconds / 60).toStringAsFixed(1)} minutes)');
 
     await _notifications.zonedSchedule(
       notificationId,
@@ -189,6 +208,8 @@ class NotificationService {
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: reminder.id,
     );
+    
+    debugPrint('✅ Once notification scheduled successfully (ID: $notificationId)');
   }
 
   /// Schedule a daily repeating notification
@@ -204,11 +225,17 @@ class NotificationService {
     );
 
     // If the scheduled time has passed today, schedule for tomorrow
-    if (scheduledTime.isBefore(now)) {
+    // Ensure at least 5 seconds buffer
+    while (scheduledTime.isBefore(now.add(const Duration(seconds: 5)))) {
       scheduledTime = scheduledTime.add(const Duration(days: 1));
+      debugPrint('⚠️ Time passed today, scheduling for tomorrow');
     }
 
-    debugPrint('⏰ Scheduling DAILY notification for ${scheduledTime}');
+    final diffSeconds = scheduledTime.difference(now).inSeconds;
+    debugPrint('⏰ NOW: $now');
+    debugPrint('⏰ SCHEDULED (DAILY): $scheduledTime');
+    debugPrint('⏰ First occurrence in: ${diffSeconds}s (~${(diffSeconds / 60).toStringAsFixed(1)} minutes)');
+    debugPrint('⏰ Will repeat: Daily at ${reminder.time.hour.toString().padLeft(2, '0')}:${reminder.time.minute.toString().padLeft(2, '0')}');
 
     await _notifications.zonedSchedule(
       notificationId,
@@ -221,6 +248,8 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
       payload: reminder.id,
     );
+    
+    debugPrint('✅ Daily notification scheduled successfully (ID: $notificationId)');
   }
 
   /// Schedule a weekly repeating notification
@@ -235,10 +264,19 @@ class NotificationService {
       reminder.time.minute,
     );
 
-    // Find next occurrence of the same weekday
-    while (scheduledTime.isBefore(now) || scheduledTime.weekday != now.weekday) {
-      scheduledTime = scheduledTime.add(const Duration(days: 1));
+    // Schedule for same weekday as today, but ensure it's in the future
+    // If time has passed, move to next week
+    while (scheduledTime.isBefore(now.add(const Duration(seconds: 5)))) {
+      scheduledTime = scheduledTime.add(const Duration(days: 7));
+      debugPrint('⚠️ Time passed this week, scheduling for next week');
     }
+
+    final diffSeconds = scheduledTime.difference(now).inSeconds;
+    final weekdayName = _getWeekdayName(scheduledTime.weekday);
+    debugPrint('⏰ NOW: $now');
+    debugPrint('⏰ SCHEDULED (WEEKLY): $scheduledTime');
+    debugPrint('⏰ First occurrence in: ${diffSeconds}s (~${(diffSeconds / 60).toStringAsFixed(1)} minutes)');
+    debugPrint('⏰ Will repeat: Every $weekdayName at ${reminder.time.hour.toString().padLeft(2, '0')}:${reminder.time.minute.toString().padLeft(2, '0')}');
 
     await _notifications.zonedSchedule(
       notificationId,
@@ -251,16 +289,27 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       payload: reminder.id,
     );
+    
+    debugPrint('✅ Weekly notification scheduled successfully (ID: $notificationId)');
   }
 
   /// Schedule notifications for specific days of the week
   Future<void> _scheduleSpecificDaysNotification(MedicationReminder reminder, int baseNotificationId) async {
-    if (reminder.specificDays.isEmpty) return;
+    if (reminder.specificDays.isEmpty) {
+      debugPrint('⚠️ No specific days selected, skipping');
+      return;
+    }
+
+    debugPrint('⏰ Scheduling for specific days: ${reminder.specificDays.map((d) => d.displayName).join(", ")}');
 
     // Schedule a separate notification for each selected day
     for (final day in reminder.specificDays) {
       final dayNotificationId = baseNotificationId + day.index;
       final scheduledTime = _getNextOccurrenceOfDay(day, reminder.time);
+      final now = tz.TZDateTime.now(tz.local);
+      final diffSeconds = scheduledTime.difference(now).inSeconds;
+
+      debugPrint('⏰ - ${day.displayName}: $scheduledTime (in ${(diffSeconds / 60).toStringAsFixed(1)} min)');
 
       await _notifications.zonedSchedule(
         dayNotificationId,
@@ -274,6 +323,8 @@ class NotificationService {
         payload: reminder.id,
       );
     }
+    
+    debugPrint('✅ Specific days notifications scheduled successfully (${reminder.specificDays.length} notifications)');
   }
 
   /// Get next occurrence of a specific day and time
@@ -289,27 +340,9 @@ class NotificationService {
     );
 
     // Find next occurrence of the specified weekday
-    while (scheduledTime.weekday != dayOfWeek.weekdayNumber || scheduledTime.isBefore(now)) {
-      scheduledTime = scheduledTime.add(const Duration(days: 1));
-    }
-
-    return scheduledTime;
-  }
-
-  /// Get next scheduled time for a given TimeOfDay
-  tz.TZDateTime _getNextScheduledTime(TimeOfDay time) {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduledTime = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      time.hour,
-      time.minute,
-    );
-
-    // If the time has passed today, schedule for tomorrow
-    if (scheduledTime.isBefore(now)) {
+    // Ensure at least 5 seconds buffer from now
+    while (scheduledTime.weekday != dayOfWeek.weekdayNumber || 
+           scheduledTime.isBefore(now.add(const Duration(seconds: 5)))) {
       scheduledTime = scheduledTime.add(const Duration(days: 1));
     }
 
@@ -408,6 +441,20 @@ class NotificationService {
     return await _notifications.pendingNotificationRequests();
   }
 
+  /// Helper: Get weekday name from weekday number (1=Monday, 7=Sunday)
+  String _getWeekdayName(int weekday) {
+    switch (weekday) {
+      case 1: return 'Lunes';
+      case 2: return 'Martes';
+      case 3: return 'Miércoles';
+      case 4: return 'Jueves';
+      case 5: return 'Viernes';
+      case 6: return 'Sábado';
+      case 7: return 'Domingo';
+      default: return 'Desconocido';
+    }
+  }
+
   /// Debug method: Schedule a notification to fire in 10 seconds
   /// Use this to verify that zonedSchedule works on the device
   Future<void> debugScheduleInTenSeconds() async {
@@ -415,14 +462,16 @@ class NotificationService {
 
     final now = tz.TZDateTime.now(tz.local);
     final scheduledTime = now.add(const Duration(seconds: 10));
+    final testId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    debugPrint('🧪 Debug scheduling notification for $scheduledTime');
+    debugPrint('🧪 ===== DEBUG NOTIFICATION TEST =====');
     debugPrint('🧪 NOW: $now');
     debugPrint('🧪 SCHEDULED: $scheduledTime');
     debugPrint('🧪 Difference: ${scheduledTime.difference(now).inSeconds} seconds');
+    debugPrint('🧪 Notification ID: $testId');
 
     await _notifications.zonedSchedule(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000, // Unique ID based on timestamp
+      testId,
       'Prueba en 10 segundos',
       'Esta notificación debería aparecer en 10 segundos',
       scheduledTime,
@@ -434,5 +483,12 @@ class NotificationService {
     );
 
     debugPrint('🧪 Debug notification scheduled successfully');
+    
+    // Verify it was scheduled
+    final pending = await getPendingNotifications();
+    final found = pending.any((n) => n.id == testId);
+    debugPrint('🧪 Verification: Notification ${found ? "FOUND" : "NOT FOUND"} in pending list');
+    debugPrint('🧪 Total pending notifications: ${pending.length}');
+    debugPrint('🧪 ====================================');
   }
 }

@@ -2,9 +2,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'providers/system_conditions_provider.dart';
-import 'services/notification_service.dart';
-import 'services/reminder_service.dart';
-import 'services/reminder_scheduler.dart';
 import 'widgets/low_battery_toast.dart';
 import 'theme/app_theme.dart';
 import 'routes/app_router.dart';
@@ -19,6 +16,7 @@ import 'services/auth_service.dart';
 import 'services/sync_queue_service.dart';
 import 'services/orders_cache_service.dart';
 import 'services/prescriptions_cache_service.dart';
+import 'services/reminders_cache_service.dart';
 import 'services/favorites_service.dart';
 import 'services/lru_prescription_cache.dart';
 import 'services/prescription_image_storage.dart';
@@ -43,14 +41,8 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize NotificationService early for medication reminders
-  // This must be done after WidgetsFlutterBinding and before any reminders can be scheduled
-  try {
-    await NotificationService().init();
-    debugPrint('✅ NotificationService initialized in main()');
-  } catch (e) {
-    debugPrint('⚠️ Failed to initialize NotificationService: $e');
-  }
+  // Note: NotificationService initialization moved to ReminderListScreen
+  // This prevents asking for permissions immediately on app startup
 
   // 🌱 SEEDING: Uncomment to seed database (run once then comment out)
   //await FirebaseSeeder().seedAll();
@@ -100,6 +92,9 @@ Future<void> main() async {
   
   // Initialize prescriptions cache service for offline-first prescriptions
   await PrescriptionsCacheService().init();
+  
+  // Initialize reminders cache service for offline-first reminders
+  await RemindersCacheService().init();
 
   // Initialize favorites service for favorite pharmacies
   await FavoritesService().init();
@@ -115,17 +110,6 @@ Future<void> main() async {
   await AutofillService().initialize();
   // Initialize prescription draft cache for saving work-in-progress prescriptions
   await PrescriptionDraftCache().init();
-
-  // Initialize in-app reminder scheduler (fallback for zonedSchedule issues)
-  // This provides reliable notifications as long as the app is running
-  final reminderService = InMemoryReminderService();
-  final notificationService = NotificationService();
-  final reminderScheduler = ReminderScheduler(
-    reminderService: reminderService,
-    notificationService: notificationService,
-  );
-  reminderScheduler.start();
-  debugPrint('✅ ReminderScheduler started in main()');
 
   // Initialize SettingsProvider
   final settingsProvider = SettingsProvider();

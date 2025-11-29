@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'adherence_event.dart';
 
 /// Represents a medication reminder with recurrence support
 class MedicationReminder {
@@ -10,6 +11,9 @@ class MedicationReminder {
   final Set<DayOfWeek> specificDays;
   final bool isActive;
   final DateTime createdAt;
+  final SyncStatus syncStatus;
+  final DateTime? lastSyncedAt;
+  final int version;
 
   const MedicationReminder({
     required this.id,
@@ -20,6 +24,9 @@ class MedicationReminder {
     this.specificDays = const {},
     this.isActive = true,
     required this.createdAt,
+    this.syncStatus = SyncStatus.synced,
+    this.lastSyncedAt,
+    this.version = 1,
   });
 
   MedicationReminder copyWith({
@@ -31,6 +38,9 @@ class MedicationReminder {
     Set<DayOfWeek>? specificDays,
     bool? isActive,
     DateTime? createdAt,
+    SyncStatus? syncStatus,
+    DateTime? lastSyncedAt,
+    int? version,
   }) {
     return MedicationReminder(
       id: id ?? this.id,
@@ -41,6 +51,9 @@ class MedicationReminder {
       specificDays: specificDays ?? this.specificDays,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      version: version ?? this.version,
     );
   }
 
@@ -54,6 +67,9 @@ class MedicationReminder {
       'specificDays': specificDays.map((d) => d.name).toList(),
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
+      'syncStatus': syncStatus.name,
+      'lastSyncedAt': lastSyncedAt?.toIso8601String(),
+      'version': version,
     };
   }
 
@@ -81,6 +97,14 @@ class MedicationReminder {
           .toSet(),
       isActive: json['isActive'] as bool? ?? true,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      syncStatus: SyncStatus.values.firstWhere(
+        (e) => e.name == json['syncStatus'],
+        orElse: () => SyncStatus.synced,
+      ),
+      lastSyncedAt: json['lastSyncedAt'] != null
+          ? DateTime.parse(json['lastSyncedAt'] as String)
+          : null,
+      version: json['version'] as int? ?? 1,
     );
   }
 

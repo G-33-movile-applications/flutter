@@ -103,44 +103,6 @@ class _NewReminderScreenState extends State<NewReminderScreen> {
     }
   }
 
-  Future<void> _testNotification() async {
-    if (!_formKey.currentState!.validate() || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa todos los campos requeridos')),
-      );
-      return;
-    }
-
-    final testReminder = MedicationReminder(
-      id: 'test',
-      medicineId: _selectedMedicine?.id ?? '',
-      medicineName: _medicineNameController.text,
-      time: _selectedTime!,
-      recurrence: _recurrence,
-      specificDays: _selectedDays,
-      isActive: true,
-      createdAt: DateTime.now(),
-    );
-
-    try {
-      await widget.reminderService.testReminderNotification(testReminder);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notificación de prueba enviada'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar notificación: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _saveReminder() async {
     if (!_formKey.currentState!.validate() || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -194,13 +156,6 @@ class _NewReminderScreenState extends State<NewReminderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Editar recordatorio' : 'Nuevo recordatorio'),
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _testNotification,
-            child: const Text('Probar', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Form(
         key: _formKey,
