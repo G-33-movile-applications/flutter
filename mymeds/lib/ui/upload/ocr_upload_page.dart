@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/prescripcion.dart';
 import '../../services/ocr_service.dart';
 import '../../services/user_session.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/prescription_draft_cache.dart';
 import '../../repositories/prescripcion_repository.dart';
 
 class OcrUploadPage extends StatefulWidget {
@@ -17,6 +19,11 @@ class OcrUploadPage extends StatefulWidget {
 class _OcrUploadPageState extends State<OcrUploadPage> {
   final OcrService _ocrService = OcrService();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
+  final PrescriptionDraftCache _draftCache = PrescriptionDraftCache();
+  
+  // Generate unique draft ID for each OCR session
+  late final String _draftId;
+  bool _draftIdInitialized = false;
 
   // Changed to support multiple images (max 3)
   final List<File> _selectedImages = [];
@@ -35,10 +42,132 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
   final List<Map<String, dynamic>> _medications = [];
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'ocr_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _saveDraftIfNeeded(); // Save before disposing
     _medicoController.dispose();
     _diagnosticoController.dispose();
     super.dispose();
+  }
+  
+  /// Load draft from cache if it exists
+  Future<void> _loadDraftIfExists() async {
+    final draft = _draftCache.getDraft(_draftId);
+    if (draft == null) return;
+    
+    debugPrint('📄 [OCR Upload] Restoring draft from ${draft.lastModified}');
+    
+    // Restore text fields
+    _medicoController.text = draft.data['medico'] as String? ?? '';
+    _diagnosticoController.text = draft.data['diagnostico'] as String? ?? '';
+    
+    // Restore extracted text
+    _extractedText = draft.data['extractedText'] as String?;
+    
+    // Restore date
+    if (draft.data['fecha'] != null) {
+      _selectedDate = DateTime.parse(draft.data['fecha'] as String);
+    }
+    
+    // Restore images
+    for (String imagePath in draft.imagePaths) {
+      final file = File(imagePath);
+      if (await file.exists()) {
+        _selectedImages.add(file);
+      }
+    }
+    
+    // Restore medications
+    if (draft.data['medications'] != null) {
+      final meds = draft.data['medications'] as List<dynamic>;
+      for (var med in meds) {
+        _medications.add({
+          'controller_nombre': TextEditingController(text: med['nombre'] ?? ''),
+          'controller_dosis': TextEditingController(text: med['dosis']?.toString() ?? ''),
+          'controller_frecuencia': TextEditingController(text: med['frecuencia']?.toString() ?? ''),
+          'controller_duracion': TextEditingController(text: med['duracion']?.toString() ?? ''),
+          'controller_observaciones': TextEditingController(text: med['observaciones'] ?? ''),
+          'unidad': med['unidad'] ?? 'mg',
+        });
+      }
+    }
+    
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📄 Borrador restaurado'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+  
+  /// Save draft if there's meaningful data
+  void _saveDraftIfNeeded() {
+    // Only save if user has entered some data
+    final hasData = _medicoController.text.trim().isNotEmpty ||
+                    _diagnosticoController.text.trim().isNotEmpty ||
+                    _selectedImages.isNotEmpty ||
+                    _medications.isNotEmpty;
+    
+    if (!hasData) {
+      debugPrint('📄 [OCR Upload] No data to save as draft');
+      return;
+    }
+    
+    // Prepare medications data
+    final medsData = _medications.map((med) {
+      return {
+        'nombre': (med['controller_nombre'] as TextEditingController).text.trim(),
+        'dosis': double.tryParse((med['controller_dosis'] as TextEditingController).text.trim()),
+        'frecuencia': int.tryParse((med['controller_frecuencia'] as TextEditingController).text.trim()),
+        'duracion': int.tryParse((med['controller_duracion'] as TextEditingController).text.trim()),
+        'observaciones': (med['controller_observaciones'] as TextEditingController).text.trim(),
+        'unidad': med['unidad'] ?? 'mg',
+      };
+    }).toList();
+    
+    _draftCache.saveDraft(
+      draftId: _draftId,
+      data: {
+        'type': 'ocr', // Identify draft type
+        'medico': _medicoController.text.trim(),
+        'diagnostico': _diagnosticoController.text.trim(),
+        'fecha': _selectedDate.toIso8601String(),
+        'medications': medsData,
+        'extractedText': _extractedText, // Save extracted OCR text for reference
+        'imageCount': _selectedImages.length, // For display purposes
+      },
+      imagePaths: _selectedImages.map((f) => f.path).toList(),
+    );
+    
+    debugPrint('💾 [OCR Upload] Draft saved');
   }
 
   Future<void> _handleCameraCapture() async {
@@ -150,6 +279,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
     setState(() {
       _selectedImages.removeAt(index);
     });
+    
+    // Auto-save draft after removing image
+    _saveDraftIfNeeded();
     
     // Clear extracted data if all images are removed
     if (_selectedImages.isEmpty) {
@@ -368,6 +500,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
         'controller_observaciones': TextEditingController(text: ''),
       });
     });
+    
+    // Auto-save draft after adding medication
+    _saveDraftIfNeeded();
   }
 
   void _removeMedication(int index) {
@@ -381,6 +516,9 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       
       _medications.removeAt(index);
     });
+    
+    // Auto-save draft after removing medication
+    _saveDraftIfNeeded();
   }
 
   void _showExtractedDataReview({required int confidence, required Map<String, dynamic> parsedData}) {
@@ -708,32 +846,68 @@ class _OcrUploadPageState extends State<OcrUploadPage> {
       }
 
       // Upload to Firestore
-      await _prescripcionRepo.createWithMedicamentos(
-        userId: userId,
-        prescripcion: prescription,
-        medicamentos: medications,
-      );
+      // Check connectivity before upload
+      final isOnline = await ConnectivityService().checkConnectivity();
+      
+      if (isOnline) {
+        // Online: Upload to Firestore immediately
+        await _prescripcionRepo.createWithMedicamentos(
+          userId: userId,
+          prescripcion: prescription,
+          medicamentos: medications,
+        );
 
-      // Refresh user session
-      await UserSession().refreshPrescripciones();
+        // Refresh user session
+        await UserSession().refreshPrescripciones();
 
-      if (!mounted) return;
+        if (!mounted) return;
+        
+        // Clear draft on successful upload
+        await _draftCache.removeDraft(_draftId);
+        debugPrint('🗑️ [OCR Upload] Draft cleared after successful upload');
 
-      _showSuccessDialog(
-        title: 'Prescripción Guardada',
-        message: 'La prescripción ha sido guardada exitosamente en tu cuenta.\n\n'
-            'ID: $prescriptionId\n'
-            'Medicamentos: ${medications.length}',
-      );
+        _showSuccessDialog(
+          title: 'Prescripción Guardada',
+          message: 'La prescripción ha sido guardada exitosamente en tu cuenta.\n\n'
+              'ID: $prescriptionId\n'
+              'Medicamentos: ${medications.length}',
+        );
 
-      // Clear form after successful upload
-      setState(() {
-        _selectedImages.clear();
-        _extractedText = null;
-        _medicoController.clear();
-        _diagnosticoController.clear();
-        _medications.clear();
-      });
+        // Clear form after successful upload
+        setState(() {
+          _selectedImages.clear();
+          _extractedText = null;
+          _medicoController.clear();
+          _diagnosticoController.clear();
+          _medications.clear();
+        });
+      } else {
+        // Offline: Queue for later upload (will be implemented in task 5)
+        if (!mounted) return;
+        
+        // Keep draft when saving offline
+        _saveDraftIfNeeded();
+        
+        _showInfoSnackBar(
+          '📴 Prescripción guardada, será sincronizada una vez tengas conexión.',
+        );
+        
+        _showSuccessDialog(
+          title: 'Guardado localmente',
+          message: 'La prescripción se guardó en tu dispositivo y se sincronizará automáticamente cuando tengas conexión.\n\n'
+              'ID: $prescriptionId\n'
+              'Medicamentos: ${medications.length}',
+        );
+        
+        // Clear form after saving locally
+        setState(() {
+          _selectedImages.clear();
+          _extractedText = null;
+          _medicoController.clear();
+          _diagnosticoController.clear();
+          _medications.clear();
+        });
+      }
     } catch (e) {
       debugPrint('Upload error: $e');
       _showErrorSnackBar('Error al guardar prescripción: ${e.toString()}');

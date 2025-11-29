@@ -236,6 +236,7 @@
     @override
     Widget build(BuildContext context) {
       final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
 
       return Scaffold(
         body: Center(
@@ -327,8 +328,20 @@
                   DropdownButtonFormField<String>(
                     value: _selectedDepartamento,
                     decoration: _dropdownDecoration("Departamento de residencia"),
+                    style: GoogleFonts.balsamiqSans(
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
+                    dropdownColor: isDark ? theme.colorScheme.surface : null,
                     items: _ciudadesPorDepartamento.keys
-                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .map((d) => DropdownMenuItem(
+                          value: d, 
+                          child: Text(
+                            d,
+                            style: TextStyle(
+                              color: isDark ? theme.textTheme.bodyLarge?.color : null,
+                            ),
+                          ),
+                        ))
                         .toList(),
                     onChanged: (v) {
                       setState(() {
@@ -344,9 +357,21 @@
                   DropdownButtonFormField<String>(
                     value: _selectedCiudad,
                     decoration: _dropdownDecoration("Ciudad de residencia"),
+                    style: GoogleFonts.balsamiqSans(
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
+                    dropdownColor: isDark ? theme.colorScheme.surface : null,
                     items: (_selectedDepartamento != null)
                         ? _ciudadesPorDepartamento[_selectedDepartamento]!
-                            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                            .map((c) => DropdownMenuItem(
+                              value: c, 
+                              child: Text(
+                                c,
+                                style: TextStyle(
+                                  color: isDark ? theme.textTheme.bodyLarge?.color : null,
+                                ),
+                              ),
+                            ))
                             .toList()
                         : [],
                     onChanged: (v) => setState(() => _selectedCiudad = v),
@@ -365,9 +390,29 @@
                   DropdownButtonFormField<String>(
                     value: _modoEntregaPreferido,
                     decoration: _dropdownDecoration("Forma preferida de entrega"),
-                    items: const [
-                      DropdownMenuItem(value: "domicilio", child: Text("Domicilio")),
-                      DropdownMenuItem(value: "recogida", child: Text("Recogida en tienda")),
+                    style: GoogleFonts.balsamiqSans(
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
+                    dropdownColor: isDark ? theme.colorScheme.surface : null,
+                    items: [
+                      DropdownMenuItem(
+                        value: "domicilio",
+                        child: Text(
+                          "Domicilio",
+                          style: TextStyle(
+                            color: isDark ? theme.textTheme.bodyLarge?.color : null,
+                          ),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: "recogida",
+                        child: Text(
+                          "Recogida en tienda",
+                          style: TextStyle(
+                            color: isDark ? theme.textTheme.bodyLarge?.color : null,
+                          ),
+                        ),
+                      ),
                     ],
                     onChanged: (v) => setState(() => _modoEntregaPreferido = v ?? "domicilio"),
                   ),
@@ -377,7 +422,8 @@
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9EC6F3),
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -385,13 +431,15 @@
                       ),
                       onPressed: _isLoading ? null : _register,
                       child: _isLoading
-                          ? const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ? CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.colorScheme.onPrimary,
+                              ),
                             )
                           : Text(
                               'REGISTRAR',
                               style: GoogleFonts.poetsenOne(
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                                 fontSize: 18,
                               ),
                             ),
@@ -402,21 +450,31 @@
                   Text(
                     "Al registrarte aceptas nuestros términos de servicio y políticas de privacidad.",
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.balsamiqSans(fontSize: 12, color: Colors.black54),
+                    style: GoogleFonts.balsamiqSans(
+                      fontSize: 12,
+                      color: isDark 
+                          ? theme.textTheme.bodySmall?.color?.withOpacity(0.7)
+                          : Colors.black54,
+                    ),
                   ),
                   const SizedBox(height: 12),
 
                   CheckboxListTile(
                     title: Row(
                       children: [
-                        Text("Acepto ", style: GoogleFonts.balsamiqSans()),
+                        Text(
+                          "Acepto ",
+                          style: GoogleFonts.balsamiqSans(
+                            color: theme.textTheme.bodyMedium?.color,
+                          ),
+                        ),
                         GestureDetector(
                           onTap: _showTermsDialog,
                           child: Text(
                             "términos y condiciones",
                             style: GoogleFonts.balsamiqSans(
                               decoration: TextDecoration.underline,
-                              color: Colors.blue,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ),
@@ -427,7 +485,12 @@
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                   CheckboxListTile(
-                    title: Text("Acepto recibir notificaciones", style: GoogleFonts.balsamiqSans()),
+                    title: Text(
+                      "Acepto recibir notificaciones",
+                      style: GoogleFonts.balsamiqSans(
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
+                    ),
                     value: _aceptaNotificaciones,
                     onChanged: (val) => setState(() => _aceptaNotificaciones = val!),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -450,26 +513,55 @@
     String? hint,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return TextFormField(
       controller: controller,
       obscureText: isPassword && !(_showPassword),
       keyboardType: type,
-      style: GoogleFonts.balsamiqSans(),
+      style: GoogleFonts.balsamiqSans(
+        color: isDark ? theme.textTheme.bodyLarge?.color : null,
+      ),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(
+          color: isDark ? theme.textTheme.bodyMedium?.color : null,
+        ),
         hintText: hint,
+        hintStyle: TextStyle(
+          color: isDark ? theme.textTheme.bodySmall?.color?.withOpacity(0.6) : null,
+        ),
         filled: true,
-        fillColor: const Color(0xFFFFF1D5),
+        fillColor: isDark 
+            ? theme.colorScheme.surface.withOpacity(0.05)
+            : const Color(0xFFFFF1D5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark ? theme.colorScheme.outline : Colors.grey[300]!,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark ? theme.colorScheme.outline.withOpacity(0.5) : Colors.grey[300]!,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: theme.colorScheme.primary,
+            width: 2,
+          ),
         ),
         // Show suffix icon only when requested and for password fields
         suffixIcon: (isPassword && showPasswordToggle)
             ? IconButton(
                 icon: Icon(
                   _showPassword ? Icons.visibility : Icons.visibility_off,
-                  // You can style the icon size if you want
+                  color: isDark ? theme.iconTheme.color : null,
                 ),
                 onPressed: () => setState(() => _showPassword = !_showPassword),
               )
@@ -480,11 +572,37 @@
 
 
     InputDecoration _dropdownDecoration(String label) {
+      final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
+      
       return InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(
+          color: isDark ? theme.textTheme.bodyMedium?.color : null,
+        ),
         filled: true,
-        fillColor: const Color(0xFFFFF1D5),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        fillColor: isDark 
+            ? theme.colorScheme.surface.withOpacity(0.05)
+            : const Color(0xFFFFF1D5),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark ? theme.colorScheme.outline : Colors.grey[300]!,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: isDark ? theme.colorScheme.outline.withOpacity(0.5) : Colors.grey[300]!,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: theme.colorScheme.primary,
+            width: 2,
+          ),
+        ),
       );
     }
   }

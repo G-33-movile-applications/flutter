@@ -11,6 +11,7 @@ import '../ui/upload/pdf_upload_page.dart';
 import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/stats/user_stats_screen.dart';
+import '../ui/prescriptions/pending_prescriptions_view.dart';
 import '../models/punto_fisico.dart';
 import '../models/prescripcion.dart';
 
@@ -27,6 +28,7 @@ class AppRouter {
   static const String profile = '/profile';
   static const String delivery = '/delivery';
   static const String stats = '/stats';
+  static const String pendingPrescriptions = '/pending-prescriptions';
   static const String forgotPassword = '/forgot-password';
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -109,6 +111,11 @@ class AppRouter {
       case stats:
         return MaterialPageRoute(
           builder: (_) => const UserStatsScreen(),
+          settings: settings,
+        );
+      case pendingPrescriptions:
+        return MaterialPageRoute(
+          builder: (_) => const PendingPrescriptionsView(),
           settings: settings,
         );
       default:

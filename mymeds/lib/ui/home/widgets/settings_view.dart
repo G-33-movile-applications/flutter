@@ -5,6 +5,7 @@ import '../../../providers/smart_notification_provider.dart';
 import 'package:provider/provider.dart';
 import '../../../services/user_session.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/autofill_service.dart';
 
 /// Settings drawer widget that slides in from the left
 class SettingsView extends StatefulWidget {
@@ -110,6 +111,12 @@ class _SettingsViewState extends State<SettingsView> {
                             );
                           },
                         ),
+                        const SizedBox(height: 24),
+
+                        // Smart Autofill Section
+                        _buildSectionTitle(theme, 'Autocompletado Inteligente'),
+                        const SizedBox(height: 12),
+                        _buildSmartAutofillSettings(context, theme),
                         const SizedBox(height: 24),
 
                         // Notifications Section
@@ -535,6 +542,174 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build Smart Autofill settings section
+  Widget _buildSmartAutofillSettings(BuildContext context, ThemeData theme) {
+    return FutureBuilder<bool>(
+      future: Future.value(AutofillService().isEnabled),
+      builder: (context, snapshot) {
+        final isEnabled = snapshot.data ?? true;
+        
+        return Column(
+          children: [
+            _buildSettingCard(
+              context: context,
+              icon: Icons.auto_awesome_rounded,
+              title: 'Autocompletado Inteligente',
+              subtitle: 'Sugerencias automáticas basadas en tu historial',
+              value: isEnabled,
+              onChanged: (value) async {
+                await AutofillService().setEnabled(value);
+                setState(() {});
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      value
+                          ? '✨ Autocompletado Inteligente activado'
+                          : 'Autocompletado Inteligente desactivado',
+                    ),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              context: context,
+              icon: Icons.delete_sweep_rounded,
+              title: 'Borrar historial de autocompletado',
+              onPressed: () async {
+                _showClearAutofillDialog(context, theme);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildAutofillStatistics(context, theme),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build autofill statistics widget
+  Widget _buildAutofillStatistics(BuildContext context, ThemeData theme) {
+    final stats = AutofillService().getStatistics();
+    final activeEntries = stats['activeEntries'] ?? 0;
+    final fieldsCovered = stats['fieldsCovered'] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.analytics_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Estadísticas',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildStatRow(theme, 'Sugerencias guardadas', '$activeEntries'),
+          const SizedBox(height: 6),
+          _buildStatRow(theme, 'Campos con sugerencias', '$fieldsCovered'),
+        ],
+      ),
+    );
+  }
+
+  /// Build a statistics row
+  Widget _buildStatRow(ThemeData theme, String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.7),
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Show dialog to confirm clearing autofill history
+  void _showClearAutofillDialog(BuildContext context, ThemeData theme) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              color: Colors.orange,
+            ),
+            const SizedBox(width: 12),
+            const Text('Borrar Historial'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas borrar todo el historial de autocompletado?\n\n'
+          'Esta acción no se puede deshacer y perderás todas las sugerencias aprendidas.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              await AutofillService().clearAllHistory();
+              
+              if (context.mounted) {
+                Navigator.pop(context);
+                
+                setState(() {}); // Refresh statistics
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Historial borrado correctamente'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Borrar'),
+          ),
+        ],
       ),
     );
   }

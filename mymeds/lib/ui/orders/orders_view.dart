@@ -95,6 +95,21 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
     // Check connectivity
     _isOnline = await _connectivity.checkConnectivity();
     
+    // If we already have orders in UserSession, show them immediately
+    if (_orders.isNotEmpty) {
+      debugPrint('📦 [OrdersView] Using orders from UserSession (${_orders.length} orders)');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+      });
+      
+      // Preload pharmacy data if online
+      if (_isOnline) {
+        _preloadPharmacyData();
+      }
+      return;
+    }
+    
     try {
       // Load orders (cache-first strategy, works offline too)
       // Note: OrdersSyncService.loadOrders() automatically updates UserSession.currentPedidos
@@ -113,7 +128,7 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
         });
         
         // Preload pharmacy data (skip if offline to avoid errors)
-        if (_isOnline || _pharmacyCache.isNotEmpty) {
+        if (_isOnline) {
           _preloadPharmacyData();
         }
       }
@@ -122,11 +137,11 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Only show error if we're online (offline is expected to work with cache)
+          // Only show error if we're online and have no cached data
           if (_isOnline) {
             _errorMessage = 'Error al cargar pedidos: ${e.toString()}';
           } else {
-            // Offline and no cache - just clear error
+            // Offline - just finish loading, show empty state if no orders
             _errorMessage = null;
           }
         });
@@ -226,20 +241,24 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
     // Get unique pharmacy IDs
     final pharmacyIds = _orders.map((order) => order.puntoFisicoId).toSet();
     
-    for (final pharmacyId in pharmacyIds) {
+    // Load all pharmacies without batching to avoid setState issues
+    for (String pharmacyId in pharmacyIds) {
       if (!_pharmacyCache.containsKey(pharmacyId)) {
         try {
           final pharmacy = await _pharmacyRepo.read(pharmacyId);
-          if (pharmacy != null && mounted) {
-            setState(() {
-              _pharmacyCache[pharmacyId] = pharmacy;
-            });
+          if (pharmacy != null) {
+            _pharmacyCache[pharmacyId] = pharmacy;
           }
         } catch (e) {
           debugPrint('⚠️ Failed to load pharmacy $pharmacyId: $e');
           // Continue loading other pharmacies even if one fails
         }
       }
+    }
+    
+    // Single setState at the end to avoid multiple rebuilds
+    if (mounted) {
+      setState(() {});
     }
   }
   
@@ -253,7 +272,7 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
     final isDark = theme.brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey[50],
+      backgroundColor: theme.scaffoldBackgroundColor, // Use theme color instead of hardcoded grey
       body: Column(
         children: [
           // Compact status indicator - only show when offline
@@ -332,9 +351,13 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _orders.length,
+        // Critical: Use standard physics, remove cacheExtent for now
+        physics: const AlwaysScrollableScrollPhysics(),
         itemBuilder: (context, index) {
           final order = _orders[index];
           final pharmacy = _pharmacyCache[order.puntoFisicoId];
+          
+          // Remove RepaintBoundary - it can cause gray screen issues
           return _buildOrderCard(order, pharmacy, theme, isDark);
         },
       ),
@@ -346,6 +369,7 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
     final statusIcon = _getStatusIcon(order.estado);
     final statusText = _getStatusText(order.estado);
     
+    // Don't use RepaintBoundary - it can cause gray screen rendering issues
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: isDark ? 2 : 1,
@@ -359,8 +383,8 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _showOrderDetails(order, pharmacy),
-        child: Padding(
+          onTap: () => _showOrderDetails(order, pharmacy),
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,7 +438,8 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      pharmacy?.nombre ?? 'Cargando...',
+                      // Use cached pharmacy name if available (for offline display)
+                      order.cachedPharmacyName ?? pharmacy?.nombre ?? 'Farmacia no disponible',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -471,7 +496,7 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
               // Order ID
               const SizedBox(height: 8),
               Text(
-                'ID: ${order.id.substring(0, 16)}...',
+                'ID: ${order.id.length > 16 ? '${order.id.substring(0, 16)}...' : order.id}',
                 style: TextStyle(
                   fontSize: 11,
                   color: isDark ? Colors.grey[600] : Colors.grey[500],

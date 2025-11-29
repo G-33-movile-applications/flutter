@@ -8,6 +8,8 @@ import '../../models/prescripcion_with_medications.dart';
 import '../../models/medicamento_prescripcion.dart';
 import '../../services/nfc_service.dart';
 import '../../services/user_session.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/prescription_draft_cache.dart';
 import '../../adapters/prescription_adapter.dart';
 import '../../repositories/prescripcion_repository.dart';
 import 'widgets/prescription_preview_widget.dart';
@@ -22,6 +24,11 @@ class NfcUploadPage extends StatefulWidget {
 class _NfcUploadPageState extends State<NfcUploadPage> {
   final NfcService _nfcService = NfcService();
   final PrescripcionRepository _prescripcionRepo = PrescripcionRepository();
+  final PrescriptionDraftCache _draftCache = PrescriptionDraftCache();
+  
+  // Generate unique draft ID for each NFC session
+  late final String _draftId;
+  bool _draftIdInitialized = false;
   
   bool _isNfcAvailable = false;
   bool _isNfcEnabled = false;
@@ -39,10 +46,103 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Initialize draft ID only once
+    if (!_draftIdInitialized) {
+      _draftIdInitialized = true;
+      
+      // Generate unique draft ID or load from arguments
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['draftId'] != null) {
+        _draftId = args['draftId'] as String;
+        _loadDraftIfExists();
+      } else {
+        // Generate new draft ID with timestamp for uniqueness
+        _draftId = 'nfc_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    // Save draft if there's unuploaded prescription
+    if (_readPrescription != null) {
+      _saveDraftIfNeeded();
+    }
     // Cancel any ongoing NFC session when leaving the page
     _nfcService.cancelSession();
     super.dispose();
+  }
+  
+  /// Load draft from cache if it exists
+  Future<void> _loadDraftIfExists() async {
+    final draft = _draftCache.getDraft(_draftId);
+    if (draft == null) return;
+    
+    debugPrint('📄 [NFC Upload] Restoring draft from ${draft.lastModified}');
+    
+    try {
+      // Restore prescription from draft data
+      final prescData = draft.data['prescription'] as Map<String, dynamic>?;
+      if (prescData != null) {
+        final prescripcion = Prescripcion.fromMap(prescData);
+        
+        // Restore medications if available
+        List<MedicamentoPrescripcion> medications = [];
+        if (draft.data['medications'] != null) {
+          final medsData = draft.data['medications'] as List<dynamic>;
+          medications = medsData
+              .map((m) => MedicamentoPrescripcion.fromMap(m as Map<String, dynamic>))
+              .toList();
+        }
+        
+        setState(() {
+          _readPrescription = PrescripcionWithMedications(
+            prescripcion: prescripcion,
+            medicamentos: medications,
+          );
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📄 Borrador de prescripción NFC restaurado'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [NFC Upload] Error restoring draft: $e');
+    }
+  }
+  
+  /// Save draft if there's unuploaded prescription
+  void _saveDraftIfNeeded() {
+    if (_readPrescription == null) {
+      debugPrint('📄 [NFC Upload] No prescription to save as draft');
+      return;
+    }
+    
+    try {
+      _draftCache.saveDraft(
+        draftId: _draftId,
+        data: {
+          'type': 'nfc', // Identify draft type
+          'prescription': _readPrescription!.prescripcion.toMap(),
+          'medications': _readPrescription!.medicamentos.map((m) => m.toMap()).toList(),
+          'medicationCount': _readPrescription!.medicamentos.length, // For display
+        },
+        imagePaths: [], // NFC doesn't have images
+      );
+      
+      debugPrint('💾 [NFC Upload] Draft saved');
+    } catch (e) {
+      debugPrint('❌ [NFC Upload] Error saving draft: $e');
+    }
   }
 
   Future<void> _checkNfcAvailability() async {
@@ -188,6 +288,9 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
         );
         _hasJustRead = true; // Set flag to prevent re-reading
       });
+      
+      // Save draft after reading prescription
+      _saveDraftIfNeeded();
 
       _showSuccessSnackBar('Prescripción leída exitosamente');
       
@@ -667,21 +770,46 @@ class _NfcUploadPageState extends State<NfcUploadPage> {
       }).toList();
 
       // Upload to Firestore
-      await _prescripcionRepo.createWithMedicamentos(
-        userId: userId,
-        prescripcion: updatedPrescription,
-        medicamentos: updatedMedications,
-      );
-
-      // Refresh user session
-      await UserSession().refreshPrescripciones();
-
-      if (!mounted) return;
+      // Check connectivity before upload
+      final isOnline = await ConnectivityService().checkConnectivity();
       
-      _showSuccessDialog(
-        title: 'Prescripción Guardada',
-        message: 'La prescripción ha sido guardada exitosamente en tu cuenta.\n\nID: $newId',
-      );
+      if (isOnline) {
+        // Online: Upload to Firestore immediately
+        await _prescripcionRepo.createWithMedicamentos(
+          userId: userId,
+          prescripcion: updatedPrescription,
+          medicamentos: updatedMedications,
+        );
+
+        // Refresh user session
+        await UserSession().refreshPrescripciones();
+
+        if (!mounted) return;
+        
+        // Clear draft on successful upload
+        await _draftCache.removeDraft(_draftId);
+        debugPrint('🗑️ [NFC Upload] Draft cleared after successful upload');
+        
+        _showSuccessDialog(
+          title: 'Prescripción Guardada',
+          message: 'La prescripción ha sido guardada exitosamente en tu cuenta.\n\nID: $newId',
+        );
+      } else {
+        // Offline: Queue for later upload (will be implemented in task 5)
+        // Keep draft when saving offline
+        _saveDraftIfNeeded();
+        
+        if (!mounted) return;
+        
+        _showInfoSnackBar(
+          '📴 Prescripción guardada, será sincronizada una vez tengas conexión.',
+        );
+        
+        _showSuccessDialog(
+          title: 'Guardado localmente',
+          message: 'La prescripción se guardó en tu dispositivo y se sincronizará automáticamente cuando tengas conexión.\n\nID: $newId',
+        );
+      }
 
       // Clear the read prescription after successful upload
       setState(() => _readPrescription = null);
