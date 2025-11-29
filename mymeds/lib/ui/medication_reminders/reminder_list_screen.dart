@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/medication_reminder.dart';
-import '../../services/reminder_service.dart';
+import '../../services/reminder_scheduling_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/medicines_repository.dart';
 import '../../services/reminder_sync_service.dart';
@@ -11,13 +11,11 @@ import '../../widgets/reminder_sync_badge.dart';
 import 'new_reminder_screen.dart';
 
 class ReminderListScreen extends StatefulWidget {
-  final ReminderService reminderService;
   final NotificationService notificationService;
   final MedicinesRepository medicinesRepository;
 
   const ReminderListScreen({
     super.key,
-    required this.reminderService,
     required this.notificationService,
     required this.medicinesRepository,
   });
@@ -31,6 +29,7 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
   bool _hasLoadedFromCache = false; // Cached data loaded
   String? _errorMessage;
   final ReminderSyncService _syncService = ReminderSyncService();
+  final ReminderSchedulingService _schedulingService = ReminderSchedulingService();
 
   @override
   void initState() {
@@ -164,7 +163,6 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     final result = await Navigator.of(context).push<MedicationReminder>(
       MaterialPageRoute(
         builder: (context) => NewReminderScreen(
-          reminderService: widget.reminderService,
           medicinesRepository: widget.medicinesRepository,
           initialReminder: initialReminder,
         ),
@@ -193,7 +191,8 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
     }
 
     try {
-      await widget.reminderService.toggleReminder(reminder.id, !reminder.isActive);
+      // Use ReminderSchedulingService instead of ReminderService
+      await _schedulingService.toggleReminder(reminder.id, !reminder.isActive);
       // Reload to get the actual state
       await _loadRemindersWithCache();
     } catch (e) {
@@ -237,7 +236,8 @@ class _ReminderListScreenState extends State<ReminderListScreen> {
 
     if (confirm == true) {
       try {
-        await widget.reminderService.deleteReminder(reminder.id);
+        // Use ReminderSchedulingService instead of ReminderService
+        await _schedulingService.cancelReminder(reminder.id);
         await _loadRemindersWithCache();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

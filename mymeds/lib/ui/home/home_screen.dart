@@ -11,7 +11,6 @@ import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/prescriptions_cache_service.dart';
 import '../../services/orders_sync_service.dart';
-import '../../services/reminder_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/medicines_repository.dart';
 import '../../models/user_model.dart';
@@ -397,7 +396,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 context,
                 MaterialPageRoute(
                   builder: (_) => ReminderListScreen(
-                    reminderService: InMemoryReminderService(),
                     notificationService: NotificationService(),
                     medicinesRepository: FirestoreMedicinesRepository(),
                   ),

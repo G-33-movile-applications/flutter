@@ -2,17 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/medication_reminder.dart';
 import '../../models/medicine.dart';
-import '../../services/reminder_service.dart';
+import '../../services/reminder_scheduling_service.dart';
 import '../../services/medicines_repository.dart';
 
 class NewReminderScreen extends StatefulWidget {
-  final ReminderService reminderService;
   final MedicinesRepository medicinesRepository;
   final MedicationReminder? initialReminder;
 
   const NewReminderScreen({
     super.key,
-    required this.reminderService,
     required this.medicinesRepository,
     this.initialReminder,
   });
@@ -132,9 +130,11 @@ class _NewReminderScreenState extends State<NewReminderScreen> {
         createdAt: widget.initialReminder?.createdAt ?? DateTime.now(),
       );
 
+      // Use ReminderSchedulingService instead of ReminderService
+      final schedulingService = ReminderSchedulingService();
       final savedReminder = widget.initialReminder == null
-          ? await widget.reminderService.createReminder(reminder)
-          : await widget.reminderService.updateReminder(reminder);
+          ? await schedulingService.createReminder(reminder)
+          : await schedulingService.updateReminder(reminder);
 
       if (mounted) {
         Navigator.of(context).pop(savedReminder);
