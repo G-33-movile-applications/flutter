@@ -35,7 +35,7 @@ class SmartNotificationProvider extends ChangeNotifier {
 
   /// Initialize the provider
   Future<void> initialize() async {
-    debugPrint('🔔 [SmartNotificationProvider] Initializing...');
+    debugPrint(' [SmartNotificationProvider] Initializing...');
     
     await _schedulerService.initialize();
     
@@ -59,7 +59,7 @@ class SmartNotificationProvider extends ChangeNotifier {
       smartNotificationsEnabled: enabled,
     );
     
-    debugPrint('⚙️ [SmartNotificationProvider] Smart notifications: ${enabled ? "ENABLED" : "DISABLED"}');
+    debugPrint(' [SmartNotificationProvider] Smart notifications: ${enabled ? "ENABLED" : "DISABLED"}');
     notifyListeners();
   }
 
@@ -92,7 +92,7 @@ class SmartNotificationProvider extends ChangeNotifier {
     
     try {
       _analytics = await _schedulerService.getAnalytics();
-      debugPrint('📊 [SmartNotificationProvider] Analytics refreshed');
+      debugPrint(' [SmartNotificationProvider] Analytics refreshed');
     } catch (e) {
       debugPrint('❌ [SmartNotificationProvider] Error loading analytics: $e');
     } finally {
@@ -105,7 +105,7 @@ class SmartNotificationProvider extends ChangeNotifier {
   Future<void> clearHistory() async {
     await _schedulerService.clearHistory();
     await refreshAnalytics();
-    debugPrint('🗑️ [SmartNotificationProvider] History cleared');
+    debugPrint(' [SmartNotificationProvider] History cleared');
   }
 
   /// Send a test notification
@@ -117,7 +117,7 @@ class SmartNotificationProvider extends ChangeNotifier {
       isUrgent: false,
     );
     
-    debugPrint('🧪 [SmartNotificationProvider] Test notification sent');
+    debugPrint(' [SmartNotificationProvider] Test notification sent');
   }
 
   /// Get notification scheduler service (for direct access)

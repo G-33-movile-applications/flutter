@@ -64,8 +64,35 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
         return;
       }
 
-      final filePath = result.files.single.path!;
+      final filePath = result.files.single.path;
+      if (filePath == null || filePath.isEmpty) {
+        setState(() => _isProcessing = false);
+        _showErrorSnackBar('No se pudo obtener la ruta del archivo');
+        return;
+      }
+
       final file = File(filePath);
+      
+      // Verify file exists and is readable
+      if (!await file.exists()) {
+        setState(() => _isProcessing = false);
+        _showErrorSnackBar('El archivo no existe o no es accesible');
+        return;
+      }
+
+      // Verify file size (max 10MB)
+      final fileSize = await file.length();
+      if (fileSize > 10 * 1024 * 1024) {
+        setState(() => _isProcessing = false);
+        _showErrorSnackBar('El archivo es demasiado grande (máximo 10MB)');
+        return;
+      }
+
+      if (fileSize == 0) {
+        setState(() => _isProcessing = false);
+        _showErrorSnackBar('El archivo está vacío');
+        return;
+      }
       
       setState(() {
         _selectedPdfFile = file;
@@ -76,80 +103,134 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
     } catch (e) {
       debugPrint('Error selecting PDF: $e');
       _showErrorSnackBar('Error al seleccionar archivo: ${e.toString()}');
+      setState(() {
+        _selectedPdfFile = null;
+        _isProcessing = false;
+      });
     } finally {
-      setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
   /// Extract text from PDF and parse prescription data
   Future<void> _extractAndParsePdf(File pdfFile) async {
+    if (!mounted) return;
+    
     setState(() => _isProcessing = true);
 
     try {
-      // Extract text from PDF
-      final fileBytes = pdfFile.readAsBytesSync();
-      final PdfDocument document = PdfDocument(inputBytes: fileBytes);
-
-      final StringBuffer textBuffer = StringBuffer();
-      for (int i = 0; i < document.pages.count; i++) {
-        String pageText = PdfTextExtractor(document).extractText(startPageIndex: i);
-        textBuffer.writeln(pageText);
-        textBuffer.writeln(); // Add spacing between pages
-      }
-
-      document.dispose();
-
-      final extractedText = textBuffer.toString().trim();
-      
-      if (extractedText.isEmpty) {
-        _showErrorSnackBar('No se pudo extraer texto del PDF');
+      // Verify file exists before reading
+      if (!await pdfFile.exists()) {
+        _showErrorSnackBar('El archivo ya no existe');
         return;
       }
 
-      setState(() => _extractedText = extractedText);
+      // Extract text from PDF with error handling
+      PdfDocument? document;
+      try {
+        final fileBytes = await pdfFile.readAsBytes();
+        
+        if (fileBytes.isEmpty) {
+          _showErrorSnackBar('El archivo PDF está vacío');
+          return;
+        }
 
-      // Parse prescription data from extracted text
-      final parsedData = _parsePrescriptionFromText(extractedText);
-      
-      // Update UI with parsed data
-      _medicoController.text = parsedData['medico'] ?? '';
-      _diagnosticoController.text = parsedData['diagnostico'] ?? '';
-      
-      if (parsedData['fecha'] != null) {
-        _selectedDate = parsedData['fecha'];
-      }
+        document = PdfDocument(inputBytes: fileBytes);
+        
+        if (document.pages.count == 0) {
+          _showErrorSnackBar('El PDF no contiene páginas');
+          return;
+        }
 
-      // Update medications
-      setState(() {
-        _medications.clear();
-        if (parsedData['medicamentos'] != null && (parsedData['medicamentos'] as List).isNotEmpty) {
-          for (final med in parsedData['medicamentos']) {
-            _medications.add({
-              'controller_nombre': TextEditingController(text: med['nombre'] ?? ''),
-              'controller_dosis': TextEditingController(text: med['dosis'] ?? ''),
-              'controller_frecuencia': TextEditingController(text: med['frecuencia'] ?? ''),
-              'controller_duracion': TextEditingController(text: med['duracion'] ?? ''),
-              'controller_observaciones': TextEditingController(text: med['observaciones'] ?? ''),
-            });
+        final StringBuffer textBuffer = StringBuffer();
+        for (int i = 0; i < document.pages.count; i++) {
+          try {
+            String pageText = PdfTextExtractor(document).extractText(startPageIndex: i);
+            if (pageText.isNotEmpty) {
+              textBuffer.writeln(pageText);
+              textBuffer.writeln(); // Add spacing between pages
+            }
+          } catch (e) {
+            debugPrint('Error extracting text from page $i: $e');
+            // Continue with next page
           }
         }
-      });
 
-      // If no medications found, add one empty medication
-      if (_medications.isEmpty) {
-        _addEmptyMedication();
+        final extractedText = textBuffer.toString().trim();
+        
+        if (extractedText.isEmpty) {
+          _showErrorSnackBar('No se pudo extraer texto del PDF. El archivo puede ser una imagen escaneada o no contener texto seleccionable.');
+          return;
+        }
+
+        if (!mounted) return;
+        setState(() => _extractedText = extractedText);
+
+        // Parse prescription data from extracted text
+        final parsedData = _parsePrescriptionFromText(extractedText);
+        
+        // Update UI with parsed data
+        _medicoController.text = parsedData['medico'] ?? '';
+        _diagnosticoController.text = parsedData['diagnostico'] ?? '';
+        
+        if (parsedData['fecha'] != null) {
+          _selectedDate = parsedData['fecha'];
+        }
+
+        // Update medications
+        if (!mounted) return;
+        setState(() {
+          _medications.clear();
+          if (parsedData['medicamentos'] != null && (parsedData['medicamentos'] as List).isNotEmpty) {
+            for (final med in parsedData['medicamentos']) {
+              _medications.add({
+                'controller_nombre': TextEditingController(text: med['nombre'] ?? ''),
+                'controller_dosis': TextEditingController(text: med['dosis'] ?? ''),
+                'controller_frecuencia': TextEditingController(text: med['frecuencia'] ?? ''),
+                'controller_duracion': TextEditingController(text: med['duracion'] ?? ''),
+                'controller_observaciones': TextEditingController(text: med['observaciones'] ?? ''),
+              });
+            }
+          }
+        });
+
+        // If no medications found, add one empty medication
+        if (_medications.isEmpty) {
+          _addEmptyMedication();
+        }
+
+        _showSuccessSnackBar('Datos extraídos del PDF. Por favor revísalos y edítalos si es necesario.');
+        
+        // Show review dialog
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          _showExtractedDataReview();
+        }
+      } catch (e) {
+        debugPrint('PDF parsing error: $e');
+        String errorMessage = 'Error al procesar el PDF';
+        
+        if (e.toString().contains('Invalid cross reference table')) {
+          errorMessage = 'El PDF está dañado o tiene un formato no compatible. Intenta con otro archivo o guarda el PDF desde otra fuente.';
+        } else if (e.toString().contains('password')) {
+          errorMessage = 'El PDF está protegido con contraseña. Por favor, usa un PDF sin protección.';
+        } else if (e.toString().contains('encrypted')) {
+          errorMessage = 'El PDF está encriptado. Por favor, usa un PDF sin encriptar.';
+        }
+        
+        _showErrorSnackBar(errorMessage);
+      } finally {
+        document?.dispose();
       }
-
-      _showSuccessSnackBar('Datos extraídos del PDF. Por favor revísalos y edítalos si es necesario.');
-      
-      // Show review dialog
-      await Future.delayed(const Duration(milliseconds: 500));
-      _showExtractedDataReview();
     } catch (e) {
-      debugPrint('PDF processing error: $e');
-      _showErrorSnackBar('Error al procesar PDF: ${e.toString()}');
+      debugPrint('File reading error: $e');
+      _showErrorSnackBar('Error al leer el archivo: ${e.toString()}');
     } finally {
-      setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -574,22 +655,6 @@ class _PdfUploadPageState extends State<PdfUploadPage> {
     );
   }
 
-  void _showInfoSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
