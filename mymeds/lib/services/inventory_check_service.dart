@@ -2,9 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:collection';
 
-import '../models/prescripcion.dart';
 import '../models/medicamento_prescripcion.dart';
-import '../models/punto_fisico.dart';
 import '../models/inventory_check_result.dart';
 import '../repositories/medicamento_prescripcion_repository.dart';
 import '../repositories/punto_fisico_repository.dart';

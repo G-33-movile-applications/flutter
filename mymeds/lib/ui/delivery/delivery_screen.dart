@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:uuid/uuid.dart';
 import '../../models/punto_fisico.dart';
 import '../../models/prescripcion.dart';
-import '../../models/pedido.dart';
 import '../../services/user_session.dart';
 import '../../facade/app_repository_facade.dart';
 import '../../services/location_service.dart';
@@ -41,7 +38,6 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
   PuntoFisico? _selectedPharmacy; // Store pharmacy (from widget or selected later)
   bool _isPickup = true; // true for pickup, false for delivery
   bool _isLoading = true;
-  bool _isCreatingPedido = false;
   String? _errorMessage;
   bool _hasInitializedDeliveryMode = false; // Track if we've set initial delivery mode
   bool _hasPrescriptions = false; // Track if user has any prescriptions
@@ -688,13 +684,11 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 
           const SizedBox(height: 32),
 
-          // Create order button
+          // Continue to payment button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: (_selectedPrescripcion != null && !_isCreatingPedido)
-                  ? _createPedido
-                  : null,
+              onPressed: _selectedPrescripcion != null ? _goToPayment : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
@@ -703,26 +697,10 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: _isCreatingPedido
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Creando pedido...'),
-                      ],
-                    )
-                  : Text(
-                      _isPickup ? 'Crear pedido (Recoger)' : 'Crear pedido (Domicilio)',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+              child: Text(
+                'Continuar al pago',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -730,6 +708,70 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     );
   }
 
+  /// Navigate to payment screen
+  Future<void> _goToPayment() async {
+    // Validation - ensure prescription is selected
+    if (_selectedPrescripcion == null || _selectedPharmacy == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_selectedPrescripcion == null 
+              ? 'Selecciona una prescripción' 
+              : 'Selecciona una farmacia'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Validation - ensure delivery address for home delivery
+    if (!_isPickup) {
+      final address = _addressController.text.trim();
+      if (address.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor ingresa la dirección de entrega'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Validate address format
+      final addressValidationError = AddressValidator.validateAddress(address);
+      if (addressValidationError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Dirección inválida: $addressValidationError'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    // Navigate to payment screen
+    if (mounted) {
+      final deliveryAddress = _isPickup 
+          ? _selectedPharmacy!.direccion 
+          : _addressController.text.trim();
+
+      Navigator.pushNamed(
+        context,
+        '/payment',
+        arguments: {
+          'prescription': _selectedPrescripcion!,
+          'pharmacy': _selectedPharmacy!,
+          'isPickup': _isPickup,
+          'deliveryAddress': deliveryAddress,
+        },
+      );
+    }
+  }
+
+  // OLD METHOD - Now using payment flow instead
+  // This method is kept for reference but is no longer used
+  // The order creation now happens in PaymentProcessingService after payment confirmation
+  /*
   Future<void> _createPedido() async {
     // Get user ID first for use in error handling
     final userId = UserSession().currentUser.value?.uid;
@@ -969,6 +1011,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       }
     }
   }
+  */
 
   @override
   Widget build(BuildContext context) {

@@ -67,6 +67,13 @@ dependencies:
   google_mlkit_text_recognition: ^0.14.0
   image_picker: ^1.1.2
   
+  # Payment & PDF generation
+  pdf: ^3.11.1
+  firebase_storage: ^13.0.2
+  open_file: ^3.5.0
+  share_plus: ^10.1.1
+  barcode_widget: ^2.0.4
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

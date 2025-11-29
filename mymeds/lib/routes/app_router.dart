@@ -12,6 +12,8 @@ import '../ui/profile/profile_screen.dart';
 import '../ui/auth/login_screen.dart';
 import '../ui/stats/user_stats_screen.dart';
 import '../ui/prescriptions/pending_prescriptions_view.dart';
+import '../ui/payment/payment_screen.dart';
+import '../ui/payment/payment_history_screen.dart';
 import '../models/punto_fisico.dart';
 import '../models/prescripcion.dart';
 
@@ -27,6 +29,8 @@ class AppRouter {
   static const String uploadPdf = '/upload/pdf';
   static const String profile = '/profile';
   static const String delivery = '/delivery';
+  static const String payment = '/payment';
+  static const String paymentHistory = '/payment-history';
   static const String stats = '/stats';
   static const String pendingPrescriptions = '/pending-prescriptions';
   static const String forgotPassword = '/forgot-password';
@@ -116,6 +120,22 @@ class AppRouter {
       case pendingPrescriptions:
         return MaterialPageRoute(
           builder: (_) => const PendingPrescriptionsView(),
+          settings: settings,
+        );
+      case payment:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => PaymentScreen(
+            prescription: args['prescription'] as Prescripcion,
+            pharmacy: args['pharmacy'] as PuntoFisico,
+            isPickup: args['isPickup'] as bool? ?? false,
+            deliveryAddress: args['deliveryAddress'] as String?,
+          ),
+          settings: settings,
+        );
+      case paymentHistory:
+        return MaterialPageRoute(
+          builder: (_) => const PaymentHistoryScreen(),
           settings: settings,
         );
       default:
