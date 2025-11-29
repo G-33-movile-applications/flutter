@@ -75,12 +75,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment History'),
+        title: const Text('Historial de Pagos'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadPaymentHistory,
-            tooltip: 'Refresh',
+            tooltip: 'Actualizar',
           ),
         ],
       ),
@@ -106,7 +106,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadPaymentHistory,
-              child: const Text('Retry'),
+              child: const Text('Reintentar'),
             ),
           ],
         ),
@@ -121,12 +121,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              'No payments yet',
+              'No hay pagos aún',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Your payment history will appear here',
+              'Tu historial de pagos aparecerá aquí',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -171,7 +171,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Payment #${payment.id.split('_').last}',
+                      'Pago #${payment.id.split('_').last}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -246,8 +246,8 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                         const SizedBox(width: 8),
                         Text(
                           bill.pdfUrl != null
-                              ? 'Bill synced to cloud'
-                              : 'Bill saved locally',
+                              ? 'Factura sincronizada en la nube'
+                              : 'Factura guardada localmente',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: bill.pdfUrl != null
                                     ? Colors.green
@@ -259,7 +259,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                     TextButton.icon(
                       onPressed: () => _viewBill(bill),
                       icon: const Icon(Icons.visibility, size: 16),
-                      label: const Text('View'),
+                      label: const Text('Ver'),
                     ),
                   ],
                 ),
@@ -281,32 +281,32 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
       backgroundColor = Colors.orange[100]!;
       textColor = Colors.orange[900]!;
       icon = Icons.sync;
-      label = 'Queued';
+      label = 'En cola';
     } else {
       switch (status) {
         case 'completed':
           backgroundColor = Colors.green[100]!;
           textColor = Colors.green[900]!;
           icon = Icons.check_circle;
-          label = 'Completed';
+          label = 'Completado';
           break;
         case 'processing':
           backgroundColor = Colors.blue[100]!;
           textColor = Colors.blue[900]!;
           icon = Icons.hourglass_empty;
-          label = 'Processing';
+          label = 'Procesando';
           break;
         case 'failed':
           backgroundColor = Colors.red[100]!;
           textColor = Colors.red[900]!;
           icon = Icons.error;
-          label = 'Failed';
+          label = 'Fallido';
           break;
         default:
           backgroundColor = Colors.grey[200]!;
           textColor = Colors.grey[800]!;
           icon = Icons.pending;
-          label = 'Pending';
+          label = 'Pendiente';
       }
     }
 
@@ -337,13 +337,13 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   String _formatPaymentMethod(String method) {
     switch (method) {
       case 'credit':
-        return 'Credit Card';
+        return 'Tarjeta de Crédito';
       case 'debit':
-        return 'Debit Card';
+        return 'Tarjeta de Débito';
       case 'cash_on_delivery':
-        return 'Cash on Delivery';
+        return 'Pago Contra Entrega';
       case 'mock':
-        return 'Mock Payment';
+        return 'Pago de Prueba';
       default:
         return method;
     }
@@ -382,7 +382,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
               
               // Title
               Text(
-                'Payment Details',
+                'Detalles del Pago',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -390,16 +390,16 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
               const SizedBox(height: 24),
               
               // Payment ID
-              _buildDetailRow('Payment ID', payment.id),
-              _buildDetailRow('Order ID', payment.orderId),
-              _buildDetailRow('Prescription ID', payment.prescriptionId),
-              _buildDetailRow('Pharmacy ID', payment.pharmacyId),
+              _buildDetailRow('ID de Pago', payment.id),
+              _buildDetailRow('ID de Pedido', payment.orderId),
+              _buildDetailRow('ID de Prescripción', payment.prescriptionId),
+              _buildDetailRow('ID de Farmacia', payment.pharmacyId),
               _buildDetailRow('Total', '\$${payment.total.toStringAsFixed(2)}'),
-              _buildDetailRow('Delivery Fee', '\$${payment.deliveryFee.toStringAsFixed(2)}'),
-              _buildDetailRow('Payment Method', _formatPaymentMethod(payment.method)),
-              _buildDetailRow('Status', payment.status.toUpperCase()),
+              _buildDetailRow('Costo de Envío', '\$${payment.deliveryFee.toStringAsFixed(2)}'),
+              _buildDetailRow('Método de Pago', _formatPaymentMethod(payment.method)),
+              _buildDetailRow('Estado', payment.status.toUpperCase()),
               _buildDetailRow(
-                'Date',
+                'Fecha',
                 DateFormat('MMMM dd, yyyy HH:mm:ss').format(payment.transactionDate),
               ),
               
@@ -409,7 +409,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
               
               // Medicines
               Text(
-                'Medicines (${payment.prices.length})',
+                'Medicamentos (${payment.prices.length})',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -443,25 +443,25 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                 
                 // Bill info
                 Text(
-                  'Bill Information',
+                  'Información de la Factura',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 12),
-                _buildDetailRow('Bill ID', bill.id),
+                _buildDetailRow('ID de Factura', bill.id),
                 _buildDetailRow(
-                  'Created',
+                  'Creado',
                   DateFormat('MMMM dd, yyyy HH:mm:ss').format(bill.createdAt),
                 ),
                 _buildDetailRow(
-                  'Status',
-                  bill.pdfUrl != null ? 'Synced to cloud' : 'Local only',
+                  'Estado',
+                  bill.pdfUrl != null ? 'Sincronizado en la nube' : 'Solo local',
                 ),
                 if (bill.localPdfPath.isNotEmpty)
-                  _buildDetailRow('Local Path', bill.localPdfPath),
+                  _buildDetailRow('Ruta Local', bill.localPdfPath),
                 if (bill.pdfUrl != null)
-                  _buildDetailRow('Cloud URL', bill.pdfUrl!),
+                  _buildDetailRow('URL en la Nube', bill.pdfUrl!),
 
                 
                 const SizedBox(height: 16),
@@ -473,7 +473,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                       _viewBill(bill);
                     },
                     icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('View Bill PDF'),
+                    label: const Text('Ver Factura PDF'),
                   ),
                 ),
               ],
@@ -517,7 +517,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   void _viewBill(Factura bill) async {
     if (bill.localPdfPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bill file not found locally')),
+        const SnackBar(content: Text('Archivo de factura no encontrado localmente')),
       );
       return;
     }
@@ -528,7 +528,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Bill file not found. It may have been deleted.'),
+            content: Text('Archivo de factura no encontrado. Puede haber sido eliminado.'),
             duration: Duration(seconds: 3),
           ),
         );
@@ -562,17 +562,17 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
           children: [
             Icon(Icons.picture_as_pdf, color: Colors.red),
             SizedBox(width: 12),
-            Text('Bill PDF'),
+            Text('Factura PDF'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Bill ID: ${bill.id}'),
+            Text('ID de Factura: ${bill.id}'),
             const SizedBox(height: 8),
             Text(
-              'Local Path:',
+              'Ruta Local:',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
             Text(
@@ -582,7 +582,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             if (bill.pdfUrl != null) ...[
               const SizedBox(height: 8),
               const Text(
-                'Cloud URL:',
+                'URL en la Nube:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               ),
               Text(
@@ -625,7 +625,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                 }
               },
               icon: const Icon(Icons.open_in_new),
-              label: const Text('Open PDF'),
+              label: const Text('Abrir PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
@@ -636,15 +636,15 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: bill.localPdfPath));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Path copied to clipboard')),
+                  const SnackBar(content: Text('Ruta copiada al portapapeles')),
                 );
               },
               icon: const Icon(Icons.copy),
-              label: const Text('Copy Path'),
+              label: const Text('Copiar Ruta'),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('Cerrar'),
           ),
         ],
       ),

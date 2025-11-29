@@ -351,14 +351,20 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _orders.length,
-        // Critical: Use standard physics, remove cacheExtent for now
+        // 🚀 MICRO-OPTIMIZATION: Enhanced scrolling performance
         physics: const AlwaysScrollableScrollPhysics(),
+        cacheExtent: 400, // Cache 400px beyond viewport for smoother scrolling
+        addRepaintBoundaries: true, // Auto repaint boundaries
+        addAutomaticKeepAlives: false, // We don't need keep-alive for simple cards
         itemBuilder: (context, index) {
           final order = _orders[index];
           final pharmacy = _pharmacyCache[order.puntoFisicoId];
           
-          // Remove RepaintBoundary - it can cause gray screen issues
-          return _buildOrderCard(order, pharmacy, theme, isDark);
+          // 🚀 MICRO-OPTIMIZATION: RepaintBoundary isolates each order card
+          return RepaintBoundary(
+            key: ValueKey('order_${order.id}'),
+            child: _buildOrderCard(order, pharmacy, theme, isDark),
+          );
         },
       ),
     );
@@ -369,13 +375,16 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
     final statusIcon = _getStatusIcon(order.estado);
     final statusText = _getStatusText(order.estado);
     
-    // Don't use RepaintBoundary - it can cause gray screen rendering issues
+    // 🚀 MICRO-OPTIMIZATION: Use const for static values
+    const cardMargin = EdgeInsets.only(bottom: 12);
+    const cardBorderRadius = 12.0;
+    
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: cardMargin,
       elevation: isDark ? 2 : 1,
       color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(cardBorderRadius),
         side: BorderSide(
           color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
           width: 1,
