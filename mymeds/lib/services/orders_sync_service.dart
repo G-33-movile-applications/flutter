@@ -129,7 +129,7 @@ class OrdersSyncService {
         // Update UserSession for UI synchronization
         UserSession().currentPedidos.value = enrichedOrders;
         
-        debugPrint('✅ [OrdersSync] Background sync completed (${enrichedOrders.length} orders)');
+        debugPrint('✅ [OrdersSync] Background sync completed! (${enrichedOrders.length} orders)');
       } catch (e) {
         debugPrint('⚠️ [OrdersSync] Background sync failed: $e');
       }

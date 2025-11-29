@@ -412,6 +412,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             },
           ),
           IconButton(
+            icon: const Icon(Icons.receipt_long),
+            tooltip: 'Historial de pagos',
+            onPressed: () {
+              Navigator.pushNamed(context, '/payment-history');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Mis estadísticas',
             onPressed: () {
