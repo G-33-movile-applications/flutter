@@ -4,10 +4,11 @@ import '../models/medication_reminder.dart';
 import '../models/adherence_event.dart';
 import '../cache/reminders_lru_cache.dart';
 import '../cache/array_map.dart';
+import 'local_reminders_database.dart';
 
 /// **Multi-layer Offline-First Cache Service** for medication reminders
 /// 
-/// ## Architecture: Three-Layer Caching Strategy
+/// ## Architecture: Four-Layer Caching Strategy
 /// 
 /// This service implements a **sophisticated multi-layer caching architecture**
 /// designed for optimal performance, memory efficiency, and offline-first UX:
@@ -16,7 +17,8 @@ import '../cache/array_map.dart';
 /// Layer 1 (Hot):  LRU Cache (in-memory)     - O(1) access, 200 entries max
 /// Layer 2 (Warm): ArrayMap Index (in-memory) - O(N) access, compact for small N
 /// Layer 3 (Cold): Hive (persistent disk)     - Disk I/O, 24h TTL
-/// Layer 4 (Network): Firestore (cloud)       - Network latency, source of truth
+/// Layer 4 (Cold): SQLite (relational disk)   - SQL queries, analytics
+/// Layer 5 (Network): Firestore (cloud)       - Network latency, source of truth
 /// ```
 /// 
 /// ### Layer 1: LRU Cache (RemindersLruCache)
@@ -41,17 +43,24 @@ import '../cache/array_map.dart';
 /// - **TTL**: 24 hours, configurable
 /// - **Use case**: App restart, network unavailable
 /// 
+/// ### Layer 4: SQLite (Relational Database)
+/// - **Purpose**: Relational queries and analytics
+/// - **Performance**: SQL queries with indexes
+/// - **Features**: Complex queries, aggregations, foreign keys
+/// - **Use case**: Adherence analytics, medication patterns
+/// 
 /// ### Read Strategy (Multi-layer)
 /// 1. Check **LRU cache** first (Layer 1) - instant if hit
 /// 2. If miss, check **Hive** (Layer 3) - disk I/O
 /// 3. **Hydrate LRU** with Hive results for future reads
-/// 4. If Hive expired/empty, fetch from **Firestore** (Layer 4)
+/// 4. If Hive expired/empty, fetch from **Firestore** (Layer 5)
 /// 
 /// ### Write Strategy (Write-through)
 /// 1. Write to **Hive** (Layer 3) - persistence
 /// 2. Write to **LRU cache** (Layer 1) - hot cache
-/// 3. Write to **ArrayMap** (Layer 2) if adherence events
-/// 4. Background sync to **Firestore** (Layer 4) when online
+/// 3. Write to **SQLite** (Layer 4) - relational storage
+/// 4. Write to **ArrayMap** (Layer 2) if adherence events
+/// 5. Background sync to **Firestore** (Layer 5) when online
 /// 
 /// ## Rubric Satisfaction
 /// 
@@ -141,7 +150,11 @@ class RemindersCacheService {
         _memoryCache.put(userId, reminder);
       }
       
-      debugPrint('💾 Cached ${reminders.length} reminders for user $userId (Hive + LRU)');
+      // === LAYER 4: Write to SQLite (relational database) ===
+      // Write-through to SQLite for complex queries and analytics
+      await LocalRemindersDatabase().upsertReminders(userId, reminders);
+      
+      debugPrint('💾 Cached ${reminders.length} reminders for user $userId (Hive + LRU + SQLite)');
     } catch (e) {
       debugPrint('❌ Failed to cache reminders: $e');
     }
@@ -240,6 +253,7 @@ class RemindersCacheService {
   /// **Multi-layer write strategy:**
   /// 1. Write to Hive (Layer 3) - persistent storage
   /// 2. Write to ArrayMap index (Layer 2) - compact in-memory index
+  /// 3. Write to SQLite (Layer 4) - relational database
   Future<void> cacheAdherenceEvents(String userId, List<AdherenceEvent> events) async {
     if (_adherenceBox == null) {
       debugPrint('⚠️ RemindersCacheService not initialized');
@@ -262,7 +276,11 @@ class RemindersCacheService {
       }
       _adherenceIndex[userId] = userIndex;
       
-      debugPrint('💾 Cached ${events.length} adherence events for user $userId (Hive + ArrayMap)');
+      // === LAYER 4: Write to SQLite (relational database) ===
+      // Write-through to SQLite for complex queries and analytics
+      await LocalRemindersDatabase().upsertAdherenceEvents(userId, events);
+      
+      debugPrint('💾 Cached ${events.length} adherence events for user $userId (Hive + ArrayMap + SQLite)');
       debugPrint('🗃️ ArrayMap stats: ${userIndex.getStats()}');
     } catch (e) {
       debugPrint('❌ Failed to cache adherence events: $e');
