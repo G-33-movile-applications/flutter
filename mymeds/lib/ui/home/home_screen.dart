@@ -526,8 +526,71 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
                 icon: Icons.map_rounded,
                 buttonText: 'Abrir mapa',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/map');
+                onPressed: () async {
+                  // Check connectivity before opening map
+                  final connectivity = ConnectivityService();
+                  final isOnline = await connectivity.checkConnectivity();
+                  
+                  if (!isOnline) {
+                    // Check if map data is cached
+                    final cacheService = CacheService();
+                    final hasMapCache = cacheService.isValid('map_pharmacies_data');
+                    
+                    if (!hasMapCache && context.mounted) {
+                      // Show error: no internet and no cached map data
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.wifi_off, color: Colors.white),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Sin conexión y sin datos del mapa guardados. Conéctate a internet para cargar el mapa.',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 4),
+                          action: SnackBarAction(
+                            label: 'ENTENDIDO',
+                            textColor: Colors.white,
+                            onPressed: () {},
+                          ),
+                        ),
+                      );
+                      return; // Don't navigate
+                    }
+                    
+                    // Has cached data - show warning but allow navigation
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.warning_amber, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '📴 Sin conexión - mostrando mapa guardado',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                  
+                  // Navigate to map
+                  if (context.mounted) {
+                    Navigator.pushNamed(context, '/map');
+                  }
                 },
               ),
               const SizedBox(height: 16),
