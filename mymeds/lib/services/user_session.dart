@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../models/pedido.dart';
 import '../models/prescripcion.dart';
+import '../models/medication_reminder.dart';
 import '../repositories/pedido_repository.dart';
 import '../repositories/prescripcion_repository.dart';
 import '../services/favorites_service.dart';
@@ -48,6 +49,7 @@ class UserSession {
   final ValueNotifier<UserModel?> currentUser = ValueNotifier<UserModel?>(null);
   final ValueNotifier<List<Pedido>> currentPedidos = ValueNotifier<List<Pedido>>([]);
   final ValueNotifier<List<Prescripcion>> currentPrescripciones = ValueNotifier<List<Prescripcion>>([]);
+  final ValueNotifier<List<MedicationReminder>> currentReminders = ValueNotifier<List<MedicationReminder>>([]);
 
   // Auth state subscription for cleanup
   StreamSubscription<User?>? _authSubscription;

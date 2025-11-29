@@ -895,6 +895,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       final pedidoId = 'ped_${uuid.v4().replaceAll('-', '').substring(0, 16)}';
       
       // Create pedido with reference to existing prescription - NO PRESCRIPTION CREATION
+      // Note: createPedidoWithSync will stamp analytics fields (createdOffline, createdAt, syncSource)
       final pedido = Pedido(
         id: pedidoId,
         prescripcionId: _selectedPrescripcion!.id,
