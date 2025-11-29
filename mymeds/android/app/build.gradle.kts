@@ -7,12 +7,13 @@ plugins {
 }
 android {
     namespace = "com.mobile.mymeds"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -25,7 +26,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26 
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -61,4 +62,8 @@ dependencies {
 
   // Add the dependencies for any other desired Firebase products
   // https://firebase.google.com/docs/android/setup#available-libraries
+  
+  // Core library desugaring for Java 8+ APIs
+  // Core library desugaring for flutter_local_notifications
+  coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

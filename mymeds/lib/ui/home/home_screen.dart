@@ -4,12 +4,15 @@ import 'widgets/motion_debug_bar.dart';
 import 'widgets/data_saver_indicator.dart';
 import 'widgets/settings_view.dart';
 import '../widgets/connectivity_feedback_banner.dart';
+import '../medication_reminders/reminder_list_screen.dart';
 import '../../services/user_session.dart';
 import '../../services/background_loader.dart';
 import '../../services/cache_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/prescriptions_cache_service.dart';
 import '../../services/orders_sync_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/medicines_repository.dart';
 import '../../models/user_model.dart';
 import '../../models/prescripcion.dart';
 import '../../models/pedido.dart';
@@ -384,6 +387,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
         actions: [
+          // Medication reminders button
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded),
+            tooltip: 'Recordatorios de medicamentos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReminderListScreen(
+                    notificationService: NotificationService(),
+                    medicinesRepository: FirestoreMedicinesRepository(),
+                  ),
+                ),
+              );
+            },
+          ),
           // Refresh button - triggers background reload with force refresh
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -514,8 +533,71 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 description: 'Encuentra sucursales EPS cercanas, horarios y stock estimado.',
                 icon: Icons.map_rounded,
                 buttonText: 'Abrir mapa',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/map');
+                onPressed: () async {
+                  // Check connectivity before opening map
+                  final connectivity = ConnectivityService();
+                  final isOnline = await connectivity.checkConnectivity();
+                  
+                  if (!isOnline) {
+                    // Check if map data is cached
+                    final cacheService = CacheService();
+                    final hasMapCache = cacheService.isValid('map_pharmacies_data');
+                    
+                    if (!hasMapCache && context.mounted) {
+                      // Show error: no internet and no cached map data
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.wifi_off, color: Colors.white),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Sin conexión y sin datos del mapa guardados. Conéctate a internet para cargar el mapa.',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 4),
+                          action: SnackBarAction(
+                            label: 'ENTENDIDO',
+                            textColor: Colors.white,
+                            onPressed: () {},
+                          ),
+                        ),
+                      );
+                      return; // Don't navigate
+                    }
+                    
+                    // Has cached data - show warning but allow navigation
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.warning_amber, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '📴 Sin conexión - mostrando mapa guardado',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                  
+                  // Navigate to map
+                  if (context.mounted) {
+                    Navigator.pushNamed(context, '/map');
+                  }
                 },
               ),
               const SizedBox(height: 16),

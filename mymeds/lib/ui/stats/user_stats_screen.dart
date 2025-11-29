@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user_stats.dart';
 import '../../services/user_stats_service.dart';
+import '../../services/orders_analytics_service.dart';
 import '../../services/user_session.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/punto_fisico.dart';
@@ -14,11 +15,13 @@ class UserStatsScreen extends StatefulWidget {
 
 class _UserStatsScreenState extends State<UserStatsScreen> {
   final UserStatsService _statsService = UserStatsService();
+  final OrdersAnalyticsService _ordersAnalytics = OrdersAnalyticsService();
   final ConnectivityService _connectivity = ConnectivityService();
   bool _isLoading = true;
   bool _isOffline = false;
   String? _error;
   UserStats? _stats;
+  OrdersOfflineSyncStats? _offlineOrdersStats;
   List<Map<String, dynamic>> _topPharmacies = [];
 
   @override
@@ -63,12 +66,21 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
         throw Exception('Usuario no autenticado');
       }
 
-      final stats = await _statsService.getUserStats(userId);
+      // Load both user stats and offline orders analytics in parallel
+      final results = await Future.wait([
+        _statsService.getUserStats(userId),
+        _ordersAnalytics.computeOfflineSyncStats(userId),
+      ]);
+      
+      final stats = results[0] as UserStats;
+      final offlineOrdersStats = results[1] as OrdersOfflineSyncStats;
+      
       // Pass stats to avoid duplicate query
       final topPharmacies = await _statsService.getTopPharmacies(userId, limit: 5, stats: stats);
 
       setState(() {
         _stats = stats;
+        _offlineOrdersStats = offlineOrdersStats;
         _topPharmacies = topPharmacies;
         _isLoading = false;
       });
@@ -187,6 +199,10 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
           _buildTotalOrdersCard(),
           const SizedBox(height: 16),
 
+          // Offline Orders Sync Analytics Card (Business Question Type 2)
+          _buildOfflineOrdersSyncCard(),
+          const SizedBox(height: 16),
+
           // Medicine Statistics Card (Business Question Type 2)
           _buildMedicineStatsCard(),
           const SizedBox(height: 16),
@@ -234,6 +250,267 @@ class _UserStatsScreenState extends State<UserStatsScreen> {
         ),
       ),
     );
+  }
+
+  /// Build Offline Orders Sync Analytics Card
+  /// 
+  /// Displays Type 2 Business Question:
+  /// "What proportion of orders is created offline, and how long do they take to synchronize?"
+  Widget _buildOfflineOrdersSyncCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    
+    // Show placeholder if no data
+    if (_offlineOrdersStats == null) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Icon(Icons.cloud_sync, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 12),
+              Text(
+                'Cargando datos de sincronización...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    final stats = _offlineOrdersStats!;
+    
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  Icons.cloud_sync,
+                  color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sincronización de Pedidos Offline',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pregunta de Negocio Tipo 2',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Stats grid
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    'Offline',
+                    '${stats.offlineOrders}',
+                    '${stats.offlinePercentage.toStringAsFixed(1)}%',
+                    Icons.cloud_off,
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatItem(
+                    'Online',
+                    '${stats.onlineOrders}',
+                    '${stats.onlinePercentage.toStringAsFixed(1)}%',
+                    Icons.cloud_done,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Sync delay info
+            if (stats.avgOfflineSyncDelay != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer, color: primaryColor, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tiempo Promedio de Sincronización',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatDuration(stats.avgOfflineSyncDelay!),
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          if (stats.syncedOfflineOrders > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${stats.syncedOfflineOrders} pedidos sincronizados',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (stats.offlineOrders > 0) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.pending_actions, color: Colors.orange, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pedidos Pendientes de Sincronización',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${stats.pendingOfflineOrders} pedido${stats.pendingOfflineOrders != 1 ? "s" : ""} esperando conexión',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey[600],
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Todos los pedidos se crearon con conexión directa',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, String percentage, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          Text(
+            percentage,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey[600],
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.inDays > 0) {
+      return '~${duration.inDays} día${duration.inDays != 1 ? "s" : ""}';
+    } else if (duration.inHours > 0) {
+      return '~${duration.inHours} hora${duration.inHours != 1 ? "s" : ""}';
+    } else if (duration.inMinutes > 0) {
+      return '~${duration.inMinutes} minuto${duration.inMinutes != 1 ? "s" : ""}';
+    } else {
+      return '~${duration.inSeconds} segundo${duration.inSeconds != 1 ? "s" : ""}';
+    }
   }
 
   Widget _buildMedicineStatsCard() {
