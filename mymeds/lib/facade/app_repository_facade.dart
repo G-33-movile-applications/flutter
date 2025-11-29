@@ -63,7 +63,21 @@ class AppRepositoryFacade {
     _syncQueueService.onCreatePedido = (Map<String, dynamic> pedidoData) async {
       final pedido = Pedido.fromJsonMap(pedidoData['pedido']); // Use fromJsonMap
       final userId = pedidoData['userId'] as String;
-      await createPedido(pedido, userId: userId);
+      
+      // CRITICAL: Only stamp firstSyncedAt if it's null (preserve offline creation metadata)
+      // The order already has createdOffline=true and createdAt from when it was queued
+      final now = DateTime.now();
+      final pedidoWithSyncStamp = pedido.firstSyncedAt == null
+          ? pedido.copyWith(firstSyncedAt: now)
+          : pedido;
+      
+      // Log analytics for offline orders being synced
+      if (pedido.createdOffline && pedido.firstSyncedAt == null) {
+        final delay = now.difference(pedido.createdAt);
+        print('📊 [Analytics] Offline order synced: ${pedido.id}, delay: ${delay.inSeconds}s, createdAt: ${pedido.createdAt}, syncedAt: $now');
+      }
+      
+      await createPedido(pedidoWithSyncStamp, userId: userId);
     };
     
     // Set callback for updating prescripcion when sync occurs
@@ -756,11 +770,22 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
       final isOnline = await _connectivityService.checkConnectivity();
       print('🌐 [AppRepositoryFacade] Connectivity status: ${isOnline ? "ONLINE" : "OFFLINE"}');
       
+      final now = DateTime.now();
+      
       if (isOnline) {
-        // Device is online - execute immediately
-        print('✅ [AppRepositoryFacade] Device online - executing pedido creation immediately');
+        // Device is online - try to execute immediately
+        print('✅ [AppRepositoryFacade] Device online - attempting immediate pedido creation');
         try {
-          await createPedido(pedido, userId: userId);
+          // Stamp as online order ONLY if it actually succeeds
+          final pedidoForOnlineCreation = pedido.copyWith(
+            createdOffline: false,
+            createdAt: now,
+            syncSource: 'online-direct',
+            firstSyncedAt: now, // Synced immediately
+          );
+          print('📊 [Analytics] Order created online: source=online-direct');
+          
+          await createPedido(pedidoForOnlineCreation, userId: userId);
           
           // Track visit to pharmacy for favorites/frequent tracking
           try {
@@ -788,23 +813,32 @@ Future<List<Map<String, dynamic>>> getMedicamentosDisponiblesEnPuntosFisicos({
           };
         } catch (e) {
           print('❌ [AppRepositoryFacade] Error creating pedido online: $e');
-          // If network error, queue instead of failing
+          // If network error, treat as offline and queue
           if (e.toString().toLowerCase().contains('network') ||
               e.toString().toLowerCase().contains('unavailable') ||
               e.toString().toLowerCase().contains('firestore')) {
-            print('📴 [AppRepositoryFacade] Network error detected, falling back to offline queue');
-            // Fall through to offline queueing
+            print('📴 [AppRepositoryFacade] Network error detected, treating as offline order and queuing');
+            // Fall through to offline queueing below
           } else {
             rethrow;
           }
         }
       }
       
-      // Device is offline - queue for later sync
-      print('📴 [AppRepositoryFacade] Device offline - queuing pedido for sync');
+      // Device is offline OR network error occurred - queue for later sync
+      // Mark as offline order for accurate analytics
+      final pedidoForOfflineQueue = pedido.copyWith(
+        createdOffline: true,
+        createdAt: now,
+        syncSource: 'offline-queue',
+        // firstSyncedAt stays null, will be set when synced
+      );
+      print('📊 [Analytics] Order queued as offline: source=offline-queue, createdAt=$now');
+      
+      print('📴 [AppRepositoryFacade] Queuing pedido for sync');
       try {
         await _syncQueueService.queueDeliveryCreation({
-          'pedido': pedido.toJsonMap(), // Use JSON-serializable map
+          'pedido': pedidoForOfflineQueue.toJsonMap(), // Use offline-stamped order
           'userId': userId,
         });
         

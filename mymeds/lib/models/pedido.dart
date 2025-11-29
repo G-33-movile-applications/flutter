@@ -15,6 +15,13 @@ class Pedido {
   // Cached pharmacy data for offline display (non-persistent, cached only)
   final String? cachedPharmacyName;
   final String? cachedPharmacyAddress;
+  
+  // Analytics fields for Type 2 Business Question:
+  // "What proportion of orders is created offline, and how long do they take to synchronize?"
+  final bool createdOffline;          // true if created when device was offline
+  final DateTime createdAt;            // local creation time
+  final DateTime? firstSyncedAt;       // time when order was first successfully synced to Firestore
+  final String? syncSource;            // 'offline-queue' or 'online-direct'
 
   Pedido({
     required this.id,
@@ -27,7 +34,11 @@ class Pedido {
     this.fechaEntrega,
     this.cachedPharmacyName,
     this.cachedPharmacyAddress,
-  });
+    this.createdOffline = false,
+    DateTime? createdAt,
+    this.firstSyncedAt,
+    this.syncSource,
+  }) : createdAt = createdAt ?? fechaPedido;
 
   // Getters for backward compatibility
   String get identificadorPedido => id;
@@ -40,6 +51,12 @@ class Pedido {
 
   // Create Pedido from Firestore document
   factory Pedido.fromMap(Map<String, dynamic> map, {String? documentId}) {
+    final fechaPedido = map['fechaPedido'] != null 
+        ? (map['fechaPedido'] as Timestamp).toDate()
+        : (map['fechaDespacho'] != null 
+            ? (map['fechaDespacho'] as Timestamp).toDate() // backward compatibility
+            : DateTime.now());
+    
     return Pedido(
       id: documentId ?? map['id'] ?? '',
       prescripcionId: map['prescripcionId'] ?? '',
@@ -49,17 +66,22 @@ class Pedido {
       direccionEntrega: map['direccionEntrega'] ?? '',
       estado: map['estado'] ?? 
               (map['entregado'] == true ? 'entregado' : 'pendiente'), // backward compatibility
-      fechaPedido: map['fechaPedido'] != null 
-          ? (map['fechaPedido'] as Timestamp).toDate()
-          : (map['fechaDespacho'] != null 
-              ? (map['fechaDespacho'] as Timestamp).toDate() // backward compatibility
-              : DateTime.now()),
+      fechaPedido: fechaPedido,
       fechaEntrega: map['fechaEntrega'] != null 
           ? (map['fechaEntrega'] as Timestamp).toDate()
           : null,
       // Load cached pharmacy data if available (for offline display)
       cachedPharmacyName: map['cachedPharmacyName'] as String?,
       cachedPharmacyAddress: map['cachedPharmacyAddress'] as String?,
+      // Analytics fields with backward compatibility (default to false/null for old orders)
+      createdOffline: map['createdOffline'] as bool? ?? false,
+      createdAt: map['createdAt'] != null
+          ? (map['createdAt'] as Timestamp).toDate()
+          : fechaPedido, // fallback to fechaPedido for old orders
+      firstSyncedAt: map['firstSyncedAt'] != null
+          ? (map['firstSyncedAt'] as Timestamp).toDate()
+          : null,
+      syncSource: map['syncSource'] as String?,
     );
   }
 
@@ -73,6 +95,11 @@ class Pedido {
       'estado': estado,
       'fechaPedido': Timestamp.fromDate(fechaPedido),
       if (fechaEntrega != null) 'fechaEntrega': Timestamp.fromDate(fechaEntrega!),
+      // Analytics fields for backend/BigQuery analytics
+      'createdOffline': createdOffline,
+      'createdAt': Timestamp.fromDate(createdAt),
+      if (firstSyncedAt != null) 'firstSyncedAt': Timestamp.fromDate(firstSyncedAt!),
+      if (syncSource != null) 'syncSource': syncSource,
     };
   }
 
@@ -90,11 +117,18 @@ class Pedido {
       // Include cached pharmacy data for offline display
       if (cachedPharmacyName != null) 'cachedPharmacyName': cachedPharmacyName,
       if (cachedPharmacyAddress != null) 'cachedPharmacyAddress': cachedPharmacyAddress,
+      // Analytics fields
+      'createdOffline': createdOffline,
+      'createdAt': createdAt.toIso8601String(),
+      if (firstSyncedAt != null) 'firstSyncedAt': firstSyncedAt!.toIso8601String(),
+      if (syncSource != null) 'syncSource': syncSource,
     };
   }
 
   // Create from JSON-serializable map
   factory Pedido.fromJsonMap(Map<String, dynamic> map) {
+    final fechaPedido = DateTime.parse(map['fechaPedido'] as String);
+    
     return Pedido(
       id: map['id'] as String,
       prescripcionId: map['prescripcionId'] as String,
@@ -102,13 +136,22 @@ class Pedido {
       tipoEntrega: map['tipoEntrega'] as String,
       direccionEntrega: map['direccionEntrega'] as String,
       estado: map['estado'] as String,
-      fechaPedido: DateTime.parse(map['fechaPedido'] as String),
+      fechaPedido: fechaPedido,
       fechaEntrega: map['fechaEntrega'] != null 
           ? DateTime.parse(map['fechaEntrega'] as String)
           : null,
       // Load cached pharmacy data
       cachedPharmacyName: map['cachedPharmacyName'] as String?,
       cachedPharmacyAddress: map['cachedPharmacyAddress'] as String?,
+      // Analytics fields with backward compatibility
+      createdOffline: map['createdOffline'] as bool? ?? false,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : fechaPedido,
+      firstSyncedAt: map['firstSyncedAt'] != null
+          ? DateTime.parse(map['firstSyncedAt'] as String)
+          : null,
+      syncSource: map['syncSource'] as String?,
     );
   }
 
@@ -133,6 +176,10 @@ class Pedido {
     DateTime? fechaEntrega,
     String? cachedPharmacyName,
     String? cachedPharmacyAddress,
+    bool? createdOffline,
+    DateTime? createdAt,
+    DateTime? firstSyncedAt,
+    String? syncSource,
   }) {
     return Pedido(
       id: id ?? this.id,
@@ -145,6 +192,10 @@ class Pedido {
       fechaEntrega: fechaEntrega ?? this.fechaEntrega,
       cachedPharmacyName: cachedPharmacyName ?? this.cachedPharmacyName,
       cachedPharmacyAddress: cachedPharmacyAddress ?? this.cachedPharmacyAddress,
+      createdOffline: createdOffline ?? this.createdOffline,
+      createdAt: createdAt ?? this.createdAt,
+      firstSyncedAt: firstSyncedAt ?? this.firstSyncedAt,
+      syncSource: syncSource ?? this.syncSource,
     );
   }
 
