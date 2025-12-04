@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import './adherence_event.dart'; // For SyncStatus enum
 
 class Pedido {
   final String id;
@@ -22,6 +23,7 @@ class Pedido {
   final DateTime createdAt;            // local creation time
   final DateTime? firstSyncedAt;       // time when order was first successfully synced to Firestore
   final String? syncSource;            // 'offline-queue' or 'online-direct'
+  final SyncStatus syncStatus;         // sync state: synced, pending, or failed
 
   Pedido({
     required this.id,
@@ -38,6 +40,7 @@ class Pedido {
     DateTime? createdAt,
     this.firstSyncedAt,
     this.syncSource,
+    this.syncStatus = SyncStatus.synced,
   }) : createdAt = createdAt ?? fechaPedido;
 
   // Getters for backward compatibility
@@ -82,6 +85,12 @@ class Pedido {
           ? (map['firstSyncedAt'] as Timestamp).toDate()
           : null,
       syncSource: map['syncSource'] as String?,
+      syncStatus: map['syncStatus'] != null
+          ? SyncStatus.values.firstWhere(
+              (e) => e.toString().split('.').last == map['syncStatus'],
+              orElse: () => SyncStatus.synced,
+            )
+          : SyncStatus.synced, // default to synced for old orders
     );
   }
 
@@ -100,6 +109,7 @@ class Pedido {
       'createdAt': Timestamp.fromDate(createdAt),
       if (firstSyncedAt != null) 'firstSyncedAt': Timestamp.fromDate(firstSyncedAt!),
       if (syncSource != null) 'syncSource': syncSource,
+      'syncStatus': syncStatus.toString().split('.').last,
     };
   }
 
@@ -122,6 +132,7 @@ class Pedido {
       'createdAt': createdAt.toIso8601String(),
       if (firstSyncedAt != null) 'firstSyncedAt': firstSyncedAt!.toIso8601String(),
       if (syncSource != null) 'syncSource': syncSource,
+      'syncStatus': syncStatus.toString().split('.').last,
     };
   }
 
@@ -152,6 +163,12 @@ class Pedido {
           ? DateTime.parse(map['firstSyncedAt'] as String)
           : null,
       syncSource: map['syncSource'] as String?,
+      syncStatus: map['syncStatus'] != null
+          ? SyncStatus.values.firstWhere(
+              (e) => e.toString().split('.').last == map['syncStatus'],
+              orElse: () => SyncStatus.synced,
+            )
+          : SyncStatus.synced,
     );
   }
 
@@ -180,6 +197,7 @@ class Pedido {
     DateTime? createdAt,
     DateTime? firstSyncedAt,
     String? syncSource,
+    SyncStatus? syncStatus,
   }) {
     return Pedido(
       id: id ?? this.id,
@@ -196,6 +214,7 @@ class Pedido {
       createdAt: createdAt ?? this.createdAt,
       firstSyncedAt: firstSyncedAt ?? this.firstSyncedAt,
       syncSource: syncSource ?? this.syncSource,
+      syncStatus: syncStatus ?? this.syncStatus,
     );
   }
 
