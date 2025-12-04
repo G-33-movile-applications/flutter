@@ -9,6 +9,7 @@ import '../models/pedido.dart';
 /// - Automatic sync with Firestore when online
 /// - Offline-first data access
 /// - Cache invalidation and TTL management
+/// - Medicines metadata caching for offline sync
 class OrdersCacheService {
   // Singleton pattern
   static final OrdersCacheService _instance = OrdersCacheService._internal();
@@ -17,17 +18,20 @@ class OrdersCacheService {
   
   static const String _boxName = 'orders_cache';
   static const String _metadataBoxName = 'orders_metadata';
+  static const String _medicinesBoxName = 'orders_medicines'; // NEW: medicines cache
   static const Duration _defaultTtl = Duration(hours: 24);
   
   Box<Map>? _ordersBox;
   Box<Map>? _metadataBox;
+  Box<Map>? _medicinesBox; // NEW: box for medicines data
   
   /// Initialize Hive boxes for orders
   Future<void> init() async {
     try {
       _ordersBox = await Hive.openBox<Map>(_boxName);
       _metadataBox = await Hive.openBox<Map>(_metadataBoxName);
-      debugPrint('📦 OrdersCacheService initialized');
+      _medicinesBox = await Hive.openBox<Map>(_medicinesBoxName);
+      debugPrint('📦 OrdersCacheService initialized (with medicines cache)');
     } catch (e) {
       debugPrint('❌ Failed to initialize OrdersCacheService: $e');
       rethrow;
@@ -130,6 +134,50 @@ class OrdersCacheService {
     }
   }
   
+  /// Cache medicines for a specific order
+  Future<void> cacheMedicinesForOrder(String orderId, List<Map<String, dynamic>> medicines) async {
+    if (_medicinesBox == null) {
+      debugPrint('⚠️ Medicines box not initialized');
+      return;
+    }
+    
+    try {
+      await _medicinesBox!.put(orderId, {
+        'medicines': medicines,
+        'cachedAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('💾 [OrdersQueue] Cached ${medicines.length} medicines for order $orderId');
+    } catch (e) {
+      debugPrint('❌ Failed to cache medicines for order $orderId: $e');
+    }
+  }
+  
+  /// Get cached medicines for a specific order
+  Future<List<Map<String, dynamic>>?> getCachedMedicinesForOrder(String orderId) async {
+    if (_medicinesBox == null) {
+      debugPrint('⚠️ Medicines box not initialized');
+      return null;
+    }
+    
+    try {
+      final data = _medicinesBox!.get(orderId);
+      if (data == null) {
+        debugPrint('📦 No cached medicines for order $orderId');
+        return null;
+      }
+      
+      final medicines = (data['medicines'] as List)
+          .map((m) => Map<String, dynamic>.from(m as Map))
+          .toList();
+      
+      debugPrint('📦 [OrdersQueue] Retrieved ${medicines.length} cached medicines for order $orderId');
+      return medicines;
+    } catch (e) {
+      debugPrint('❌ Failed to get cached medicines for order $orderId: $e');
+      return null;
+    }
+  }
+  
   /// Clear cache for a specific user
   Future<void> clearCache(String userId) async {
     if (_ordersBox == null) return;
@@ -137,6 +185,7 @@ class OrdersCacheService {
     try {
       await _ordersBox!.delete(userId);
       await _metadataBox?.delete(userId);
+      // Note: We don't clear medicines here as they're keyed by orderId, not userId
       debugPrint('🗑️ Cleared cache for user $userId');
     } catch (e) {
       debugPrint('❌ Failed to clear cache: $e');
@@ -150,7 +199,8 @@ class OrdersCacheService {
     try {
       await _ordersBox!.clear();
       await _metadataBox?.clear();
-      debugPrint('🗑️ Cleared all orders cache');
+      await _medicinesBox?.clear();
+      debugPrint('🗑️ Cleared all orders cache (including medicines)');
     } catch (e) {
       debugPrint('❌ Failed to clear all cache: $e');
     }
@@ -185,6 +235,7 @@ class OrdersCacheService {
   Future<void> dispose() async {
     await _ordersBox?.close();
     await _metadataBox?.close();
+    await _medicinesBox?.close();
     debugPrint('📦 OrdersCacheService disposed');
   }
 }

@@ -342,8 +342,8 @@ class PaymentProcessingService {
   }) async {
     final now = DateTime.now();
     
-    debugPrint('📦 [Payment] Creating order locally: ${payment.orderId}');
-    debugPrint('📦 [Payment] Order details: deliveryType=$deliveryType, isOnline=$isOnline');
+    debugPrint('📦 [OrdersQueue] Creating order locally: ${payment.orderId}');
+    debugPrint('📦 [OrdersQueue] Order details: deliveryType=$deliveryType, isOnline=$isOnline, medicines=${medicines.length}');
 
     // Step 1: Create Pedido with offline-first metadata
     final order = Pedido(
@@ -363,7 +363,7 @@ class PaymentProcessingService {
       syncStatus: SyncStatus.pending, // Start as pending, will be updated if sync succeeds
     );
 
-    debugPrint('📦 [Payment] Order object created with syncStatus: ${order.syncStatus}');
+    debugPrint('📦 [OrdersQueue] Order object created with syncStatus: ${order.syncStatus}, createdOffline: ${order.createdOffline}');
 
     // Step 2: Add to OrdersSyncService cache
     // This makes the order immediately visible in OrdersView
@@ -377,11 +377,21 @@ class PaymentProcessingService {
       syncImmediately: isOnline, // Only sync if online
     );
 
-    debugPrint('📦 [Payment] Order added to cache with final syncStatus: ${syncedOrder.syncStatus}');
+    debugPrint('📦 [OrdersQueue] Order added to cache with final syncStatus: ${syncedOrder.syncStatus}');
     
     // Log offline creation for BQ Type 2 analytics
     if (syncedOrder.createdOffline) {
-      debugPrint('📊 [BQ Type 2] Order created OFFLINE - userId: $userId, orderId: ${syncedOrder.id}, createdAt: ${syncedOrder.createdAt}');
+      if (syncedOrder.syncStatus == SyncStatus.pending) {
+        debugPrint('📊 [BQ Type 2] Order created OFFLINE - queued for sync');
+        debugPrint('📊 [BQ Type 2]   userId: $userId, orderId: ${syncedOrder.id}');
+        debugPrint('📊 [BQ Type 2]   createdAt: ${syncedOrder.createdAt}, syncStatus: pending');
+      } else if (syncedOrder.syncStatus == SyncStatus.synced) {
+        final syncDelay = syncedOrder.firstSyncedAt!.difference(syncedOrder.createdAt).inMilliseconds;
+        debugPrint('📊 [BQ Type 2] Order created OFFLINE but synced immediately');
+        debugPrint('📊 [BQ Type 2]   userId: $userId, orderId: ${syncedOrder.id}');
+        debugPrint('📊 [BQ Type 2]   createdAt: ${syncedOrder.createdAt}, firstSyncedAt: ${syncedOrder.firstSyncedAt}');
+        debugPrint('📊 [BQ Type 2]   syncDelay: ${syncDelay}ms');
+      }
     } else if (syncedOrder.syncStatus == SyncStatus.synced) {
       debugPrint('📊 [BQ Type 2] Order created ONLINE and synced - userId: $userId, orderId: ${syncedOrder.id}, syncDelay: 0ms');
     }

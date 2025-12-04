@@ -50,10 +50,15 @@ class OrdersSyncService {
       if (isOnline && _wasOffline && _currentUserId != null) {
         debugPrint('🌐 [OrdersSync] Connection restored! Triggering immediate order sync...');
         _wasOffline = false;
-        await pushPendingOrders(_currentUserId!);
+        
+        // Push pending orders to Firestore
+        final syncedCount = await pushPendingOrders(_currentUserId!);
+        if (syncedCount > 0) {
+          debugPrint('✅ [OrdersSync] Synced $syncedCount pending orders to Firestore');
+        }
       } else if (!isOnline) {
         _wasOffline = true;
-        debugPrint('📴 [OrdersSync] Connection lost - will sync when restored');
+        debugPrint('📴 [OrdersSync] Connection lost - will queue and sync when restored');
       }
     });
     
@@ -273,13 +278,17 @@ class OrdersSyncService {
     required String pharmacyAddress,
     bool syncImmediately = true,
   }) async {
-    debugPrint('📥 [OrdersSync] Adding order to cache: ${order.id}');
+    debugPrint('📥 [OrdersQueue] Adding order to cache: ${order.id} (syncStatus: ${order.syncStatus})');
     
     // Enrich order with cached pharmacy data for offline display
     final enrichedOrder = order.copyWith(
       cachedPharmacyName: pharmacyName,
       cachedPharmacyAddress: pharmacyAddress,
     );
+    
+    // Cache medicines for this order (for later sync)
+    await _cache.cacheMedicinesForOrder(order.id, medicines);
+    debugPrint('💾 [OrdersQueue] Cached ${medicines.length} medicines for order ${order.id}');
     
     // Load current cached orders
     final currentOrders = await _cache.getCachedOrders(userId, ignoreExpiry: true) ?? [];
@@ -293,13 +302,13 @@ class OrdersSyncService {
     // Update UserSession for immediate UI update
     UserSession().currentPedidos.value = updatedOrders;
     
-    debugPrint('✅ [OrdersSync] Order added to cache (${updatedOrders.length} total orders)');
+    debugPrint('✅ [OrdersQueue] Order added to cache (${updatedOrders.length} total orders)');
     
     // Try to sync to Firestore if online and requested
     if (syncImmediately) {
       final isOnline = await _connectivity.checkConnectivity();
       if (isOnline) {
-        debugPrint('🌐 [OrdersSync] Attempting immediate sync for order: ${order.id}');
+        debugPrint('🌐 [OrdersQueue] Online - attempting immediate sync for order ${order.id}');
         try {
           final syncedOrder = await _pushOrderToFirestore(
             order: enrichedOrder,
@@ -315,13 +324,15 @@ class OrdersSyncService {
             UserSession().currentPedidos.value = updatedOrders;
           }
           
+          debugPrint('✅ [OrdersQueue] Order ${order.id} synced immediately to Firestore');
           return syncedOrder;
         } catch (e) {
-          debugPrint('⚠️ [OrdersSync] Immediate sync failed, order remains pending: $e');
+          debugPrint('❌ [OrdersQueue] Immediate sync failed for order ${order.id}: $e');
+          debugPrint('📥 [OrdersQueue] Order queued for later sync (syncStatus: pending)');
           // Return original order with pending status (already in cache)
         }
       } else {
-        debugPrint('📴 [OrdersSync] Offline - order will sync when connection returns');
+        debugPrint('📴 [OrdersQueue] Offline - order ${order.id} queued for sync when online (syncStatus: pending)');
       }
     }
     
@@ -338,6 +349,8 @@ class OrdersSyncService {
     required List<Map<String, dynamic>> medicines,
   }) async {
     final now = DateTime.now();
+    
+    debugPrint('📤 [OrdersQueue] Pushing order ${order.id} to Firestore with ${medicines.length} medicines...');
     
     // Create order in Firestore
     await _facade.createPedido(order, userId: userId);
@@ -367,7 +380,7 @@ class OrdersSyncService {
           .set(medicamento.toMap());
     }
     
-    debugPrint('✅ [OrdersSync] Order synced to Firestore: ${order.id}');
+    debugPrint('✅ [OrdersQueue] Order ${order.id} synced to Firestore with ${medicines.length} medicines');
     
     // Return order with updated sync metadata
     return order.copyWith(
@@ -381,12 +394,12 @@ class OrdersSyncService {
   /// Called when connectivity returns or manually triggered
   /// Returns the number of orders successfully synced
   Future<int> pushPendingOrders(String userId) async {
-    debugPrint('🔄 [OrdersSync] Pushing pending orders for user: $userId');
+    debugPrint('🔄 [OrdersQueue] Pushing pending orders for user: $userId');
     
     // Check connectivity first
     final isOnline = await _connectivity.checkConnectivity();
     if (!isOnline) {
-      debugPrint('📴 [OrdersSync] Offline - cannot push pending orders');
+      debugPrint('📴 [OrdersQueue] Offline - cannot push pending orders');
       return 0;
     }
     
@@ -397,24 +410,46 @@ class OrdersSyncService {
     final pendingOrders = cachedOrders.where((o) => o.syncStatus == SyncStatus.pending).toList();
     
     if (pendingOrders.isEmpty) {
-      debugPrint('✅ [OrdersSync] No pending orders to sync');
+      debugPrint('✅ [OrdersQueue] No pending orders to sync');
       return 0;
     }
     
-    debugPrint('🔄 [OrdersSync] Found ${pendingOrders.length} pending orders to sync');
+    debugPrint('🔄 [OrdersQueue] Found ${pendingOrders.length} pending orders to sync');
     
     int syncedCount = 0;
     final updatedOrders = List<Pedido>.from(cachedOrders);
     
     for (final order in pendingOrders) {
       try {
-        // Note: We need to get medicines from cache or skip for now
-        // In a production system, medicines would also be cached with the order
-        // For now, we'll mark the order as synced without medicines (they were already created in payment flow)
+        debugPrint('📤 [OrdersQueue] Syncing order ${order.id}...');
         
-        // Create just the order document in Firestore (medicines were saved during payment)
-        await _facade.createPedido(order, userId: userId);
+        // Retrieve cached medicines for this order
+        final medicines = await _cache.getCachedMedicinesForOrder(order.id);
         
+        if (medicines == null || medicines.isEmpty) {
+          debugPrint('⚠️ [OrdersQueue] No cached medicines found for order ${order.id} - creating order without medicines');
+          // Create order without medicines (edge case - should not happen in normal flow)
+          await _facade.createPedido(order, userId: userId);
+        } else {
+          // Sync order with medicines using _pushOrderToFirestore
+          final syncedOrder = await _pushOrderToFirestore(
+            order: order,
+            userId: userId,
+            medicines: medicines,
+          );
+          
+          // Update in the list
+          final index = updatedOrders.indexWhere((o) => o.id == order.id);
+          if (index != -1) {
+            updatedOrders[index] = syncedOrder;
+          }
+          
+          syncedCount++;
+          debugPrint('✅ [OrdersQueue] Order ${order.id} synced successfully (${syncedCount}/${pendingOrders.length})');
+          continue;
+        }
+        
+        // Fallback: mark as synced even without medicines
         final now = DateTime.now();
         final syncedOrder = order.copyWith(
           syncStatus: SyncStatus.synced,
@@ -428,9 +463,9 @@ class OrdersSyncService {
         }
         
         syncedCount++;
-        debugPrint('✅ [OrdersSync] Synced order: ${order.id}');
+        debugPrint('✅ [OrdersQueue] Order ${order.id} synced (without medicines)');
       } catch (e) {
-        debugPrint('❌ [OrdersSync] Failed to sync order ${order.id}: $e');
+        debugPrint('❌ [OrdersQueue] Failed to sync order ${order.id}: $e');
         
         // Mark as failed
         final index = updatedOrders.indexWhere((o) => o.id == order.id);
@@ -444,7 +479,7 @@ class OrdersSyncService {
     if (syncedCount > 0 || updatedOrders.any((o) => o.syncStatus == SyncStatus.failed)) {
       await _cache.cacheOrders(userId, updatedOrders);
       UserSession().currentPedidos.value = updatedOrders;
-      debugPrint('✅ [OrdersSync] Updated cache with sync results (${syncedCount} synced)');
+      debugPrint('✅ [OrdersQueue] Updated cache with sync results (${syncedCount}/${pendingOrders.length} synced)');
     }
     
     return syncedCount;
