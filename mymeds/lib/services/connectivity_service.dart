@@ -38,11 +38,12 @@ class ConnectivityService {
     _currentConnectionType = _mapResultToConnectionType(results);
 
     // Listen to connectivity changes
+    // Use asBroadcastStream() to allow multiple listeners
     _connectionStream = _connectivity.onConnectivityChanged.map((results) {
       _currentConnectionType = _mapResultToConnectionType(results);
       debugPrint('🌐 Connectivity changed: $_currentConnectionType');
       return _currentConnectionType;
-    });
+    }).asBroadcastStream();
   }
 
   /// Map ConnectivityResult(s) to ConnectionType

@@ -45,6 +45,8 @@ class PaymentProcessingService {
   static const int _dbVersion = 1;
 
   bool _isInitialized = false;
+  StreamSubscription<ConnectionType>? _connectivitySubscription;
+  bool _wasOffline = false; // Track previous offline state
 
   /// Initialize the service
   Future<void> init() async {
@@ -92,7 +94,7 @@ class PaymentProcessingService {
       )
     ''');
 
-    // Sync queue table
+    // Sync queue table for payments
     await db.execute('''
       CREATE TABLE $_syncQueueTable (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,7 +110,44 @@ class PaymentProcessingService {
       )
     ''');
 
-    debugPrint('💳 PaymentProcessingService: Database created');
+    // Facturas (bills) table
+    await db.execute('''
+      CREATE TABLE facturas (
+        id TEXT PRIMARY KEY,
+        paymentId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        invoiceNumber TEXT NOT NULL,
+        localPdfPath TEXT NOT NULL,
+        pdfUrl TEXT,
+        storageRef TEXT,
+        status TEXT NOT NULL,
+        syncedToCloud INTEGER DEFAULT 0,
+        retryCount INTEGER DEFAULT 0,
+        syncedAt INTEGER,
+        createdAt INTEGER NOT NULL,
+        metadata TEXT,
+        FOREIGN KEY (paymentId) REFERENCES $_paymentsTable (id)
+      )
+    ''');
+
+    // Factura sync queue table
+    await db.execute('''
+      CREATE TABLE factura_sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        facturaId TEXT NOT NULL,
+        paymentId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        status TEXT NOT NULL,
+        retryCount INTEGER DEFAULT 0,
+        lastAttempt INTEGER,
+        errorMessage TEXT,
+        createdAt INTEGER NOT NULL,
+        FOREIGN KEY (facturaId) REFERENCES facturas (id)
+      )
+    ''');
+
+    debugPrint('💳 PaymentProcessingService: Database created with factura tables');
   }
 
   /// Get database instance
@@ -461,21 +500,34 @@ class PaymentProcessingService {
 /// 
 /// Now integrates with OrdersSyncService to push pending orders
 void _startSyncListener() {
-  // Listen to connectivity changes
+  // Cancel existing subscription if any
+  _connectivitySubscription?.cancel();
+  
+  // Listen to connectivity changes - IMMEDIATE sync on reconnection
+  _connectivitySubscription = _connectivity.connectionStream.listen((connectionType) async {
+    final isOnline = connectionType != ConnectionType.none;
+    
+    // Only sync when transitioning from offline to online
+    if (isOnline && _wasOffline) {
+      debugPrint('🌐 [PaymentSync] Connection restored! Triggering immediate sync...');
+      _wasOffline = false;
+      await _processSyncQueue();
+    } else if (!isOnline) {
+      _wasOffline = true;
+      debugPrint('📴 [PaymentSync] Connection lost - will sync when restored');
+    }
+  });
+  
+  // Also keep periodic timer as backup (every 5 minutes)
   Timer.periodic(const Duration(minutes: 5), (timer) async {
     final isOnline = await _connectivity.checkConnectivity();
     if (isOnline) {
-      debugPrint('🔄 Connection available, processing sync queue...');
+      debugPrint('⏰ [PaymentSync] Periodic sync check...');
       await _processSyncQueue();
-      
-      // Also trigger pending order sync (this is the key integration!)
-      // Note: We don't have userId here, so we rely on OrdersView to trigger this
-      // when connectivity returns. But we log it for visibility.
-      debugPrint('🔄 Connectivity returned - OrdersView will trigger pending order sync');
     }
   });
 
-  debugPrint('👂 Sync listener started');
+  debugPrint('👂 Payment sync listener started (connectivity + periodic)');
 }  /// Process pending sync queue
   Future<void> _processSyncQueue() async {
     try {
@@ -717,5 +769,12 @@ void _startSyncListener() {
       debugPrint('❌ Error fetching bill: $e');
       return null;
     }
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _database?.close();
+    debugPrint('🗑️ PaymentProcessingService disposed');
   }
 }

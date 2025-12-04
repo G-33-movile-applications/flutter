@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/pedido.dart';
@@ -25,6 +26,39 @@ class OrdersSyncService {
   final AppRepositoryFacade _facade = AppRepositoryFacade();
   final OrdersCacheService _cache = OrdersCacheService();
   final ConnectivityService _connectivity = ConnectivityService();
+  
+  StreamSubscription<ConnectionType>? _connectivitySubscription;
+  String? _currentUserId; // Track current user for auto-sync
+  bool _isInitialized = false;
+  bool _wasOffline = false; // Track previous offline state
+  
+  /// Initialize the service with connectivity listener
+  Future<void> init(String userId) async {
+    if (_isInitialized && _currentUserId == userId) return;
+    
+    _currentUserId = userId;
+    _isInitialized = true;
+    
+    // Cancel existing subscription
+    _connectivitySubscription?.cancel();
+    
+    // Listen to connectivity changes - IMMEDIATE sync on reconnection
+    _connectivitySubscription = _connectivity.connectionStream.listen((connectionType) async {
+      final isOnline = connectionType != ConnectionType.none;
+      
+      // Only sync when transitioning from offline to online
+      if (isOnline && _wasOffline && _currentUserId != null) {
+        debugPrint('🌐 [OrdersSync] Connection restored! Triggering immediate order sync...');
+        _wasOffline = false;
+        await pushPendingOrders(_currentUserId!);
+      } else if (!isOnline) {
+        _wasOffline = true;
+        debugPrint('📴 [OrdersSync] Connection lost - will sync when restored');
+      }
+    });
+    
+    debugPrint('👂 Orders sync listener started (connectivity)');
+  }
   
   /// Load orders with offline-first strategy
   /// 
@@ -414,5 +448,11 @@ class OrdersSyncService {
     }
     
     return syncedCount;
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    debugPrint('🗑️ OrdersSyncService disposed');
   }
 }

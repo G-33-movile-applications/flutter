@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -9,6 +10,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:barcode/barcode.dart' as barcode;
 import 'package:open_file/open_file.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as path_lib;
 import '../models/factura.dart';
 import '../models/pago.dart';
 import '../services/connectivity_service.dart';
@@ -40,6 +43,16 @@ class BillGeneratorService {
 
   String? _billsDirectory;
   bool _isInitialized = false;
+  
+  // Database for factura persistence
+  Database? _database;
+  static const String _facturasTable = 'facturas';
+  static const String _syncQueueTable = 'factura_sync_queue';
+  
+  // Sync timer
+  Timer? _syncTimer;
+  StreamSubscription<ConnectionType>? _connectivitySubscription;
+  bool _wasOffline = false; // Track previous offline state
 
   /// Initialize the service
   Future<void> init() async {
@@ -56,12 +69,148 @@ class BillGeneratorService {
         debugPrint('📁 Created bills directory: $_billsDirectory');
       }
 
+      // Initialize database
+      await _initDatabase();
+      
+      // Load cache from database
+      await _loadCacheFromDatabase();
+      
+      // Start sync timer for offline bills
+      _startSyncTimer();
+
       _isInitialized = true;
       debugPrint('📄 BillGeneratorService: Initialized');
     } catch (e) {
       debugPrint('❌ BillGeneratorService: Init failed: $e');
       rethrow;
     }
+  }
+  
+  /// Initialize SQLite database - uses same database as PaymentProcessingService
+  Future<void> _initDatabase() async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final dbFile = path_lib.join(dbPath, 'payments.db'); // Use same DB as PaymentProcessingService
+      
+      _database = await openDatabase(
+        dbFile,
+        version: 1,
+        onCreate: (db, version) async {
+          // Tables should already be created by PaymentProcessingService
+          // This onCreate won't run if the database already exists
+          debugPrint('💾 BillGeneratorService: Database already exists');
+        },
+        onOpen: (db) async {
+          // Ensure factura tables exist on open
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS $_facturasTable (
+              id TEXT PRIMARY KEY,
+              paymentId TEXT NOT NULL,
+              orderId TEXT NOT NULL,
+              userId TEXT NOT NULL,
+              invoiceNumber TEXT NOT NULL,
+              localPdfPath TEXT NOT NULL,
+              pdfUrl TEXT,
+              storageRef TEXT,
+              status TEXT NOT NULL,
+              syncedToCloud INTEGER DEFAULT 0,
+              retryCount INTEGER DEFAULT 0,
+              syncedAt INTEGER,
+              createdAt INTEGER NOT NULL,
+              metadata TEXT,
+              UNIQUE(paymentId)
+            )
+          ''');
+          
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS $_syncQueueTable (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              facturaId TEXT NOT NULL,
+              paymentId TEXT NOT NULL,
+              orderId TEXT NOT NULL,
+              status TEXT NOT NULL,
+              retryCount INTEGER DEFAULT 0,
+              lastAttempt INTEGER,
+              errorMessage TEXT,
+              createdAt INTEGER NOT NULL,
+              FOREIGN KEY (facturaId) REFERENCES $_facturasTable (id)
+            )
+          ''');
+          
+          debugPrint('💾 Factura tables ensured in payments.db');
+        },
+      );
+      
+      debugPrint('💾 Bills database initialized (shared with payments)');
+    } catch (e) {
+      debugPrint('❌ Database init failed: $e');
+      rethrow;
+    }
+  }
+  
+  /// Load cache from database on startup
+  Future<void> _loadCacheFromDatabase() async {
+    try {
+      final db = _database;
+      if (db == null) return;
+      
+      final results = await db.query(
+        _facturasTable,
+        columns: ['paymentId', 'localPdfPath'],
+        where: 'localPdfPath IS NOT NULL AND localPdfPath != ""',
+      );
+      
+      for (final row in results) {
+        final paymentId = row['paymentId'] as String;
+        final localPath = row['localPdfPath'] as String;
+        final file = File(localPath);
+        
+        if (await file.exists()) {
+          _lruCache[paymentId] = localPath;
+          _cacheAccessOrder.add(paymentId);
+          
+          // Maintain max cache size
+          if (_cacheAccessOrder.length > _maxCacheSize) {
+            final removed = _cacheAccessOrder.removeAt(0);
+            _lruCache.remove(removed);
+          }
+        }
+      }
+      
+      debugPrint('💾 Loaded ${_lruCache.length} bills into LRU cache');
+    } catch (e) {
+      debugPrint('⚠️ Failed to load cache from database: $e');
+    }
+  }
+  
+  /// Start periodic sync timer for offline bills
+  void _startSyncTimer() {
+    // Cancel existing subscriptions
+    _syncTimer?.cancel();
+    _connectivitySubscription?.cancel();
+    
+    // Listen to connectivity changes - IMMEDIATE sync on reconnection
+    _connectivitySubscription = _connectivity.connectionStream.listen((connectionType) async {
+      final isOnline = connectionType != ConnectionType.none;
+      
+      // Only sync when transitioning from offline to online
+      if (isOnline && _wasOffline) {
+        debugPrint('🌐 [BillSync] Connection restored! Triggering immediate bill sync...');
+        _wasOffline = false;
+        await _processSyncQueue();
+      } else if (!isOnline) {
+        _wasOffline = true;
+        debugPrint('📴 [BillSync] Connection lost - will sync when restored');
+      }
+    });
+    
+    // Also keep periodic timer as backup (every 5 minutes)
+    _syncTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      debugPrint('⏰ [BillSync] Periodic sync check...');
+      _processSyncQueue();
+    });
+    
+    debugPrint('👂 Bill sync listener started (connectivity + periodic)');
   }
 
   /// Generate bill PDF for payment
@@ -99,13 +248,26 @@ class BillGeneratorService {
 
       // Create factura metadata
       final factura = await _createFacturaMetadata(payment, orderDetails, localPath);
+      
+      // Save factura to local database
+      await _saveFacturaLocally(factura);
 
       // Try to upload to Firebase Storage if online
       final isOnline = await _connectivity.checkConnectivity();
+      bool uploadSuccess = false;
+      
       if (isOnline) {
-        await _uploadToFirebase(factura, localPath);
+        uploadSuccess = await _uploadToFirebase(factura, localPath);
+        
+        if (!uploadSuccess) {
+          // Upload failed, queue for retry
+          await _addToSyncQueue(factura);
+          debugPrint('⚠️ Upload failed, bill queued for retry');
+        }
       } else {
-        debugPrint('📴 Offline: Bill will sync later');
+        // Offline, queue for later sync
+        await _addToSyncQueue(factura);
+        debugPrint('📴 Offline: Bill queued for sync');
       }
 
       debugPrint('✅ Bill generated: $localPath');
@@ -115,6 +277,7 @@ class BillGeneratorService {
         'localPath': localPath,
         'facturaId': factura.id,
         'fromCache': false,
+        'uploaded': uploadSuccess,
       };
     } catch (e) {
       debugPrint('❌ Bill generation failed: $e');
@@ -508,6 +671,7 @@ class BillGeneratorService {
       updatedAt: now,
       syncedAt: null,
       userId: payment.userId,
+      paymentId: payment.id,
       orderId: payment.orderId,
       pageCount: 1, // Would be set by PDF generation
       fileSize: fileSize,
@@ -523,7 +687,8 @@ class BillGeneratorService {
   }
 
   /// Upload to Firebase Storage and sync metadata (EVENTUAL CONNECTIVITY)
-  Future<void> _uploadToFirebase(Factura factura, String localPath) async {
+  /// Returns true if upload succeeded, false otherwise
+  Future<bool> _uploadToFirebase(Factura factura, String localPath) async {
     try {
       final file = File(localPath);
       if (!await file.exists()) {
@@ -558,22 +723,25 @@ class BillGeneratorService {
           .set(updatedFactura.toMap());
 
       debugPrint('🔥 Factura metadata synced to Firestore: ${factura.id}');
+      
+      // Update local database
+      await _updateFacturaLocally(updatedFactura);
+      
+      return true;
     } catch (e) {
       debugPrint('❌ Firebase upload failed: $e');
-      // Save failed status to Firestore
+      
+      // Update local factura with failed status
       final failedFactura = factura.copyWith(
         status: 'failed',
         errorMessage: e.toString(),
         retryCount: factura.retryCount + 1,
         updatedAt: DateTime.now(),
       );
-
-      await _firestore
-          .collection('usuarios')
-          .doc(factura.userId)
-          .collection('facturas')
-          .doc(factura.id)
-          .set(failedFactura.toMap());
+      
+      await _updateFacturaLocally(failedFactura);
+      
+      return false;
     }
   }
 
@@ -663,6 +831,7 @@ class BillGeneratorService {
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
             userId: userId,
+            paymentId: paymentId,
             orderId: paymentId,
             pageCount: 1,
             fileSize: await file.length(),
@@ -672,12 +841,26 @@ class BillGeneratorService {
         }
       }
 
-      // Query Firestore for bill metadata
+      // First try local database
+      final localFactura = await _getFacturaFromDatabase(paymentId);
+      if (localFactura != null) {
+        // Check if local file exists
+        if (localFactura.localPdfPath.isNotEmpty) {
+          final file = File(localFactura.localPdfPath);
+          if (await file.exists()) {
+            _addToCache(paymentId, localFactura.localPdfPath);
+            debugPrint('💾 Bill found in local database: $paymentId');
+            return localFactura;
+          }
+        }
+      }
+      
+      // Query Firestore for bill metadata (FIX: use paymentId field)
       final querySnapshot = await _firestore
           .collection('usuarios')
           .doc(userId)
           .collection('facturas')
-          .where('orderId', isEqualTo: paymentId)
+          .where('paymentId', isEqualTo: paymentId)
           .limit(1)
           .get();
 
@@ -703,5 +886,247 @@ class BillGeneratorService {
       debugPrint('❌ Error getting bill by payment ID: $e');
       return null;
     }
+  }
+  
+  /// Save factura to local database
+  Future<void> _saveFacturaLocally(Factura factura) async {
+    try {
+      final db = _database;
+      if (db == null) return;
+      
+      await db.insert(
+        _facturasTable,
+        {
+          'id': factura.id,
+          'paymentId': factura.paymentId,
+          'orderId': factura.orderId,
+          'userId': factura.userId,
+          'invoiceNumber': factura.invoiceNumber,
+          'localPdfPath': factura.localPdfPath,
+          'pdfUrl': factura.pdfUrl,
+          'storageRef': factura.storageRef,
+          'status': factura.status,
+          'syncedToCloud': factura.syncedToCloud ? 1 : 0,
+          'retryCount': factura.retryCount,
+          'syncedAt': factura.syncedAt,
+          'createdAt': factura.createdAt.millisecondsSinceEpoch,
+          'metadata': json.encode(factura.metadata),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      debugPrint('💾 Factura saved locally: ${factura.id}');
+    } catch (e) {
+      debugPrint('❌ Failed to save factura locally: $e');
+    }
+  }
+  
+  /// Update factura in local database
+  Future<void> _updateFacturaLocally(Factura factura) async {
+    try {
+      final db = _database;
+      if (db == null) return;
+      
+      await db.update(
+        _facturasTable,
+        {
+          'pdfUrl': factura.pdfUrl,
+          'storageRef': factura.storageRef,
+          'status': factura.status,
+          'syncedToCloud': factura.syncedToCloud ? 1 : 0,
+          'retryCount': factura.retryCount,
+          'syncedAt': factura.syncedAt,
+          'metadata': json.encode(factura.metadata),
+        },
+        where: 'id = ?',
+        whereArgs: [factura.id],
+      );
+      
+      debugPrint('💾 Factura updated locally: ${factura.id}');
+    } catch (e) {
+      debugPrint('❌ Failed to update factura locally: $e');
+    }
+  }
+  
+  /// Get factura from local database by paymentId
+  Future<Factura?> _getFacturaFromDatabase(String paymentId) async {
+    try {
+      final db = _database;
+      if (db == null) return null;
+      
+      final results = await db.query(
+        _facturasTable,
+        where: 'paymentId = ?',
+        whereArgs: [paymentId],
+        limit: 1,
+      );
+      
+      if (results.isEmpty) return null;
+      
+      final row = results.first;
+      return Factura(
+        id: row['id'] as String,
+        invoiceNumber: row['invoiceNumber'] as String,
+        localPdfPath: row['localPdfPath'] as String,
+        pdfUrl: row['pdfUrl'] as String?,
+        storageRef: row['storageRef'] as String?,
+        orderSnapshot: {},
+        status: row['status'] as String,
+        syncedToCloud: (row['syncedToCloud'] as int) == 1,
+        retryCount: row['retryCount'] as int,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(row['createdAt'] as int),
+        updatedAt: DateTime.now(),
+        syncedAt: row['syncedAt'] as int?,
+        userId: row['userId'] as String,
+        paymentId: row['paymentId'] as String,
+        orderId: row['orderId'] as String,
+        pageCount: 1,
+        fileSize: 0,
+        generatedAt: row['createdAt'] as int,
+        metadata: json.decode(row['metadata'] as String? ?? '{}'),
+      );
+    } catch (e) {
+      debugPrint('❌ Failed to get factura from database: $e');
+      return null;
+    }
+  }
+  
+  /// Add factura to sync queue
+  Future<void> _addToSyncQueue(Factura factura) async {
+    try {
+      final db = _database;
+      if (db == null) return;
+      
+      await db.insert(
+        _syncQueueTable,
+        {
+          'facturaId': factura.id,
+          'paymentId': factura.paymentId,
+          'orderId': factura.orderId,
+          'status': 'pending',
+          'retryCount': 0,
+          'lastAttempt': null,
+          'errorMessage': null,
+          'createdAt': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      debugPrint('📋 Factura added to sync queue: ${factura.id}');
+    } catch (e) {
+      debugPrint('❌ Failed to add factura to sync queue: $e');
+    }
+  }
+  
+  /// Process sync queue for offline bills
+  Future<void> _processSyncQueue() async {
+    try {
+      final db = _database;
+      if (db == null) return;
+      
+      // Check connectivity
+      final isOnline = await _connectivity.checkConnectivity();
+      if (!isOnline) {
+        debugPrint('📴 Offline: Skipping bill sync');
+        return;
+      }
+      
+      // Get pending bills from queue
+      final pendingBills = await db.query(
+        _syncQueueTable,
+        where: 'status = ? AND retryCount < ?',
+        whereArgs: ['pending', 5], // Max 5 retries
+        orderBy: 'createdAt ASC',
+        limit: 10, // Process 10 at a time
+      );
+      
+      if (pendingBills.isEmpty) {
+        return;
+      }
+      
+      debugPrint('🔄 Processing ${pendingBills.length} pending bills');
+      
+      for (final queueItem in pendingBills) {
+        final facturaId = queueItem['facturaId'] as String;
+        final queueId = queueItem['id'] as int;
+        
+        // Get factura from database
+        final facturaResults = await db.query(
+          _facturasTable,
+          where: 'id = ?',
+          whereArgs: [facturaId],
+          limit: 1,
+        );
+        
+        if (facturaResults.isEmpty) {
+          // Factura not found, remove from queue
+          await db.delete(_syncQueueTable, where: 'id = ?', whereArgs: [queueId]);
+          continue;
+        }
+        
+        final facturaData = facturaResults.first;
+        final localPath = facturaData['localPdfPath'] as String;
+        
+        // Recreate Factura object
+        final factura = Factura(
+          id: facturaData['id'] as String,
+          invoiceNumber: facturaData['invoiceNumber'] as String,
+          localPdfPath: localPath,
+          pdfUrl: facturaData['pdfUrl'] as String?,
+          storageRef: facturaData['storageRef'] as String?,
+          orderSnapshot: {},
+          status: facturaData['status'] as String,
+          syncedToCloud: (facturaData['syncedToCloud'] as int) == 1,
+          retryCount: facturaData['retryCount'] as int,
+          createdAt: DateTime.fromMillisecondsSinceEpoch(facturaData['createdAt'] as int),
+          updatedAt: DateTime.now(),
+          syncedAt: facturaData['syncedAt'] as int?,
+          userId: facturaData['userId'] as String,
+          paymentId: facturaData['paymentId'] as String,
+          orderId: facturaData['orderId'] as String,
+          pageCount: 1,
+          fileSize: 0,
+          generatedAt: facturaData['createdAt'] as int,
+          metadata: json.decode(facturaData['metadata'] as String? ?? '{}'),
+        );
+        
+        // Try to upload
+        final success = await _uploadToFirebase(factura, localPath);
+        
+        if (success) {
+          // Remove from queue
+          await db.delete(_syncQueueTable, where: 'id = ?', whereArgs: [queueId]);
+          debugPrint('✅ Bill synced successfully: ${factura.id}');
+        } else {
+          // Update retry count
+          await db.update(
+            _syncQueueTable,
+            {
+              'retryCount': (queueItem['retryCount'] as int) + 1,
+              'lastAttempt': DateTime.now().millisecondsSinceEpoch,
+              'errorMessage': 'Upload failed',
+            },
+            where: 'id = ?',
+            whereArgs: [queueId],
+          );
+          debugPrint('⚠️ Bill sync failed, will retry: ${factura.id}');
+        }
+        
+        // Small delay between uploads
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
+      debugPrint('✅ Sync queue processing complete');
+    } catch (e) {
+      debugPrint('❌ Error processing sync queue: $e');
+    }
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    _syncTimer?.cancel();
+    _connectivitySubscription?.cancel();
+    _database?.close();
+    debugPrint('🗑️ BillGeneratorService disposed');
   }
 }
