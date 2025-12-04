@@ -15,9 +15,12 @@ import 'services/storage_service.dart';
 import 'services/auth_service.dart';
 import 'services/sync_queue_service.dart';
 import 'services/orders_cache_service.dart';
+import 'services/orders_sync_service.dart';
 import 'services/prescriptions_cache_service.dart';
 import 'services/reminders_cache_service.dart';
 import 'services/favorites_service.dart';
+import 'services/payment_processing_service.dart';
+import 'services/bill_generator_service.dart';
 import 'services/lru_prescription_cache.dart';
 import 'services/prescription_image_storage.dart';
 import 'services/autofill_service.dart';
@@ -108,6 +111,36 @@ Future<void> main() async {
       debugPrint('✅ Active reminders rescheduled successfully');
     } catch (e) {
       debugPrint('❌ Error rescheduling reminders: $e');
+      // Non-critical - app can continue
+    }
+    
+    // Initialize OrdersSyncService with connectivity listener for auto-sync
+    debugPrint('🔄 Initializing OrdersSyncService with connectivity listener');
+    try {
+      await OrdersSyncService().init(userId);
+      debugPrint('✅ OrdersSyncService initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Error initializing OrdersSyncService: $e');
+      // Non-critical - app can continue
+    }
+    
+    // Initialize PaymentProcessingService with connectivity listener for auto-sync
+    debugPrint('🔄 Initializing PaymentProcessingService with connectivity listener');
+    try {
+      await PaymentProcessingService().init();
+      debugPrint('✅ PaymentProcessingService initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Error initializing PaymentProcessingService: $e');
+      // Non-critical - app can continue
+    }
+    
+    // Initialize BillGeneratorService with connectivity listener for auto-sync
+    debugPrint('🔄 Initializing BillGeneratorService with connectivity listener');
+    try {
+      await BillGeneratorService().init();
+      debugPrint('✅ BillGeneratorService initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Error initializing BillGeneratorService: $e');
       // Non-critical - app can continue
     }
   }

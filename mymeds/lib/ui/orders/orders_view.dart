@@ -157,10 +157,40 @@ class _OrdersViewState extends State<OrdersView> with AutomaticKeepAliveClientMi
         
         // Auto-sync when coming back online
         if (isOnline) {
-          _handleRefresh();
+          _handleConnectionRestored();
         }
       }
     });
+  }
+  
+  /// Handle connection restoration - sync pending orders and refresh
+  Future<void> _handleConnectionRestored() async {
+    final userId = UserSession().currentUid;
+    if (userId == null) return;
+    
+    debugPrint('🌐 [OrdersView] Connection restored - syncing pending orders');
+    
+    try {
+      // Push pending orders first
+      final syncedCount = await _syncService.pushPendingOrders(userId);
+      if (syncedCount > 0) {
+        debugPrint('✅ [OrdersView] Synced $syncedCount pending orders');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ $syncedCount pedido${syncedCount > 1 ? 's' : ''} sincronizado${syncedCount > 1 ? 's' : ''}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [OrdersView] Error syncing pending orders: $e');
+    }
+    
+    // Then refresh to get latest data
+    await _handleRefresh();
   }
   
   Future<void> _handleRefresh() async {

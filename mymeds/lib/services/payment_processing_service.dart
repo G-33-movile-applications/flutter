@@ -8,9 +8,11 @@ import '../models/pago.dart';
 import '../models/pedido.dart';
 import '../models/medicamento_pedido.dart';
 import '../models/factura.dart';
+import '../models/adherence_event.dart'; // For SyncStatus enum
 import '../repositories/pedido_repository.dart';
 import '../services/connectivity_service.dart';
 import '../services/bill_generator_service.dart';
+import '../services/orders_sync_service.dart'; // For offline-first order sync
 
 /// Payment Processing Service
 /// 
@@ -32,6 +34,7 @@ class PaymentProcessingService {
 
   final PedidoRepository _pedidoRepo = PedidoRepository();
   final ConnectivityService _connectivity = ConnectivityService();
+  final OrdersSyncService _ordersSync = OrdersSyncService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final BillGeneratorService _billGenerator = BillGeneratorService();
 
@@ -42,6 +45,8 @@ class PaymentProcessingService {
   static const int _dbVersion = 1;
 
   bool _isInitialized = false;
+  StreamSubscription<ConnectionType>? _connectivitySubscription;
+  bool _wasOffline = false; // Track previous offline state
 
   /// Initialize the service
   Future<void> init() async {
@@ -89,7 +94,7 @@ class PaymentProcessingService {
       )
     ''');
 
-    // Sync queue table
+    // Sync queue table for payments
     await db.execute('''
       CREATE TABLE $_syncQueueTable (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +110,44 @@ class PaymentProcessingService {
       )
     ''');
 
-    debugPrint('💳 PaymentProcessingService: Database created');
+    // Facturas (bills) table
+    await db.execute('''
+      CREATE TABLE facturas (
+        id TEXT PRIMARY KEY,
+        paymentId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        invoiceNumber TEXT NOT NULL,
+        localPdfPath TEXT NOT NULL,
+        pdfUrl TEXT,
+        storageRef TEXT,
+        status TEXT NOT NULL,
+        syncedToCloud INTEGER DEFAULT 0,
+        retryCount INTEGER DEFAULT 0,
+        syncedAt INTEGER,
+        createdAt INTEGER NOT NULL,
+        metadata TEXT,
+        FOREIGN KEY (paymentId) REFERENCES $_paymentsTable (id)
+      )
+    ''');
+
+    // Factura sync queue table
+    await db.execute('''
+      CREATE TABLE factura_sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        facturaId TEXT NOT NULL,
+        paymentId TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        status TEXT NOT NULL,
+        retryCount INTEGER DEFAULT 0,
+        lastAttempt INTEGER,
+        errorMessage TEXT,
+        createdAt INTEGER NOT NULL,
+        FOREIGN KEY (facturaId) REFERENCES facturas (id)
+      )
+    ''');
+
+    debugPrint('💳 PaymentProcessingService: Database created with factura tables');
   }
 
   /// Get database instance
@@ -117,6 +159,13 @@ class PaymentProcessingService {
   }
 
   /// Process payment for prescription order
+  /// 
+  /// **OFFLINE-FIRST IMPLEMENTATION**:
+  /// - Creates order locally first (always)
+  /// - Adds to OrdersSyncService cache for immediate UI visibility
+  /// - Attempts immediate sync to Firestore if online
+  /// - If offline or sync fails, order remains in pending state
+  /// - Auto-syncs when connectivity returns via OrdersSyncService
   /// 
   /// Parameters:
   /// - userId: Current user ID
@@ -132,7 +181,7 @@ class PaymentProcessingService {
   /// - deliveryAddress: Delivery address (if home delivery)
   /// 
   /// Returns:
-  /// - Success: {success: true, paymentId, orderId, message}
+  /// - Success: {success: true, paymentId, orderId, billLocalPath, message}
   /// - Failure: {success: false, message}
   Future<Map<String, dynamic>> processPayment({
     required String userId,
@@ -148,23 +197,24 @@ class PaymentProcessingService {
     String? deliveryAddress,
   }) async {
     try {
-      debugPrint('💳 Processing payment: $total for prescription $prescriptionId');
+      debugPrint('💳 [Payment] Processing payment: \$$total for prescription $prescriptionId');
+      debugPrint('💳 [Payment] Delivery type: $deliveryType, method: $method');
 
-      // Mock payment processing (2 second delay)
+      // Step 1: Mock payment processing (2 second delay for UX realism)
       await Future.delayed(const Duration(seconds: 2));
 
-      // Generate IDs
+      // Step 2: Generate IDs
       final paymentId = 'PAY_${DateTime.now().millisecondsSinceEpoch}';
       final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
       final now = DateTime.now();
 
-      // Create prices map
+      // Step 3: Create prices map
       final pricesMap = <String, double>{};
       for (final med in medicines) {
         pricesMap[med['medicationId'] as String] = (med['pricePerUnit'] as num).toDouble();
       }
 
-      // Create payment object
+      // Step 4: Create payment object
       final payment = Pago(
         id: paymentId,
         userId: userId,
@@ -179,62 +229,61 @@ class PaymentProcessingService {
         status: 'completed',
       );
 
-      // Save payment locally (LOCAL STORAGE REQUIREMENT)
+      // Step 5: Save payment locally (LOCAL STORAGE REQUIREMENT)
       await _savePaymentLocally(payment);
+      debugPrint('💾 [Payment] Payment saved locally: $paymentId');
 
-      // Check connectivity
+      // Step 6: Check connectivity for offline-first order creation
       final isOnline = await _connectivity.checkConnectivity();
+      debugPrint('🌐 [Payment] Connectivity status: ${isOnline ? 'ONLINE' : 'OFFLINE'}');
 
+      // Step 7: Create order LOCALLY FIRST (offline-first pattern)
+      final localOrder = await _createOrderLocallyAndQueueSync(
+        payment: payment,
+        userId: userId,
+        prescriptionId: prescriptionId,
+        pharmacyName: pharmacyName,
+        pharmacyAddress: pharmacyAddress,
+        medicines: medicines,
+        deliveryType: deliveryType,
+        deliveryAddress: deliveryAddress,
+        isOnline: isOnline,
+      );
+      
+      debugPrint('✅ [Payment] Order created locally: ${localOrder.id} (syncStatus: ${localOrder.syncStatus})');
+
+      // Step 8: Update prescription paidAt timestamp (try even if offline, will sync later)
       if (isOnline) {
-        // Try to create order in Firestore immediately
         try {
-          await _createFirestoreOrder(
-            payment: payment,
-            prescriptionId: prescriptionId,
-            pharmacyName: pharmacyName,
-            pharmacyAddress: pharmacyAddress,
-            medicines: medicines,
-            deliveryType: deliveryType,
-            deliveryAddress: deliveryAddress,
-          );
-
-          // Update prescription paidAt timestamp
           await _updatePrescriptionPaidAt(userId, prescriptionId);
-
-          debugPrint('✅ Payment processed and synced immediately');
-
-          return {
-            'success': true,
-            'paymentId': paymentId,
-            'orderId': orderId,
-            'message': 'Payment successful!',
-          };
+          debugPrint('✅ [Payment] Prescription paidAt updated: $prescriptionId');
         } catch (e) {
-          debugPrint('⚠️ Online sync failed, queuing: $e');
-          // Queue for later sync
-          await _enqueueSyncOperation(payment, medicines, deliveryType, deliveryAddress, pharmacyName, pharmacyAddress);
-          
-          return {
-            'success': true,
-            'paymentId': paymentId,
-            'orderId': orderId,
-            'message': 'Payment successful! Order will sync when connection improves.',
-          };
+          debugPrint('⚠️ [Payment] Failed to update prescription paidAt (will retry): $e');
         }
-      } else {
-        // Offline: queue for sync (EVENTUAL CONNECTIVITY REQUIREMENT)
-        debugPrint('📴 Offline: Queuing payment for sync');
-        await _enqueueSyncOperation(payment, medicines, deliveryType, deliveryAddress, pharmacyName, pharmacyAddress);
-
-        return {
-          'success': true,
-          'paymentId': paymentId,
-          'orderId': orderId,
-          'message': 'Payment saved! Order will sync when you\'re back online.',
-        };
       }
-    } catch (e) {
-      debugPrint('❌ Payment processing failed: $e');
+
+      // Step 9: Determine success message based on sync status
+      String message;
+      if (localOrder.syncStatus == SyncStatus.synced) {
+        message = 'Payment successful! Order created.';
+      } else if (localOrder.syncStatus == SyncStatus.pending) {
+        message = 'Payment successful! Order will sync when you\'re back online.';
+      } else {
+        message = 'Payment successful! Order saved locally.';
+      }
+
+      debugPrint('✅ [Payment] Payment processed successfully');
+      
+      return {
+        'success': true,
+        'paymentId': paymentId,
+        'orderId': orderId,
+        'message': message,
+        'order': localOrder, // Return the order for further processing
+      };
+    } catch (e, stackTrace) {
+      debugPrint('❌ [Payment] Payment processing failed: $e');
+      debugPrint(stackTrace.toString());
       return {
         'success': false,
         'message': 'Payment failed: ${e.toString()}',
@@ -271,7 +320,90 @@ class PaymentProcessingService {
     debugPrint('💾 Payment saved locally: ${payment.id}');
   }
 
-  /// Create order in Firestore
+  /// Create order locally and queue for sync (OFFLINE-FIRST IMPLEMENTATION)
+  /// 
+  /// This is the core method that implements the offline-first pattern:
+  /// 1. Creates Pedido object with appropriate sync metadata
+  /// 2. Adds to OrdersSyncService cache (for immediate UI visibility)
+  /// 3. Attempts immediate sync to Firestore if online
+  /// 4. Returns order with correct syncStatus
+  /// 
+  /// The order is ALWAYS created locally first, ensuring the app works offline
+  Future<Pedido> _createOrderLocallyAndQueueSync({
+    required Pago payment,
+    required String userId,
+    required String prescriptionId,
+    required String pharmacyName,
+    required String pharmacyAddress,
+    required List<Map<String, dynamic>> medicines,
+    required String deliveryType,
+    String? deliveryAddress,
+    required bool isOnline,
+  }) async {
+    final now = DateTime.now();
+    
+    debugPrint('📦 [OrdersQueue] Creating order locally: ${payment.orderId}');
+    debugPrint('📦 [OrdersQueue] Order details: deliveryType=$deliveryType, isOnline=$isOnline, medicines=${medicines.length}');
+
+    // Step 1: Create Pedido with offline-first metadata
+    final order = Pedido(
+      id: payment.orderId,
+      prescripcionId: prescriptionId,
+      puntoFisicoId: payment.pharmacyId,
+      tipoEntrega: deliveryType,
+      direccionEntrega: deliveryAddress ?? pharmacyAddress,
+      estado: 'en_proceso', // Confirmed order status
+      fechaPedido: now,
+      fechaEntrega: null,
+      // Offline-first metadata
+      createdOffline: !isOnline, // Mark as offline-created if not online
+      createdAt: now,
+      firstSyncedAt: null, // Will be set when synced
+      syncSource: isOnline ? 'online-direct' : 'offline-queue',
+      syncStatus: SyncStatus.pending, // Start as pending, will be updated if sync succeeds
+    );
+
+    debugPrint('📦 [OrdersQueue] Order object created with syncStatus: ${order.syncStatus}, createdOffline: ${order.createdOffline}');
+
+    // Step 2: Add to OrdersSyncService cache
+    // This makes the order immediately visible in OrdersView
+    // and handles the sync attempt if online
+    final syncedOrder = await _ordersSync.addOrderToCache(
+      order: order,
+      userId: userId,
+      medicines: medicines,
+      pharmacyName: pharmacyName,
+      pharmacyAddress: pharmacyAddress,
+      syncImmediately: isOnline, // Only sync if online
+    );
+
+    debugPrint('📦 [OrdersQueue] Order added to cache with final syncStatus: ${syncedOrder.syncStatus}');
+    
+    // Log offline creation for BQ Type 2 analytics
+    if (syncedOrder.createdOffline) {
+      if (syncedOrder.syncStatus == SyncStatus.pending) {
+        debugPrint('📊 [BQ Type 2] Order created OFFLINE - queued for sync');
+        debugPrint('📊 [BQ Type 2]   userId: $userId, orderId: ${syncedOrder.id}');
+        debugPrint('📊 [BQ Type 2]   createdAt: ${syncedOrder.createdAt}, syncStatus: pending');
+      } else if (syncedOrder.syncStatus == SyncStatus.synced) {
+        final syncDelay = syncedOrder.firstSyncedAt!.difference(syncedOrder.createdAt).inMilliseconds;
+        debugPrint('📊 [BQ Type 2] Order created OFFLINE but synced immediately');
+        debugPrint('📊 [BQ Type 2]   userId: $userId, orderId: ${syncedOrder.id}');
+        debugPrint('📊 [BQ Type 2]   createdAt: ${syncedOrder.createdAt}, firstSyncedAt: ${syncedOrder.firstSyncedAt}');
+        debugPrint('📊 [BQ Type 2]   syncDelay: ${syncDelay}ms');
+      }
+    } else if (syncedOrder.syncStatus == SyncStatus.synced) {
+      debugPrint('📊 [BQ Type 2] Order created ONLINE and synced - userId: $userId, orderId: ${syncedOrder.id}, syncDelay: 0ms');
+    }
+
+    return syncedOrder;
+  }
+
+  /// Create order in Firestore (DEPRECATED - use OrdersSyncService.addOrderToCache instead)
+  /// 
+  /// This method is now handled by OrdersSyncService._pushOrderToFirestore
+  /// Kept for reference but should not be called directly
+  @Deprecated('Use OrdersSyncService.addOrderToCache instead')
   Future<void> _createFirestoreOrder({
     required Pago payment,
     required String prescriptionId,
@@ -375,17 +507,37 @@ class PaymentProcessingService {
   }
 
 /// Start background sync listener
+/// 
+/// Now integrates with OrdersSyncService to push pending orders
 void _startSyncListener() {
-  // Listen to connectivity changes
+  // Cancel existing subscription if any
+  _connectivitySubscription?.cancel();
+  
+  // Listen to connectivity changes - IMMEDIATE sync on reconnection
+  _connectivitySubscription = _connectivity.connectionStream.listen((connectionType) async {
+    final isOnline = connectionType != ConnectionType.none;
+    
+    // Only sync when transitioning from offline to online
+    if (isOnline && _wasOffline) {
+      debugPrint('🌐 [PaymentSync] Connection restored! Triggering immediate sync...');
+      _wasOffline = false;
+      await _processSyncQueue();
+    } else if (!isOnline) {
+      _wasOffline = true;
+      debugPrint('📴 [PaymentSync] Connection lost - will sync when restored');
+    }
+  });
+  
+  // Also keep periodic timer as backup (every 5 minutes)
   Timer.periodic(const Duration(minutes: 5), (timer) async {
     final isOnline = await _connectivity.checkConnectivity();
     if (isOnline) {
-      debugPrint('🔄 Connection available, processing sync queue...');
+      debugPrint('⏰ [PaymentSync] Periodic sync check...');
       await _processSyncQueue();
     }
   });
 
-  debugPrint('👂 Sync listener started');
+  debugPrint('👂 Payment sync listener started (connectivity + periodic)');
 }  /// Process pending sync queue
   Future<void> _processSyncQueue() async {
     try {
@@ -627,5 +779,12 @@ void _startSyncListener() {
       debugPrint('❌ Error fetching bill: $e');
       return null;
     }
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    _database?.close();
+    debugPrint('🗑️ PaymentProcessingService disposed');
   }
 }

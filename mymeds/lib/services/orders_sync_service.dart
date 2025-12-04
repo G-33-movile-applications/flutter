@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/pedido.dart';
+import '../models/medicamento_pedido.dart';
+import '../models/adherence_event.dart'; // For SyncStatus enum
 import '../facade/app_repository_facade.dart';
 import '../services/orders_cache_service.dart';
 import '../services/connectivity_service.dart';
@@ -22,6 +26,44 @@ class OrdersSyncService {
   final AppRepositoryFacade _facade = AppRepositoryFacade();
   final OrdersCacheService _cache = OrdersCacheService();
   final ConnectivityService _connectivity = ConnectivityService();
+  
+  StreamSubscription<ConnectionType>? _connectivitySubscription;
+  String? _currentUserId; // Track current user for auto-sync
+  bool _isInitialized = false;
+  bool _wasOffline = false; // Track previous offline state
+  
+  /// Initialize the service with connectivity listener
+  Future<void> init(String userId) async {
+    if (_isInitialized && _currentUserId == userId) return;
+    
+    _currentUserId = userId;
+    _isInitialized = true;
+    
+    // Cancel existing subscription
+    _connectivitySubscription?.cancel();
+    
+    // Listen to connectivity changes - IMMEDIATE sync on reconnection
+    _connectivitySubscription = _connectivity.connectionStream.listen((connectionType) async {
+      final isOnline = connectionType != ConnectionType.none;
+      
+      // Only sync when transitioning from offline to online
+      if (isOnline && _wasOffline && _currentUserId != null) {
+        debugPrint('🌐 [OrdersSync] Connection restored! Triggering immediate order sync...');
+        _wasOffline = false;
+        
+        // Push pending orders to Firestore
+        final syncedCount = await pushPendingOrders(_currentUserId!);
+        if (syncedCount > 0) {
+          debugPrint('✅ [OrdersSync] Synced $syncedCount pending orders to Firestore');
+        }
+      } else if (!isOnline) {
+        _wasOffline = true;
+        debugPrint('📴 [OrdersSync] Connection lost - will queue and sync when restored');
+      }
+    });
+    
+    debugPrint('👂 Orders sync listener started (connectivity)');
+  }
   
   /// Load orders with offline-first strategy
   /// 
@@ -213,5 +255,239 @@ class OrdersSyncService {
   /// Get cache metadata
   Future<Map<String, dynamic>?> getCacheMetadata(String userId) async {
     return await _cache.getCacheMetadata(userId);
+  }
+  
+  /// Add a new order to local cache and optionally sync to Firestore
+  /// 
+  /// This method is used by PaymentProcessingService to create orders offline-first
+  /// 
+  /// Parameters:
+  /// - order: The order to add
+  /// - userId: User ID
+  /// - medicines: List of medications for the order (for subcollection)
+  /// - pharmacyName: Pharmacy name (for cached display)
+  /// - pharmacyAddress: Pharmacy address (for cached display)
+  /// - syncImmediately: If true and online, sync to Firestore immediately
+  /// 
+  /// Returns the order with updated sync metadata
+  Future<Pedido> addOrderToCache({
+    required Pedido order,
+    required String userId,
+    required List<Map<String, dynamic>> medicines,
+    required String pharmacyName,
+    required String pharmacyAddress,
+    bool syncImmediately = true,
+  }) async {
+    debugPrint('📥 [OrdersQueue] Adding order to cache: ${order.id} (syncStatus: ${order.syncStatus})');
+    
+    // Enrich order with cached pharmacy data for offline display
+    final enrichedOrder = order.copyWith(
+      cachedPharmacyName: pharmacyName,
+      cachedPharmacyAddress: pharmacyAddress,
+    );
+    
+    // Cache medicines for this order (for later sync)
+    await _cache.cacheMedicinesForOrder(order.id, medicines);
+    debugPrint('💾 [OrdersQueue] Cached ${medicines.length} medicines for order ${order.id}');
+    
+    // Load current cached orders
+    final currentOrders = await _cache.getCachedOrders(userId, ignoreExpiry: true) ?? [];
+    
+    // Add new order to the beginning (most recent first)
+    final updatedOrders = [enrichedOrder, ...currentOrders];
+    
+    // Update cache
+    await _cache.cacheOrders(userId, updatedOrders);
+    
+    // Update UserSession for immediate UI update
+    UserSession().currentPedidos.value = updatedOrders;
+    
+    debugPrint('✅ [OrdersQueue] Order added to cache (${updatedOrders.length} total orders)');
+    
+    // Try to sync to Firestore if online and requested
+    if (syncImmediately) {
+      final isOnline = await _connectivity.checkConnectivity();
+      if (isOnline) {
+        debugPrint('🌐 [OrdersQueue] Online - attempting immediate sync for order ${order.id}');
+        try {
+          final syncedOrder = await _pushOrderToFirestore(
+            order: enrichedOrder,
+            userId: userId,
+            medicines: medicines,
+          );
+          
+          // Update cache with synced order
+          final index = updatedOrders.indexWhere((o) => o.id == order.id);
+          if (index != -1) {
+            updatedOrders[index] = syncedOrder;
+            await _cache.cacheOrders(userId, updatedOrders);
+            UserSession().currentPedidos.value = updatedOrders;
+          }
+          
+          debugPrint('✅ [OrdersQueue] Order ${order.id} synced immediately to Firestore');
+          return syncedOrder;
+        } catch (e) {
+          debugPrint('❌ [OrdersQueue] Immediate sync failed for order ${order.id}: $e');
+          debugPrint('📥 [OrdersQueue] Order queued for later sync (syncStatus: pending)');
+          // Return original order with pending status (already in cache)
+        }
+      } else {
+        debugPrint('📴 [OrdersQueue] Offline - order ${order.id} queued for sync when online (syncStatus: pending)');
+      }
+    }
+    
+    return enrichedOrder;
+  }
+  
+  /// Push a pending order to Firestore
+  /// 
+  /// Called by addOrderToCache or pushPendingOrders
+  /// Updates the order's sync metadata on success
+  Future<Pedido> _pushOrderToFirestore({
+    required Pedido order,
+    required String userId,
+    required List<Map<String, dynamic>> medicines,
+  }) async {
+    final now = DateTime.now();
+    
+    debugPrint('📤 [OrdersQueue] Pushing order ${order.id} to Firestore with ${medicines.length} medicines...');
+    
+    // Create order in Firestore
+    await _facade.createPedido(order, userId: userId);
+    
+    // Save medicines to subcollection
+    final firestore = FirebaseFirestore.instance;
+    for (final med in medicines) {
+      final medicamentoRef = firestore.collection('medicamentos_globales').doc(med['medicationId'] as String).path;
+      final medicamento = MedicamentoPedido(
+        id: med['medicationId'] as String,
+        pedidoId: order.id,
+        medicamentoRef: medicamentoRef,
+        nombre: med['medicationName'] as String,
+        cantidad: (med['quantity'] as num).toInt(),
+        precioUnitario: (med['pricePerUnit'] as num).toInt(),
+        total: (med['subtotal'] as num).toInt(),
+        userId: userId,
+      );
+      
+      await firestore
+          .collection('usuarios')
+          .doc(userId)
+          .collection('pedidos')
+          .doc(order.id)
+          .collection('medicamentos')
+          .doc(medicamento.id)
+          .set(medicamento.toMap());
+    }
+    
+    debugPrint('✅ [OrdersQueue] Order ${order.id} synced to Firestore with ${medicines.length} medicines');
+    
+    // Return order with updated sync metadata
+    return order.copyWith(
+      syncStatus: SyncStatus.synced,
+      firstSyncedAt: order.firstSyncedAt ?? now, // Only set if not already set
+    );
+  }
+  
+  /// Push all pending orders to Firestore
+  /// 
+  /// Called when connectivity returns or manually triggered
+  /// Returns the number of orders successfully synced
+  Future<int> pushPendingOrders(String userId) async {
+    debugPrint('🔄 [OrdersQueue] Pushing pending orders for user: $userId');
+    
+    // Check connectivity first
+    final isOnline = await _connectivity.checkConnectivity();
+    if (!isOnline) {
+      debugPrint('📴 [OrdersQueue] Offline - cannot push pending orders');
+      return 0;
+    }
+    
+    // Load cached orders
+    final cachedOrders = await _cache.getCachedOrders(userId, ignoreExpiry: true) ?? [];
+    
+    // Filter pending orders
+    final pendingOrders = cachedOrders.where((o) => o.syncStatus == SyncStatus.pending).toList();
+    
+    if (pendingOrders.isEmpty) {
+      debugPrint('✅ [OrdersQueue] No pending orders to sync');
+      return 0;
+    }
+    
+    debugPrint('🔄 [OrdersQueue] Found ${pendingOrders.length} pending orders to sync');
+    
+    int syncedCount = 0;
+    final updatedOrders = List<Pedido>.from(cachedOrders);
+    
+    for (final order in pendingOrders) {
+      try {
+        debugPrint('📤 [OrdersQueue] Syncing order ${order.id}...');
+        
+        // Retrieve cached medicines for this order
+        final medicines = await _cache.getCachedMedicinesForOrder(order.id);
+        
+        if (medicines == null || medicines.isEmpty) {
+          debugPrint('⚠️ [OrdersQueue] No cached medicines found for order ${order.id} - creating order without medicines');
+          // Create order without medicines (edge case - should not happen in normal flow)
+          await _facade.createPedido(order, userId: userId);
+        } else {
+          // Sync order with medicines using _pushOrderToFirestore
+          final syncedOrder = await _pushOrderToFirestore(
+            order: order,
+            userId: userId,
+            medicines: medicines,
+          );
+          
+          // Update in the list
+          final index = updatedOrders.indexWhere((o) => o.id == order.id);
+          if (index != -1) {
+            updatedOrders[index] = syncedOrder;
+          }
+          
+          syncedCount++;
+          debugPrint('✅ [OrdersQueue] Order ${order.id} synced successfully (${syncedCount}/${pendingOrders.length})');
+          continue;
+        }
+        
+        // Fallback: mark as synced even without medicines
+        final now = DateTime.now();
+        final syncedOrder = order.copyWith(
+          syncStatus: SyncStatus.synced,
+          firstSyncedAt: order.firstSyncedAt ?? now,
+        );
+        
+        // Update in the list
+        final index = updatedOrders.indexWhere((o) => o.id == order.id);
+        if (index != -1) {
+          updatedOrders[index] = syncedOrder;
+        }
+        
+        syncedCount++;
+        debugPrint('✅ [OrdersQueue] Order ${order.id} synced (without medicines)');
+      } catch (e) {
+        debugPrint('❌ [OrdersQueue] Failed to sync order ${order.id}: $e');
+        
+        // Mark as failed
+        final index = updatedOrders.indexWhere((o) => o.id == order.id);
+        if (index != -1) {
+          updatedOrders[index] = order.copyWith(syncStatus: SyncStatus.failed);
+        }
+      }
+    }
+    
+    // Update cache with synced orders
+    if (syncedCount > 0 || updatedOrders.any((o) => o.syncStatus == SyncStatus.failed)) {
+      await _cache.cacheOrders(userId, updatedOrders);
+      UserSession().currentPedidos.value = updatedOrders;
+      debugPrint('✅ [OrdersQueue] Updated cache with sync results (${syncedCount}/${pendingOrders.length} synced)');
+    }
+    
+    return syncedCount;
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    debugPrint('🗑️ OrdersSyncService disposed');
   }
 }

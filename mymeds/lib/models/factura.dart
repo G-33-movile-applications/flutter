@@ -22,6 +22,7 @@ class Factura {
   final DateTime updatedAt; // Last update timestamp
   final int? syncedAt; // Unix timestamp when synced to cloud (nullable)
   final String userId;
+  final String paymentId; // Payment ID that generated this bill
   final String orderId;
   final int pageCount; // Number of pages in PDF
   final int fileSize; // File size in bytes
@@ -45,6 +46,7 @@ class Factura {
     required this.updatedAt,
     this.syncedAt,
     required this.userId,
+    required this.paymentId,
     required this.orderId,
     required this.pageCount,
     required this.fileSize,
@@ -75,6 +77,7 @@ class Factura {
           : DateTime.now(),
       syncedAt: map['syncedAt'],
       userId: map['userId'] ?? '',
+      paymentId: map['paymentId'] ?? '',
       orderId: map['orderId'] ?? '',
       pageCount: map['pageCount'] ?? 1,
       fileSize: map['fileSize'] ?? 0,
@@ -102,6 +105,7 @@ class Factura {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'syncedAt': syncedAt,
       'userId': userId,
+      'paymentId': paymentId,
       'orderId': orderId,
       'pageCount': pageCount,
       'fileSize': fileSize,
@@ -135,6 +139,7 @@ class Factura {
     DateTime? updatedAt,
     int? syncedAt,
     String? userId,
+    String? paymentId,
     String? orderId,
     int? pageCount,
     int? fileSize,
@@ -158,6 +163,7 @@ class Factura {
       updatedAt: updatedAt ?? this.updatedAt,
       syncedAt: syncedAt ?? this.syncedAt,
       userId: userId ?? this.userId,
+      paymentId: paymentId ?? this.paymentId,
       orderId: orderId ?? this.orderId,
       pageCount: pageCount ?? this.pageCount,
       fileSize: fileSize ?? this.fileSize,

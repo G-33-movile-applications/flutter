@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/pedido.dart';
 import '../services/orders_cache_service.dart';
 
 /// Analytics service for computing offline order sync statistics
